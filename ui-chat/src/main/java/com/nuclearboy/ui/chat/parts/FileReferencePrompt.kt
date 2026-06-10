@@ -8,6 +8,36 @@ internal fun buildFileReferencePrompt(
     return "请阅读项目文件 `$relativePath`，并结合我的要求继续处理："
 }
 
+internal fun buildFileReferencesPrompt(
+    filePaths: List<String>,
+    projectRoot: String,
+): String {
+    val relativePaths = filePaths
+        .map { projectRelativeFilePath(it, projectRoot) }
+        .distinct()
+    return if (relativePaths.size == 1) {
+        "请阅读项目文件 `${relativePaths.first()}`，并结合我的要求继续处理："
+    } else {
+        buildString {
+            appendLine("请阅读以下项目文件，并结合我的要求继续处理：")
+            relativePaths.forEach { path ->
+                appendLine("- `$path`")
+            }
+        }.trimEnd()
+    }
+}
+
+internal fun toggleSelectedFilePath(
+    selectedPaths: List<String>,
+    filePath: String,
+): List<String> {
+    return if (filePath in selectedPaths) {
+        selectedPaths.filterNot { it == filePath }
+    } else {
+        selectedPaths + filePath
+    }
+}
+
 internal fun appendToChatDraft(
     currentDraft: String,
     addition: String,

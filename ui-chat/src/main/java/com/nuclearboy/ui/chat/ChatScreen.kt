@@ -59,16 +59,19 @@ import com.nuclearboy.ui.chat.components.FileReferenceIconButton
 import com.nuclearboy.ui.chat.components.FileReferenceTextButton
 import com.nuclearboy.ui.chat.components.FilePanelSearchField
 import com.nuclearboy.ui.chat.components.FilePanelSortBar
+import com.nuclearboy.ui.chat.components.FileSelectionActionBar
 import com.nuclearboy.ui.chat.components.ScrollToBottomAction
 import com.nuclearboy.ui.chat.parts.appendToChatDraft
 import com.nuclearboy.ui.chat.parts.buildFilePanelOverview
 import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
+import com.nuclearboy.ui.chat.parts.buildFileReferencesPrompt
 import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
 import com.nuclearboy.ui.chat.parts.FilePanelSortMode
 import com.nuclearboy.ui.chat.parts.sortFilePanelEntries
 import com.nuclearboy.ui.chat.parts.shouldFollowChatScroll
 import com.nuclearboy.ui.chat.parts.shouldShowJumpToBottom
+import com.nuclearboy.ui.chat.parts.toggleSelectedFilePath
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -361,6 +364,16 @@ fun ChatScreen(
                     inputFocusRequest++
                     Toast.makeText(context, "已引用: ${file.name}", Toast.LENGTH_SHORT).show()
                 },
+                onReferenceFiles = { files ->
+                    val prompt = buildFileReferencesPrompt(
+                        filePaths = files.map { it.path },
+                        projectRoot = viewModel.getProjectRoot(),
+                    )
+                    inputDraft = appendToChatDraft(inputDraft, prompt)
+                    showFiles = false
+                    inputFocusRequest++
+                    Toast.makeText(context, "已引用 ${files.size} 个文件", Toast.LENGTH_SHORT).show()
+                },
             )
         }
     } // Box
@@ -377,6 +390,7 @@ private fun ProjectFilePanel(
     context: Context,
     onClose: () -> Unit = {},
     onReferenceFile: (FileInfo) -> Unit = {},
+    onReferenceFiles: (List<FileInfo>) -> Unit = {},
 ) {
     val nc = NuclearBoyTheme.colorScheme
     val fileListState = rememberLazyListState()
@@ -387,6 +401,8 @@ private fun ProjectFilePanel(
     var previewContent by remember { mutableStateOf<String?>(null) }
     var filterQuery by rememberSaveable(browseDir) { mutableStateOf("") }
     var sortMode by rememberSaveable(browseDir) { mutableStateOf(FilePanelSortMode.Name) }
+    var selectedFilePaths by rememberSaveable(browseDir) { mutableStateOf(emptyList<String>()) }
+    val selectedPathSet = remember(selectedFilePaths) { selectedFilePaths.toSet() }
     val filteredFiles = remember(files, filterQuery) {
         filterFilePanelEntries(files, filterQuery)
     }
@@ -395,6 +411,12 @@ private fun ProjectFilePanel(
     }
     val filePanelOverview = remember(visibleFiles) {
         buildFilePanelOverview(visibleFiles)
+    }
+    val selectedFiles = remember(files, selectedPathSet, sortMode) {
+        sortFilePanelEntries(
+            files.filter { !it.isDirectory && it.path in selectedPathSet },
+            sortMode,
+        )
     }
     val filterSummary = remember(files.size, visibleFiles.size, filterQuery) {
         filePanelFilterSummary(
@@ -406,6 +428,14 @@ private fun ProjectFilePanel(
 
     LaunchedEffect(browseDir, filterQuery, sortMode) {
         fileListState.scrollToItem(0)
+    }
+
+    LaunchedEffect(files) {
+        val validPaths = files.asSequence()
+            .filterNot { it.isDirectory }
+            .map { it.path }
+            .toSet()
+        selectedFilePaths = selectedFilePaths.filter { it in validPaths }
     }
 
     Surface(
@@ -481,6 +511,17 @@ private fun ProjectFilePanel(
                     onModeSelected = { sortMode = it },
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
+                if (selectedFiles.isNotEmpty()) {
+                    FileSelectionActionBar(
+                        selectedCount = selectedFiles.size,
+                        onReferenceSelected = {
+                            onReferenceFiles(selectedFiles)
+                            selectedFilePaths = emptyList()
+                        },
+                        onClearSelection = { selectedFilePaths = emptyList() },
+                        modifier = Modifier.padding(bottom = 6.dp),
+                    )
+                }
             }
             // File list
             if (files.isEmpty()) {
@@ -503,6 +544,7 @@ private fun ProjectFilePanel(
                         items(visibleFiles, key = { it.path }) { file ->
                             FileRow(
                                 file = file, projectRoot = projectRoot, context = context,
+                                isSelected = file.path in selectedPathSet,
                                 onClick = {
                                     if (file.isDirectory) onNavigateTo(file.name)
                                     else {
@@ -513,6 +555,12 @@ private fun ProjectFilePanel(
                                     }
                                 },
                                 onReference = { onReferenceFile(file) },
+                                onSelectionToggle = {
+                                    selectedFilePaths = toggleSelectedFilePath(
+                                        selectedPaths = selectedFilePaths,
+                                        filePath = file.path,
+                                    )
+                                },
                             )
                         }
                     }
@@ -653,8 +701,10 @@ private fun ProjectFilePanel(
 @Composable
 private fun FileRow(
     file: FileInfo, projectRoot: String, context: Context,
+    isSelected: Boolean = false,
     onClick: () -> Unit,
     onReference: () -> Unit = {},
+    onSelectionToggle: () -> Unit = {},
 ) {
     val nc = NuclearBoyTheme.colorScheme
     Row(
@@ -675,6 +725,17 @@ private fun FileRow(
             color = nc.material.onSurfaceVariant.copy(alpha = 0.6f))
         if (!file.isDirectory) {
             Spacer(Modifier.width(4.dp))
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = { onSelectionToggle() },
+                modifier = Modifier.size(26.dp),
+                colors = CheckboxDefaults.colors(
+                    checkedColor = nc.material.primary,
+                    uncheckedColor = nc.material.onSurfaceVariant.copy(alpha = 0.65f),
+                    checkmarkColor = nc.material.onPrimary,
+                ),
+            )
+            Spacer(Modifier.width(2.dp))
             FileReferenceIconButton(onClick = onReference)
         }
     }
