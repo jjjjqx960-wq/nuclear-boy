@@ -116,6 +116,26 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `file selection action bar stays visible when hidden selection exists`() {
+        val shouldShow = shouldShowFileSelectionActionBar(
+            selectedCount = 2,
+            visibleFileCount = 0,
+        )
+
+        assertEquals(true, shouldShow)
+    }
+
+    @Test
+    fun `file selection action bar hides when nothing is selectable or selected`() {
+        val shouldShow = shouldShowFileSelectionActionBar(
+            selectedCount = 0,
+            visibleFileCount = 0,
+        )
+
+        assertEquals(false, shouldShow)
+    }
+
+    @Test
     fun `file selection status label shows selected visible progress`() {
         val label = fileSelectionStatusLabel(
             selectedCount = 7,

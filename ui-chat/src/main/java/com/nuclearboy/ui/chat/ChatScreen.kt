@@ -74,6 +74,7 @@ import com.nuclearboy.ui.chat.parts.selectVisibleFilePaths
 import com.nuclearboy.ui.chat.parts.selectedFilePanelEntries
 import com.nuclearboy.ui.chat.parts.sortFilePanelEntries
 import com.nuclearboy.ui.chat.parts.shouldFollowChatScroll
+import com.nuclearboy.ui.chat.parts.shouldShowFileSelectionActionBar
 import com.nuclearboy.ui.chat.parts.shouldShowJumpToBottom
 import com.nuclearboy.ui.chat.parts.toggleSelectedFilePath
 import com.nuclearboy.ui.chat.parts.unselectHiddenFilePaths
@@ -440,6 +441,12 @@ private fun ProjectFilePanel(
     val selectedVisibleCount = remember(visibleSelectableFiles, selectedPathSet) {
         visibleSelectableFiles.count { it.path in selectedPathSet }
     }
+    val shouldShowSelectionActionBar = remember(selectedFiles.size, visibleSelectableFiles.size) {
+        shouldShowFileSelectionActionBar(
+            selectedCount = selectedFiles.size,
+            visibleFileCount = visibleSelectableFiles.size,
+        )
+    }
     val selectionStatusLabel = remember(
         selectedFiles.size,
         selectedVisibleCount,
@@ -552,40 +559,40 @@ private fun ProjectFilePanel(
                     onModeSelected = { sortMode = it },
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
-                if (visibleSelectableFiles.isNotEmpty()) {
-                    FileSelectionActionBar(
-                        selectedCount = selectedFiles.size,
-                        selectedVisibleCount = selectedVisibleCount,
-                        statusLabel = selectionStatusLabel,
-                        visibleFileCount = visibleSelectableFiles.size,
-                        showSelectedOnly = showSelectedOnly,
-                        onSelectVisible = {
-                            selectedFilePaths = selectVisibleFilePaths(
-                                selectedPaths = selectedFilePaths,
-                                visibleFiles = visibleFiles,
-                            )
-                        },
-                        onUnselectVisible = {
-                            selectedFilePaths = unselectVisibleFilePaths(
-                                selectedPaths = selectedFilePaths,
-                                visibleFiles = visibleFiles,
-                            )
-                        },
-                        onUnselectHidden = {
-                            selectedFilePaths = unselectHiddenFilePaths(
-                                selectedPaths = selectedFilePaths,
-                                visibleFiles = visibleFiles,
-                            )
-                        },
-                        onShowSelectedOnlyChange = { showSelectedOnly = it },
-                        onReferenceSelected = {
-                            onReferenceFiles(selectedFiles)
-                            selectedFilePaths = emptyList()
-                        },
-                        onClearSelection = { selectedFilePaths = emptyList() },
-                        modifier = Modifier.padding(bottom = 6.dp),
-                    )
-                }
+            }
+            if (shouldShowSelectionActionBar) {
+                FileSelectionActionBar(
+                    selectedCount = selectedFiles.size,
+                    selectedVisibleCount = selectedVisibleCount,
+                    statusLabel = selectionStatusLabel,
+                    visibleFileCount = visibleSelectableFiles.size,
+                    showSelectedOnly = showSelectedOnly,
+                    onSelectVisible = {
+                        selectedFilePaths = selectVisibleFilePaths(
+                            selectedPaths = selectedFilePaths,
+                            visibleFiles = visibleFiles,
+                        )
+                    },
+                    onUnselectVisible = {
+                        selectedFilePaths = unselectVisibleFilePaths(
+                            selectedPaths = selectedFilePaths,
+                            visibleFiles = visibleFiles,
+                        )
+                    },
+                    onUnselectHidden = {
+                        selectedFilePaths = unselectHiddenFilePaths(
+                            selectedPaths = selectedFilePaths,
+                            visibleFiles = visibleFiles,
+                        )
+                    },
+                    onShowSelectedOnlyChange = { showSelectedOnly = it },
+                    onReferenceSelected = {
+                        onReferenceFiles(selectedFiles)
+                        selectedFilePaths = emptyList()
+                    },
+                    onClearSelection = { selectedFilePaths = emptyList() },
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
             }
             // File list
             if (files.isEmpty()) {

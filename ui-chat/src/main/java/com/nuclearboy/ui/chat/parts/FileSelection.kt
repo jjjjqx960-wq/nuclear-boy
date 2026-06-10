@@ -51,6 +51,13 @@ internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
         .sumOf { it.size.coerceAtLeast(0L) }
 }
 
+internal fun shouldShowFileSelectionActionBar(
+    selectedCount: Int,
+    visibleFileCount: Int,
+): Boolean {
+    return selectedCount > 0 || visibleFileCount > 0
+}
+
 internal fun fileSelectionStatusLabel(
     selectedCount: Int,
     selectedVisibleCount: Int,
