@@ -68,6 +68,7 @@ import com.nuclearboy.ui.chat.parts.buildFileReferencesPrompt
 import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
 import com.nuclearboy.ui.chat.parts.FilePanelSortMode
+import com.nuclearboy.ui.chat.parts.selectedFileTotalSizeBytes
 import com.nuclearboy.ui.chat.parts.selectVisibleFilePaths
 import com.nuclearboy.ui.chat.parts.selectedFilePanelEntries
 import com.nuclearboy.ui.chat.parts.sortFilePanelEntries
@@ -425,6 +426,9 @@ private fun ProjectFilePanel(
     val visibleFiles = remember(sortedFilteredFiles, selectedFiles, showSelectedOnly) {
         if (showSelectedOnly) selectedFiles else sortedFilteredFiles
     }
+    val selectedTotalSizeLabel = remember(selectedFiles) {
+        selectedFileTotalSizeBytes(selectedFiles).toFileSizeString()
+    }
     val filePanelOverview = remember(visibleFiles) {
         buildFilePanelOverview(visibleFiles)
     }
@@ -537,6 +541,7 @@ private fun ProjectFilePanel(
                     FileSelectionActionBar(
                         selectedCount = selectedFiles.size,
                         selectedVisibleCount = selectedVisibleCount,
+                        selectedSizeLabel = selectedTotalSizeLabel,
                         visibleFileCount = visibleSelectableFiles.size,
                         showSelectedOnly = showSelectedOnly,
                         onSelectVisible = {

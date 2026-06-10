@@ -34,6 +34,12 @@ internal fun unselectVisibleFilePaths(
     return selectedPaths.filterNot { it in visibleFilePathSet }
 }
 
+internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
+    return files
+        .filterNot { it.isDirectory }
+        .sumOf { it.size.coerceAtLeast(0L) }
+}
+
 internal fun selectedFilePanelEntries(
     files: List<FileInfo>,
     selectedPaths: List<String>,

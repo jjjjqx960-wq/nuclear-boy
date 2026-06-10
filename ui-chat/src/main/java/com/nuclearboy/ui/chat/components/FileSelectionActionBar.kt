@@ -37,6 +37,7 @@ import com.nuclearboy.ui.chat.NuclearBoyTheme
 internal fun FileSelectionActionBar(
     selectedCount: Int,
     selectedVisibleCount: Int,
+    selectedSizeLabel: String,
     visibleFileCount: Int,
     showSelectedOnly: Boolean,
     onSelectVisible: () -> Unit,
@@ -61,7 +62,11 @@ internal fun FileSelectionActionBar(
             val hasSelection = selectedCount > 0
             val canUnselectVisible = hasSelection && selectedVisibleCount > 0 && !showSelectedOnly
             Text(
-                text = if (hasSelection) "已选 $selectedCount 个" else "可选 $visibleFileCount 个",
+                text = if (hasSelection) {
+                    "已选 $selectedCount 个 · $selectedSizeLabel"
+                } else {
+                    "可选 $visibleFileCount 个"
+                },
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontFamily = FontFamily.Monospace,

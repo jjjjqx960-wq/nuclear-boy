@@ -86,4 +86,18 @@ class FileReferencePromptTest {
 
         assertEquals(listOf("README.md"), entries.map { it.path })
     }
+
+    @Test
+    fun `selected file total size skips directories and negative sizes`() {
+        val totalSize = selectedFileTotalSizeBytes(
+            files = listOf(
+                FileInfo(path = "app/src", name = "src", size = 4096, isDirectory = true),
+                FileInfo(path = "app/src/Main.kt", name = "Main.kt", extension = "kt", size = 1024),
+                FileInfo(path = "README.md", name = "README.md", extension = "md", size = 2048),
+                FileInfo(path = "broken.bin", name = "broken.bin", extension = "bin", size = -1),
+            ),
+        )
+
+        assertEquals(3072L, totalSize)
+    }
 }
