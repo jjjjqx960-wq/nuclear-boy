@@ -1,0 +1,24 @@
+## 目录职责
+
+`chat` 是 `ui-chat` 的部件层源码目录，承载聊天屏幕、聊天 ViewModel、消息渲染、输入区和 Token HUD 等用户聊天工作流。
+
+## 边界
+
+这里可以组合组件层与下游业务模块形成完整聊天体验，但新增可复用数据和局部 UI 应先下沉到 `parts` 或 `components`。
+
+## 允许依赖
+
+允许依赖 `components`、`parts`、`common`、`api-deepseek`、`agent-core`、`skills`、`tools-docgen`、`memory` 和 Compose/Hilt 相关库。
+
+## 禁止事项
+
+不要在 UI 文案、日志或系统消息中复述明文 Token、密码、签名密钥或完整个人数据。不要把模型协议、文件系统细节或工具执行逻辑写进屏幕组件。
+
+## 常用命令
+
+- `./gradlew :ui-chat:compileDebugKotlin`
+- `./gradlew :app:assembleDebug`
+
+## 验证方式
+
+重点验证普通发送、快捷命令、`/goal`、`/loop`、`/stop`、`/compact`、`/rewind`、消息持久化和流式状态更新。

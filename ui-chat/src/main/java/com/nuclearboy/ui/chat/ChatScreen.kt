@@ -32,9 +32,12 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.common.*
+import com.nuclearboy.ui.chat.components.CommandShortcutBar
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -196,6 +200,7 @@ fun ChatScreen(
                 onSend = { text -> viewModel.sendMessage(text) },
                 onCancel = { viewModel.cancelCurrentOperation() },
                 fileCount = viewModel.projectFiles.collectAsState().value.size,
+                hasMessages = uiState.messages.any { it.role != MessageRole.SYSTEM },
                 placeholder = if (projectId == "__general__") "和核弹男孩对话…" else "输入指令…",
                 onAttachFile = {
                     android.util.Log.e("NuclearBoy", "[ChatScreen] filePicker launched")
@@ -826,11 +831,13 @@ private fun TypingPrompt(text: String, color: Color) {
 private fun ChatInputBar(
     isProcessing: Boolean, onSend: (String) -> Unit, onCancel: () -> Unit,
     fileCount: Int = 0,
+    hasMessages: Boolean = false,
     onAttachFile: (() -> Unit)? = null,
     placeholder: String = "输入指令…",
 ) {
-    var text by remember { mutableStateOf("") }
+    var text by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
     val nc = NuclearBoyTheme.colorScheme
 
     Surface(
@@ -840,16 +847,47 @@ private fun ChatInputBar(
         shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
         border = BorderStroke(2.dp, nc.material.outline.copy(alpha = 0.3f)),
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
                 .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
+            CommandShortcutBar(
+                isProcessing = isProcessing,
+                hasMessages = hasMessages,
+                onCommandSelected = { command ->
+                    if (command.submitImmediately) {
+                        text = ""
+                        focusManager.clearFocus()
+                        if (command.commandText == "/stop") onCancel() else onSend(command.commandText)
+                    } else {
+                        text = command.commandText
+                        focusRequester.requestFocus()
+                    }
+                },
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
             // Attach file button
             if (onAttachFile != null && !isProcessing) {
                 IconButton(onClick = onAttachFile, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.AttachFile, "添加附件", modifier = Modifier.size(18.dp),
-                        tint = nc.material.onSurfaceVariant)
+                    BadgedBox(
+                        badge = {
+                            if (fileCount > 0) {
+                                Badge(containerColor = nc.material.primary, contentColor = Color.Black) {
+                                    Text(
+                                        fileCount.coerceAtMost(99).toString(),
+                                        fontSize = 8.sp,
+                                    )
+                                }
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Default.AttachFile, "添加附件", modifier = Modifier.size(18.dp),
+                            tint = nc.material.onSurfaceVariant)
+                    }
                 }
             }
 
@@ -860,7 +898,7 @@ private fun ChatInputBar(
 
             OutlinedTextField(
                 value = text, onValueChange = { text = it },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).focusRequester(focusRequester),
                 placeholder = { Text(placeholder, style = MaterialTheme.typography.bodyMedium.copy(
                     fontFamily = FontFamily.Monospace, fontSize = 13.sp,
                     color = nc.material.onSurfaceVariant.copy(alpha = 0.4f))) },
@@ -895,6 +933,7 @@ private fun ChatInputBar(
                     Icon(Icons.AutoMirrored.Filled.Send, "发送", modifier = Modifier.size(16.dp),
                         tint = if (canSend) Color.Black else nc.material.onSurfaceVariant.copy(alpha = 0.3f))
                 }
+            }
             }
         }
     }

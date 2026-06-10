@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.2
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.3
 
 ---
 
@@ -32,6 +32,12 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.3 重点
+
+- 聊天输入区新增命令快捷栏，常用 `/goal`、`/loop`、`/compact`、`/rewind`、`/model` 和停止任务入口可一键触达。
+- 附件入口显示当前项目文件数量角标，减少打开文件面板前的信息盲区。
+- 按零件/组件/部件分层补齐聊天快捷命令目录说明和更新日志。
 
 ## 1.0.2 重点
 
