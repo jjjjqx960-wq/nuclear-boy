@@ -63,11 +63,17 @@ internal fun fileSelectionStatusLabel(
     selectedVisibleCount: Int,
     visibleFileCount: Int,
     selectedSizeLabel: String,
+    showSelectedOnly: Boolean = false,
+    hasFilterQuery: Boolean = false,
 ): String {
     return if (selectedCount > 0) {
-        val hiddenSelectedCount = (selectedCount - selectedVisibleCount).coerceAtLeast(0)
-        val hiddenLabel = if (hiddenSelectedCount > 0) " · 隐藏 $hiddenSelectedCount" else ""
-        "已选 $selectedCount 个 · $selectedSizeLabel · 可见 $selectedVisibleCount/$visibleFileCount$hiddenLabel"
+        if (showSelectedOnly && hasFilterQuery) {
+            "已选 $selectedCount 个 · $selectedSizeLabel · 匹配 $selectedVisibleCount/$selectedCount"
+        } else {
+            val hiddenSelectedCount = (selectedCount - selectedVisibleCount).coerceAtLeast(0)
+            val hiddenLabel = if (hiddenSelectedCount > 0) " · 隐藏 $hiddenSelectedCount" else ""
+            "已选 $selectedCount 个 · $selectedSizeLabel · 可见 $selectedVisibleCount/$visibleFileCount$hiddenLabel"
+        }
     } else {
         "可选 $visibleFileCount 个"
     }

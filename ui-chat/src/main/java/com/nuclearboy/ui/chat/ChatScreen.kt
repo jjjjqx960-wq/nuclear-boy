@@ -458,12 +458,16 @@ private fun ProjectFilePanel(
         selectedVisibleCount,
         visibleSelectableFiles.size,
         selectedTotalSizeLabel,
+        showSelectedOnly,
+        filterQuery,
     ) {
         fileSelectionStatusLabel(
             selectedCount = selectedFiles.size,
             selectedVisibleCount = selectedVisibleCount,
             visibleFileCount = visibleSelectableFiles.size,
             selectedSizeLabel = selectedTotalSizeLabel,
+            showSelectedOnly = showSelectedOnly,
+            hasFilterQuery = filterQuery.isNotBlank(),
         )
     }
     val filterSummary = remember(files.size, filteredFiles.size, filterQuery) {

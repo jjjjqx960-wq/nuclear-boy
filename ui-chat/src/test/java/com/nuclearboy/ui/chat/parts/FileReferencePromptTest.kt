@@ -160,6 +160,20 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `file selection status label shows selected match progress in selected only filter mode`() {
+        val label = fileSelectionStatusLabel(
+            selectedCount = 7,
+            selectedVisibleCount = 3,
+            visibleFileCount = 3,
+            selectedSizeLabel = "12 KB",
+            showSelectedOnly = true,
+            hasFilterQuery = true,
+        )
+
+        assertEquals("已选 7 个 · 12 KB · 匹配 3/7", label)
+    }
+
+    @Test
     fun `file selection status label stays compact without selection`() {
         val label = fileSelectionStatusLabel(
             selectedCount = 0,
