@@ -2,6 +2,6 @@
 <paths>
     <cache-path name="generated_docs" path="documents/" />
     <external-files-path name="workspace" path="NuclearBoy/" />
-    <files-path name="sandbox_output" path="sandbox/" />
+    <files-path name="python_output" path="python/" />
     <external-files-path name="downloads" path="Download/" />
 </paths>

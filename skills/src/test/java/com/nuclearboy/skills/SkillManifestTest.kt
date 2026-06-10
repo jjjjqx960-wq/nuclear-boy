@@ -10,7 +10,7 @@ class SkillManifestTest {
         val param = SkillParameter("name", "string", "Name", required = true)
         assertTrue(param.validate("hello"))
         assertTrue(param.validate("123"))
-        assertTrue(param.validate(""))
+        assertFalse(param.validate(""))
     }
 
     @Test
@@ -82,19 +82,19 @@ class SkillManifestTest {
     @Test
     fun `filesystem permissions glob matching`() {
         // workspace/** matches workspace/ and subdirectories
-        assertTrue(FilesystemPermissions.matchesGlob("workspace/**", "workspace/test.py"))
-        assertTrue(FilesystemPermissions.matchesGlob("workspace/**", "workspace/sub/dir/file.txt"))
-        assertTrue(FilesystemPermissions.matchesGlob("workspace/**", "workspace/"))
-        assertFalse(FilesystemPermissions.matchesGlob("workspace/**", "/etc/passwd"))
-        assertFalse(FilesystemPermissions.matchesGlob("workspace/**", "../outside.txt"))
-        assertFalse(FilesystemPermissions.matchesGlob("workspace/**", "workspace/../../outside.txt"))
+        assertTrue(FilesystemPermissions.matchesGlob("workspace/test.py", "workspace/**"))
+        assertTrue(FilesystemPermissions.matchesGlob("workspace/sub/dir/file.txt", "workspace/**"))
+        assertTrue(FilesystemPermissions.matchesGlob("workspace/", "workspace/**"))
+        assertFalse(FilesystemPermissions.matchesGlob("/etc/passwd", "workspace/**"))
+        assertFalse(FilesystemPermissions.matchesGlob("../outside.txt", "workspace/**"))
+        assertFalse(FilesystemPermissions.matchesGlob("workspace/../../outside.txt", "workspace/**"))
     }
 
     @Test
     fun `filesystem permissions single wildcard`() {
-        assertTrue(FilesystemPermissions.matchesGlob("*.py", "test.py"))
-        assertFalse(FilesystemPermissions.matchesGlob("*.py", "test.txt"))
-        assertFalse(FilesystemPermissions.matchesGlob("*.py", "dir/test.py"))
+        assertTrue(FilesystemPermissions.matchesGlob("test.py", "*.py"))
+        assertFalse(FilesystemPermissions.matchesGlob("test.txt", "*.py"))
+        assertFalse(FilesystemPermissions.matchesGlob("dir/test.py", "*.py"))
     }
 
     @Test

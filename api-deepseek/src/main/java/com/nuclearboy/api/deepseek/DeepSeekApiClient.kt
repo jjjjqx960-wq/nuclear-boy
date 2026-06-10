@@ -3,17 +3,15 @@ package com.nuclearboy.api.deepseek
 import com.nuclearboy.common.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
-import java.io.BufferedReader
 import java.io.IOException
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
-import javax.net.ssl.X509TrustManager
 
 /**
  * Main DeepSeek API client.
@@ -32,6 +30,7 @@ class DeepSeekApiClient(
     val contextManager: ContextWindowManager = ContextWindowManager(),
     private val baseUrlProvider: () -> String = { AppConstants.DEEPSEEK_BASE_URL },
     private val modelOverrideProvider: () -> String? = { null },
+    private val providerProtocolProvider: () -> ProviderProtocol = { ProviderProtocol.OPENAI },
 ) {
 
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
@@ -44,25 +43,9 @@ class DeepSeekApiClient(
 
     private val random = SecureRandom()
 
+    private val internalProtocolHeader = "X-NuclearBoy-Provider-Protocol"
+
     private val client: OkHttpClient by lazy {
-        val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(
-            @Suppress("CustomX509TrustManager")
-            object : X509TrustManager {
-                override fun checkClientTrusted(
-                    chain: Array<out java.security.cert.X509Certificate>?,
-                    authType: String?
-                ) {}
-                override fun checkServerTrusted(
-                    chain: Array<out java.security.cert.X509Certificate>?,
-                    authType: String?
-                ) {}
-                override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
-            }
-        )
-
-        val sslContext = javax.net.ssl.SSLContext.getInstance("TLSv1.3")
-        sslContext.init(null, trustAllCerts, SecureRandom())
-
         OkHttpClient.Builder()
             .connectTimeout(AppConstants.REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(AppConstants.REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -72,18 +55,35 @@ class DeepSeekApiClient(
                 val apiKey = apiKeyProvider() ?: run {
                     throw IOException("API Key not configured")
                 }
-                val request = chain.request().newBuilder()
-                    .addHeader("Authorization", "Bearer $apiKey")
+                val providerProtocol = chain.request().header(internalProtocolHeader)
+                val requestBuilder = chain.request().newBuilder()
+                    .removeHeader(internalProtocolHeader)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "text/event-stream")
-                    .build()
-                chain.proceed(request)
+                if (apiKey.isNotBlank()) {
+                    if (providerProtocol == ProviderProtocol.ANTHROPIC.name) {
+                        requestBuilder.addHeader("x-api-key", apiKey)
+                        requestBuilder.addHeader("anthropic-version", "2023-06-01")
+                    } else {
+                        requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+                    }
+                }
+                chain.proceed(requestBuilder.build())
             }
             .addInterceptor(HttpLoggingInterceptor().apply {
+                redactHeader("Authorization")
+                redactHeader("x-api-key")
                 level = HttpLoggingInterceptor.Level.HEADERS
             })
-            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
-            .hostnameVerifier { _, _ -> true }
+            .build()
+    }
+
+    private val diagnosticClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .build()
     }
 
@@ -100,6 +100,11 @@ class DeepSeekApiClient(
         tools: List<ToolDefinitionDto>? = null,
     ): Flow<StreamEvent> = flow {
         val model = modelOverrideProvider() ?: modelTier.modelId
+        val activeProtocol = activeProviderProtocol(model)
+        if (activeProtocol == ProviderProtocol.ANTHROPIC) {
+            emitAll(streamAnthropicChat(messages, model, modelTier, tools))
+            return@flow
+        }
         val request = buildRequest(messages, model, thinkingMode, tools, stream = true)
         android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() ENTRY model=$model msgs=${messages.size} tools=${tools?.size ?: 0} thinking=$thinkingMode stream=true")
         val clientStartMs = System.currentTimeMillis()
@@ -170,22 +175,16 @@ class DeepSeekApiClient(
                                     emit(StreamEvent.Content(delta.content, isReasoning = false))
                                     tokenTracker.onStreamToken(isReasoning = false)
                                 }
-                                delta.toolCalls?.forEach { toolDelta ->
+                                delta.toolCalls?.takeIf { it.isNotEmpty() }?.let { toolDeltas ->
                                     toolCallsDetected = true
-                                    val id = toolDelta.id
-                                    if (id != null) {
-                                        emit(StreamEvent.ToolCallRequest(
-                                            listOf(ToolCallDto(id = id, function = FunctionCallDto(
-                                                name = toolDelta.function?.name ?: "",
-                                                arguments = toolDelta.function?.arguments ?: "")))))
-                                    } else {
-                                        val fnArgs = toolDelta.function?.arguments
-                                        if (fnArgs != null) {
-                                            emit(StreamEvent.ToolCallDelta(listOf(ToolCallDeltaDto(
-                                                index = toolDelta.index, function = FunctionCallDeltaDto(arguments = fnArgs)
-                                            ))))
-                                        }
-                                    }
+                                    emit(StreamEvent.ToolCallDelta(toolDeltas.map { toolDelta ->
+                                        ToolCallDeltaDto(
+                                            index = toolDelta.index,
+                                            id = toolDelta.id,
+                                            type = toolDelta.type,
+                                            function = toolDelta.function,
+                                        )
+                                    }))
                                 }
                             }
                         } catch (_: Exception) { continue }
@@ -213,7 +212,7 @@ class DeepSeekApiClient(
                     return@flow
                 }
                 retryCount++
-                val delayMs = AppConstants.RETRY_BASE_DELAY_MS * (1 shl (retryCount - 1)) + (random.nextLong() % 500)
+                val delayMs = AppConstants.RETRY_BASE_DELAY_MS * (1 shl (retryCount - 1)) + random.nextInt(500).toLong()
                 android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() retrying attempt=$retryCount delayMs=$delayMs")
                 emit(StreamEvent.Thinking("重试第 ${retryCount} 次…"))
                 delay(delayMs)
@@ -306,7 +305,460 @@ class DeepSeekApiClient(
             }
         }
 
+    suspend fun testCustomProvider(
+        baseUrl: String,
+        modelName: String,
+        apiKey: String?,
+        protocol: ProviderProtocol = ProviderProtocol.AUTO,
+    ): AppResult<ProviderTestResult> = withContext(Dispatchers.IO) {
+        val normalizedModel = modelName.trim()
+        val resolvedProtocol = ProviderProtocol.resolve(protocol, baseUrl, normalizedModel)
+        val normalizedBaseUrl = when (resolvedProtocol) {
+            ProviderProtocol.ANTHROPIC -> normalizeAnthropicBaseUrl(baseUrl)
+            else -> normalizeOpenAiBaseUrl(baseUrl)
+        }
+        if (normalizedBaseUrl.isBlank()) {
+            return@withContext AppResult.failure(AppError.InvalidRequest, "服务地址不能为空")
+        }
+        if (normalizedModel.isBlank()) {
+            return@withContext AppResult.failure(AppError.InvalidRequest, "模型名不能为空")
+        }
+
+        val endpoint = when (resolvedProtocol) {
+            ProviderProtocol.ANTHROPIC -> buildAnthropicMessagesEndpoint(normalizedBaseUrl)
+            else -> buildOpenAiChatCompletionsEndpoint(normalizedBaseUrl)
+        }
+        val startedAt = System.currentTimeMillis()
+        try {
+            if (resolvedProtocol == ProviderProtocol.ANTHROPIC) {
+                return@withContext testAnthropicProvider(
+                    endpoint = endpoint,
+                    modelName = normalizedModel,
+                    apiKey = apiKey,
+                    startedAt = startedAt,
+                )
+            }
+            val request = ChatCompletionRequest(
+                model = normalizedModel,
+                messages = listOf(MessageDto(role = "user", content = "ping")),
+                temperature = 0.0,
+                maxTokens = 8,
+                stream = false,
+                thinking = null,
+                reasoningEffort = null,
+            )
+            val body = json.encodeToString(ChatCompletionRequest.serializer(), request)
+            val requestBuilder = Request.Builder()
+                .url(endpoint)
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Accept", "application/json")
+            val key = apiKey?.trim().orEmpty()
+            if (key.isNotBlank()) {
+                requestBuilder.addHeader("Authorization", "Bearer $key")
+            }
+
+            val response = diagnosticClient.newCall(requestBuilder.build()).execute()
+            val responseBody = response.body?.string().orEmpty()
+            val elapsedMs = System.currentTimeMillis() - startedAt
+            if (!response.isSuccessful) {
+                return@withContext AppResult.failure(
+                    providerHttpError(response.code),
+                    buildProviderHttpFailureDetail(
+                        httpCode = response.code,
+                        endpoint = endpoint,
+                        modelName = normalizedModel,
+                        body = responseBody,
+                    ),
+                )
+            }
+
+            val parsed = runCatching {
+                json.decodeFromString(ChatCompletionResponse.serializer(), responseBody)
+            }.getOrElse {
+                return@withContext AppResult.failure(
+                    AppError.Unknown,
+                    "服务返回 HTTP 200，但响应不是 OpenAI chat/completions JSON。\n" +
+                        "请确认接入地址是 OpenAI 兼容网关，不是模型列表或网页地址。\n" +
+                        "返回片段：${sanitizeProviderBody(responseBody)}",
+                )
+            }
+            val content = parsed.choices.firstOrNull()?.message?.content.orEmpty()
+            AppResult.success(
+                ProviderTestResult(
+                    endpoint = endpoint,
+                    modelName = parsed.model.ifBlank { normalizedModel },
+                    protocol = ProviderProtocol.OPENAI,
+                    latencyMs = elapsedMs,
+                    replyPreview = content.take(120),
+                )
+            )
+        } catch (e: IllegalArgumentException) {
+            AppResult.failure(
+                AppError.InvalidRequest,
+                "服务地址格式不正确：${e.message ?: "无法解析 URL"}。\n" +
+                    "示例：http://your-gateway:20128/v1 或 https://example.com/v1",
+            )
+        } catch (e: SSLException) {
+            AppResult.failure(
+                AppError.NetworkUnavailable,
+                "HTTPS/TLS 握手失败。若网关只支持 HTTP，请填 http:// 地址；若填的是 HTTPS，请检查证书链和域名。",
+            )
+        } catch (e: java.net.SocketTimeoutException) {
+            AppResult.failure(
+                AppError.NetworkTimeout,
+                "连接超时。请确认手机当前网络能访问该 IP/域名和端口，网关服务正在运行。",
+            )
+        } catch (e: IOException) {
+            val message = e.message.orEmpty()
+            val detail = when {
+                message.contains("CLEARTEXT communication", ignoreCase = true) ->
+                    "Android 拦截了明文 HTTP 请求。当前地址是 HTTP，请升级到允许自定义 HTTP 网关的版本，或改用 HTTPS。"
+                message.contains("Failed to connect", ignoreCase = true) ||
+                    message.contains("Connection refused", ignoreCase = true) ->
+                    "连接失败。请确认地址、端口、防火墙和网关进程状态。"
+                message.contains("Unable to resolve host", ignoreCase = true) ->
+                    "域名解析失败。请检查域名或 DNS；如果是 IP 地址，请确认格式正确。"
+                else -> "网络请求失败：${message.ifBlank { e.javaClass.simpleName }}"
+            }
+            AppResult.failure(classifyError(e), detail)
+        } catch (e: Exception) {
+            AppResult.failure(
+                classifyError(e),
+                "测试请求失败：${e.message ?: e.javaClass.simpleName}",
+            )
+        }
+    }
+
+    private fun streamAnthropicChat(
+        messages: List<MessageDto>,
+        model: String,
+        modelTier: ModelTier,
+        tools: List<ToolDefinitionDto>?,
+    ): Flow<StreamEvent> = flow {
+        android.util.Log.e("NuclearBoy", "[ApiClient] streamAnthropicChat() ENTRY model=$model msgs=${messages.size} tools=${tools?.size ?: 0}")
+        val clientStartMs = System.currentTimeMillis()
+        val promptTokens = estimatePromptTokens(messages)
+        tokenTracker.startRequest(modelTier, ProviderProtocol.ANTHROPIC.name.lowercase(), promptTokens)
+        emit(StreamEvent.Thinking("正在思考…"))
+
+        var retryCount = 0
+        var lastException: Exception? = null
+
+        while (retryCount <= AppConstants.MAX_RETRIES) {
+            try {
+                val body = buildAnthropicRequestBody(
+                    messages = messages,
+                    model = model,
+                    tools = tools,
+                    stream = true,
+                    maxTokens = 8192,
+                )
+                val requestBody = body.toRequestBody("application/json".toMediaType())
+                val httpRequest = Request.Builder()
+                    .url(buildAnthropicMessagesEndpoint(baseUrlProvider()))
+                    .header(internalProtocolHeader, ProviderProtocol.ANTHROPIC.name)
+                    .post(requestBody)
+                    .build()
+                android.util.Log.e("NuclearBoy", "[ApiClient] streamAnthropicChat() HTTP request sent url=${httpRequest.url} bodySize=${body.length}")
+
+                val response = client.newCall(httpRequest).execute()
+                if (!response.isSuccessful) {
+                    val errorBody = response.body?.string().orEmpty()
+                    throw DeepSeekHttpException(
+                        code = response.code,
+                        message = parseProviderErrorMessage(errorBody) ?: "HTTP ${response.code}",
+                        errorType = null,
+                    )
+                }
+
+                val responseBody = response.body ?: throw IOException("Empty response body")
+                val reader = responseBody.charStream().buffered()
+                var inputTokens = promptTokens
+                var outputTokens = 0L
+                val content = StringBuilder()
+                var lineCount = 0
+
+                reader.useLines { lines ->
+                    for (line in lines) {
+                        if (line.isBlank() || !line.startsWith("data: ")) continue
+                        val payload = line.removePrefix("data: ").trim()
+                        if (payload == "[DONE]") break
+                        lineCount++
+
+                        val event = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull() ?: continue
+                        when (event["type"]?.jsonPrimitive?.contentOrNull) {
+                            "message_start" -> {
+                                val usage = event["message"]?.jsonObject?.get("usage")?.jsonObject
+                                inputTokens = usage?.get("input_tokens")?.jsonPrimitive?.longOrNull ?: inputTokens
+                                outputTokens = usage?.get("output_tokens")?.jsonPrimitive?.longOrNull ?: outputTokens
+                            }
+                            "content_block_start" -> {
+                                val index = event["index"]?.jsonPrimitive?.intOrNull ?: 0
+                                val block = event["content_block"]?.jsonObject ?: continue
+                                when (block["type"]?.jsonPrimitive?.contentOrNull) {
+                                    "text" -> {
+                                        val text = block["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                                        if (text.isNotEmpty()) {
+                                            content.append(text)
+                                            emit(StreamEvent.Content(text))
+                                        }
+                                    }
+                                    "tool_use" -> {
+                                        val id = block["id"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                                        val name = block["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                                        val input = block["input"]?.takeIf { it !is JsonNull }?.toString().orEmpty()
+                                        emit(StreamEvent.ToolCallDelta(listOf(
+                                            ToolCallDeltaDto(
+                                                index = index,
+                                                id = id,
+                                                function = FunctionCallDeltaDto(
+                                                    name = name,
+                                                    arguments = input.takeIf { it != "{}" },
+                                                ),
+                                            )
+                                        )))
+                                    }
+                                }
+                            }
+                            "content_block_delta" -> {
+                                val index = event["index"]?.jsonPrimitive?.intOrNull ?: 0
+                                val delta = event["delta"]?.jsonObject ?: continue
+                                when (delta["type"]?.jsonPrimitive?.contentOrNull) {
+                                    "text_delta" -> {
+                                        val text = delta["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                                        if (text.isNotEmpty()) {
+                                            content.append(text)
+                                            emit(StreamEvent.Content(text))
+                                            tokenTracker.onStreamToken(isReasoning = false)
+                                        }
+                                    }
+                                    "input_json_delta" -> {
+                                        val partial = delta["partial_json"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                                        if (partial.isNotEmpty()) {
+                                            emit(StreamEvent.ToolCallDelta(listOf(
+                                                ToolCallDeltaDto(
+                                                    index = index,
+                                                    function = FunctionCallDeltaDto(arguments = partial),
+                                                )
+                                            )))
+                                        }
+                                    }
+                                }
+                            }
+                            "message_delta" -> {
+                                val usage = event["usage"]?.jsonObject
+                                outputTokens = usage?.get("output_tokens")?.jsonPrimitive?.longOrNull ?: outputTokens
+                            }
+                        }
+                    }
+                }
+
+                val usage = UsageDto(
+                    promptTokens = inputTokens,
+                    completionTokens = outputTokens.takeIf { it > 0 } ?: content.length.toLong(),
+                    totalTokens = inputTokens + (outputTokens.takeIf { it > 0 } ?: content.length.toLong()),
+                )
+                val elapsedMs = System.currentTimeMillis() - clientStartMs
+                android.util.Log.e("NuclearBoy", "[ApiClient] Anthropic stream complete lines=$lineCount contentLen=${content.length} prompt=${usage.promptTokens} completion=${usage.completionTokens} elapsedMs=$elapsedMs")
+                tokenTracker.onRequestComplete(usage)
+                emit(StreamEvent.Complete(usage))
+                return@flow
+            } catch (e: Exception) {
+                lastException = e
+                val appError = classifyError(e)
+                android.util.Log.e("NuclearBoy", "[ApiClient] streamAnthropicChat() error retryCount=$retryCount maxRetries=${AppConstants.MAX_RETRIES} appError=$appError isRetryable=${appError.isRetryable}")
+                if (!appError.isRetryable || retryCount >= AppConstants.MAX_RETRIES) {
+                    emit(StreamEvent.Error(appError, e.message))
+                    return@flow
+                }
+                retryCount++
+                val delayMs = AppConstants.RETRY_BASE_DELAY_MS * (1 shl (retryCount - 1)) + random.nextInt(500).toLong()
+                emit(StreamEvent.Thinking("重试第 ${retryCount} 次…"))
+                delay(delayMs)
+            }
+        }
+        lastException?.let { emit(StreamEvent.Error(classifyError(it), it.message)) }
+    }
+
+    private fun testAnthropicProvider(
+        endpoint: String,
+        modelName: String,
+        apiKey: String?,
+        startedAt: Long,
+    ): AppResult<ProviderTestResult> {
+        val body = buildAnthropicRequestBody(
+            messages = listOf(MessageDto(role = "user", content = "ping")),
+            model = modelName,
+            tools = null,
+            stream = false,
+            maxTokens = 8,
+        )
+        val requestBuilder = Request.Builder()
+            .url(endpoint)
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Accept", "application/json")
+            .addHeader("anthropic-version", "2023-06-01")
+        val key = apiKey?.trim().orEmpty()
+        if (key.isNotBlank()) {
+            requestBuilder.addHeader("x-api-key", key)
+        }
+
+        val response = diagnosticClient.newCall(requestBuilder.build()).execute()
+        val responseBody = response.body?.string().orEmpty()
+        val elapsedMs = System.currentTimeMillis() - startedAt
+        if (!response.isSuccessful) {
+            return AppResult.failure(
+                providerHttpError(response.code),
+                buildProviderHttpFailureDetail(
+                    httpCode = response.code,
+                    endpoint = endpoint,
+                    modelName = modelName,
+                    body = responseBody,
+                ),
+            )
+        }
+
+        val parsed = runCatching { json.parseToJsonElement(responseBody).jsonObject }.getOrElse {
+            return AppResult.failure(
+                AppError.Unknown,
+                "服务返回 HTTP 200，但响应不是 Anthropic messages JSON。\n" +
+                    "请确认接入地址是 Anthropic 兼容网关。\n" +
+                    "返回片段：${sanitizeProviderBody(responseBody)}",
+            )
+        }
+        val content = parsed["content"]?.jsonArray
+            ?.firstOrNull { it.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "text" }
+            ?.jsonObject
+            ?.get("text")
+            ?.jsonPrimitive
+            ?.contentOrNull
+            .orEmpty()
+        return AppResult.success(
+            ProviderTestResult(
+                endpoint = endpoint,
+                modelName = parsed["model"]?.jsonPrimitive?.contentOrNull?.ifBlank { modelName } ?: modelName,
+                protocol = ProviderProtocol.ANTHROPIC,
+                latencyMs = elapsedMs,
+                replyPreview = content.take(120),
+            )
+        )
+    }
+
     // ── Private ────────────────────────────────────────
+
+    private fun activeProviderProtocol(modelName: String): ProviderProtocol {
+        return if (modelOverrideProvider() == null) {
+            ProviderProtocol.OPENAI
+        } else {
+            ProviderProtocol.resolve(providerProtocolProvider(), baseUrlProvider(), modelName)
+        }
+    }
+
+    private fun buildAnthropicRequestBody(
+        messages: List<MessageDto>,
+        model: String,
+        tools: List<ToolDefinitionDto>?,
+        stream: Boolean,
+        maxTokens: Int,
+    ): String {
+        val systemText = messages
+            .filter { it.role == "system" }
+            .mapNotNull { it.content }
+            .filter { it.isNotBlank() }
+            .joinToString("\n\n")
+
+        val anthropicMessages = mutableListOf<JsonObject>()
+        var index = 0
+        val nonSystem = messages.filterNot { it.role == "system" }
+        while (index < nonSystem.size) {
+            val msg = nonSystem[index]
+            if (msg.role == "tool") {
+                val blocks = mutableListOf<JsonObject>()
+                while (index < nonSystem.size && nonSystem[index].role == "tool") {
+                    val toolMessage = nonSystem[index]
+                    blocks.add(buildJsonObject {
+                        put("type", JsonPrimitive("tool_result"))
+                        put("tool_use_id", JsonPrimitive(toolMessage.toolCallId.orEmpty()))
+                        put("content", JsonPrimitive(toolMessage.content.orEmpty()))
+                    })
+                    index++
+                }
+                anthropicMessages.add(buildJsonObject {
+                    put("role", JsonPrimitive("user"))
+                    put("content", JsonArray(blocks))
+                })
+                continue
+            }
+
+            val role = when (msg.role) {
+                "assistant" -> "assistant"
+                else -> "user"
+            }
+            val contentElement = if (msg.role == "assistant" && !msg.toolCalls.isNullOrEmpty()) {
+                val blocks = mutableListOf<JsonObject>()
+                msg.content?.takeIf { it.isNotBlank() }?.let { text ->
+                    blocks.add(buildJsonObject {
+                        put("type", JsonPrimitive("text"))
+                        put("text", JsonPrimitive(text))
+                    })
+                }
+                msg.toolCalls.forEach { toolCall ->
+                    blocks.add(buildJsonObject {
+                        put("type", JsonPrimitive("tool_use"))
+                        put("id", JsonPrimitive(toolCall.id))
+                        put("name", JsonPrimitive(toolCall.function.name))
+                        put("input", parseJsonObjectOrEmpty(toolCall.function.arguments))
+                    })
+                }
+                JsonArray(blocks)
+            } else {
+                JsonPrimitive(msg.content.orEmpty())
+            }
+            anthropicMessages.add(buildJsonObject {
+                put("role", JsonPrimitive(role))
+                put("content", contentElement)
+            })
+            index++
+        }
+
+        val body = buildJsonObject {
+            put("model", JsonPrimitive(model))
+            put("max_tokens", JsonPrimitive(maxTokens))
+            put("stream", JsonPrimitive(stream))
+            if (systemText.isNotBlank()) {
+                put("system", JsonPrimitive(systemText))
+            }
+            put("messages", JsonArray(anthropicMessages))
+            if (!tools.isNullOrEmpty()) {
+                put("tools", JsonArray(tools.map { tool ->
+                    buildJsonObject {
+                        put("name", JsonPrimitive(tool.function.name))
+                        put("description", JsonPrimitive(tool.function.description))
+                        put("input_schema", tool.function.parameters ?: emptyJsonSchema())
+                    }
+                }))
+            }
+        }
+        return body.toString()
+    }
+
+    private fun parseJsonObjectOrEmpty(raw: String): JsonObject {
+        if (raw.isBlank()) return buildJsonObject { }
+        return runCatching {
+            json.parseToJsonElement(raw).jsonObject
+        }.getOrElse {
+            buildJsonObject {
+                put("value", JsonPrimitive(raw))
+            }
+        }
+    }
+
+    private fun emptyJsonSchema(): JsonObject = buildJsonObject {
+        put("type", JsonPrimitive("object"))
+        put("properties", buildJsonObject { })
+    }
 
     private fun buildRequest(
         messages: List<MessageDto>,
@@ -355,11 +807,84 @@ class DeepSeekApiClient(
         val body = json.encodeToString(ChatCompletionRequest.serializer(), request)
         android.util.Log.e("NuclearBoy", "[ApiClient] buildHttpRequest() bodySize=${body.length} bytes")
         val requestBody = body.toRequestBody("application/json".toMediaType())
+        val endpoint = buildOpenAiChatCompletionsEndpoint(baseUrlProvider())
 
         return okhttp3.Request.Builder()
-            .url("${baseUrlProvider()}/v1/chat/completions")
+            .url(endpoint)
             .post(requestBody)
             .build()
+    }
+
+    private fun providerHttpError(code: Int): AppError = when (code) {
+        400, 404, 422 -> AppError.InvalidRequest
+        401, 403 -> AppError.ApiKeyInvalid
+        402 -> AppError.InsufficientBalance
+        429 -> AppError.RateLimited
+        in 500..599 -> AppError.ServerError
+        else -> AppError.Unknown
+    }
+
+    private fun buildProviderHttpFailureDetail(
+        httpCode: Int,
+        endpoint: String,
+        modelName: String,
+        body: String,
+    ): String {
+        val providerMessage = parseProviderErrorMessage(body)
+        val providerHint = providerSpecificEndpointHint(endpoint)
+        val hint = when (httpCode) {
+            400, 422 -> "请求格式或模型名可能不被网关接受。请核对模型名：$modelName。"
+            401, 403 -> "鉴权失败。请检查 API Key、网关是否要求 Bearer Token，以及账号是否有该模型权限。"
+            404 -> "接口路径不存在。当前会请求 $endpoint；服务地址可填根地址或 /v1，不要填网页地址。"
+            402 -> "账号余额或额度不足。"
+            429 -> "请求过快或额度被限流，稍后再试。"
+            in 500..599 -> "网关服务端报错。请查看网关日志，确认上游模型可用。"
+            else -> "网关返回了未识别的 HTTP 状态。"
+        }
+        return buildString {
+            append("HTTP $httpCode")
+            if (!providerMessage.isNullOrBlank()) append("：$providerMessage")
+            append('\n')
+            append(hint)
+            if (providerHint.isNotBlank()) {
+                append('\n')
+                append(providerHint)
+            }
+            val preview = sanitizeProviderBody(body)
+            if (preview.isNotBlank()) {
+                append("\n返回片段：")
+                append(preview)
+            }
+        }
+    }
+
+    private fun providerSpecificEndpointHint(endpoint: String): String {
+        val lower = endpoint.lowercase()
+        return when {
+            "ark.cn-beijing.volces.com" in lower ->
+                "火山 Ark 聊天补全请使用 https://ark.cn-beijing.volces.com/api/v3。"
+            "api.minimaxi.com" in lower ->
+                "MiniMax 可使用 OpenAI 兼容地址 https://api.minimaxi.com/v1，也可选择 Anthropic 协议并填写 https://api.minimaxi.com/anthropic。"
+            lower.endsWith("/v1/messages") ->
+                "当前请求使用 Anthropic Messages 协议；如果你的网关只支持 OpenAI，请把协议切到 OpenAI。"
+            else -> ""
+        }
+    }
+
+    private fun parseProviderErrorMessage(body: String): String? {
+        if (body.isBlank()) return null
+        return runCatching {
+            json.decodeFromString(DeepSeekErrorResponse.serializer(), body).error?.message
+        }.getOrNull()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun sanitizeProviderBody(body: String): String {
+        return body
+            .replace(Regex("Bearer\\s+[A-Za-z0-9._~+/=-]+", RegexOption.IGNORE_CASE), "Bearer <REDACTED_TOKEN>")
+            .replace(Regex("sk-[A-Za-z0-9_-]+"), "sk-<REDACTED_TOKEN>")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .take(500)
     }
 
     private fun classifyError(e: Exception): AppError {
@@ -394,11 +919,86 @@ class DeepSeekApiClient(
 
     fun close() {
         client.dispatcher.executorService.shutdown()
+        diagnosticClient.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
+        diagnosticClient.connectionPool.evictAll()
+    }
+
+    companion object {
+        fun normalizeOpenAiBaseUrl(raw: String): String {
+            var url = raw.trim().trimEnd('/')
+            if (url.isBlank()) return ""
+            val lower = url.lowercase()
+            if (lower.startsWith("https://api.minimaxi.com/anthropic")) {
+                return "https://api.minimaxi.com"
+            }
+            if (lower.startsWith("https://ark.cn-beijing.volces.com/api/compatible")) {
+                return "https://ark.cn-beijing.volces.com/api/v3"
+            }
+            val suffixes = listOf(
+                "/v1/messages",
+                "/v1/chat/completions",
+                "/chat/completions",
+                "/v1",
+            )
+            for (suffix in suffixes) {
+                if (url.lowercase().endsWith(suffix)) {
+                    url = url.dropLast(suffix.length).trimEnd('/')
+                    break
+                }
+            }
+            return url
+        }
+
+        fun buildOpenAiChatCompletionsEndpoint(raw: String): String {
+            val baseUrl = normalizeOpenAiBaseUrl(raw).trimEnd('/')
+            if (baseUrl.isBlank()) return ""
+            val lower = baseUrl.lowercase()
+            val hasVersionedPath = Regex(""".*/v\d+$""").matches(lower)
+            return if (hasVersionedPath) {
+                "$baseUrl/chat/completions"
+            } else {
+                "$baseUrl/v1/chat/completions"
+            }
+        }
+
+        fun normalizeAnthropicBaseUrl(raw: String): String {
+            var url = raw.trim().trimEnd('/')
+            if (url.isBlank()) return ""
+            val suffixes = listOf(
+                "/v1/messages",
+                "/messages",
+            )
+            for (suffix in suffixes) {
+                if (url.lowercase().endsWith(suffix)) {
+                    url = url.dropLast(suffix.length).trimEnd('/')
+                    break
+                }
+            }
+            return url
+        }
+
+        fun buildAnthropicMessagesEndpoint(raw: String): String {
+            val baseUrl = normalizeAnthropicBaseUrl(raw).trimEnd('/')
+            if (baseUrl.isBlank()) return ""
+            return if (baseUrl.lowercase().endsWith("/v1")) {
+                "$baseUrl/messages"
+            } else {
+                "$baseUrl/v1/messages"
+            }
+        }
     }
 }
 
 // ── Supporting Types ──────────────────────────────────
+
+data class ProviderTestResult(
+    val endpoint: String,
+    val modelName: String,
+    val protocol: ProviderProtocol,
+    val latencyMs: Long,
+    val replyPreview: String,
+)
 
 sealed class StreamEvent {
     data class Thinking(val message: String) : StreamEvent()

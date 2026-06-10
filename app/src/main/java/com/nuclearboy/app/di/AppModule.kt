@@ -11,11 +11,8 @@ import com.nuclearboy.api.deepseek.*
 import com.nuclearboy.common.*
 import com.nuclearboy.app.python.ChaquopyPythonExecutor
 import com.nuclearboy.memory.MemoryStore
-import com.nuclearboy.python.PolicyEnforcer
 import com.nuclearboy.python.PythonExecutor
 import com.nuclearboy.python.PythonSandbox
-import com.nuclearboy.python.SandboxOperation
-import com.nuclearboy.python.SandboxPolicy
 import com.nuclearboy.skills.SkillManager
 import com.nuclearboy.skills.SkillMarketPlace
 import com.nuclearboy.tools.docgen.FileOperations
@@ -78,10 +75,11 @@ object AppModule {
             contextManager = contextWindowManager,
             baseUrlProvider = { apiKeyManager.getActiveBaseUrl() },
             modelOverrideProvider = { apiKeyManager.getModelOverride() },
+            providerProtocolProvider = { apiKeyManager.getActiveProviderProtocol() },
         )
     }
 
-    // ── Python Sandbox ────────────────────────────────
+    // ── Python Executor ────────────────────────────────
 
     @Provides
     @Singleton
@@ -100,13 +98,6 @@ object AppModule {
         val sandbox = PythonSandbox(context)
         sandbox.executor = executor
         return sandbox
-    }
-
-    @Provides
-    @Singleton
-    fun providePolicyEnforcer(): PolicyEnforcer {
-        android.util.Log.e("NuclearBoy", "[DI] providePolicyEnforcer")
-        return PolicyEnforcer()
     }
 
     // ── Memory ────────────────────────────────────────
@@ -170,8 +161,6 @@ object AppModule {
         fileOperations: FileOperations,
         skillManager: SkillManager,
         memoryStore: MemoryStore,
-        policyEnforcer: PolicyEnforcer,
-        apiKeyManager: ApiKeyManager,
     ): ToolRegistry {
         android.util.Log.e("NuclearBoy", "[DI] provideToolRegistry — entry")
         val registry = ToolRegistry()
@@ -196,43 +185,18 @@ object AppModule {
 
         registry.pythonExecutor = { _, params ->
             val scriptCode = params["path"] ?: params["script"]
-            android.util.Log.e("NuclearBoy", "[DI] pythonExecutor called — scriptLen=${scriptCode?.length ?: 0}, workingDir=${params["workingDir"]}, keys=${params.keys}, sandbox=${apiKeyManager.isSandboxEnabled()}")
+            android.util.Log.e("NuclearBoy", "[DI] pythonExecutor called — scriptLen=${scriptCode?.length ?: 0}, workingDir=${params["workingDir"]}, keys=${params.keys}")
             if (scriptCode == null) ToolResult(false, "", error = "缺少 path 参数。示例：path=\"print('hello')\"")
             else {
                 val wd = params["workingDir"]?.takeIf { it != "." } ?: fileOperations.projectRoot().absolutePath
-                if (apiKeyManager.isSandboxEnabled()) {
-                    // 沙箱模式：文件访问限制在工作区内，禁 shell，校验 + Python 层双重防护
-                    val workspaceRoot = fileOperations.getWorkspaceRoot().absolutePath
-                    val policy = SandboxPolicy(
-                        allowedReadPaths = listOf(workspaceRoot),
-                        allowedWritePaths = listOf(workspaceRoot),
-                        networkAllowed = true,
-                        allowedPackages = emptyList(), // 预装包全部可用
-                        shellAllowed = false,
-                    )
-                    val validation = policyEnforcer.validate(
-                        policy, SandboxOperation.ExecuteScript(scriptCode, wd)
-                    )
-                    if (validation is AppResult.Failure) {
-                        android.util.Log.e("NuclearBoy", "[DI] pythonExecutor BLOCKED by sandbox — ${validation.technicalDetail}")
-                        ToolResult(false, "", error = "🛡️ 沙箱拦截：${validation.technicalDetail ?: validation.error.humanMessage}。如需放开限制，可在设置里关闭沙箱模式或用 /sandbox off")
-                    } else {
-                        val guarded = policyEnforcer.buildPolicyPreamble(policy) + "\n" + scriptCode
-                        val r = pythonSandbox.execute(guarded, wd, env = policyEnforcer.buildEnvironment(policy))
-                        android.util.Log.e("NuclearBoy", "[DI] pythonExecutor(sandboxed) result — exitCode=${r.exitCode}, stdoutLen=${r.stdout.length}, stderrLen=${r.stderr.length}")
-                        ToolResult(success = r.exitCode == 0, output = r.stdout, error = r.stderr.ifBlank { null })
-                    }
-                } else {
-                    // 非沙箱模式：用户手动开启，脚本不受路径/shell 限制
-                    val r = pythonSandbox.execute(scriptCode, wd)
-                    android.util.Log.e("NuclearBoy", "[DI] pythonExecutor(raw) result — exitCode=${r.exitCode}, stdoutLen=${r.stdout.length}, stderrLen=${r.stderr.length}")
-                    ToolResult(success = r.exitCode == 0, output = r.stdout, error = r.stderr.ifBlank { null })
-                }
+                val r = pythonSandbox.execute(scriptCode, wd)
+                android.util.Log.e("NuclearBoy", "[DI] pythonExecutor result — exitCode=${r.exitCode}, stdoutLen=${r.stdout.length}, stderrLen=${r.stderr.length}")
+                ToolResult(success = r.exitCode == 0, output = r.stdout, error = r.stderr.ifBlank { null })
             }
         }
 
         registry.skillsExecutor = { name, params ->
-            android.util.Log.e("NuclearBoy", "[DI] skillsExecutor called — skillName=$name, params=${params}")
+            android.util.Log.e("NuclearBoy", "[DI] skillsExecutor called — skillName=$name, paramKeys=${params.keys}")
             when (val r = skillManager.executeSkill(name, params)) {
                 is AppResult.Success -> {
                     android.util.Log.e("NuclearBoy", "[DI] skillsExecutor — skill '$name' OK")
@@ -286,7 +250,7 @@ object AppModule {
         )
         // 用户取消对话时的清理回调
         engine.onCancel = {
-            // Python 沙箱不支持外部中断，正在执行的脚本会自然完成（结果丢弃）
+            // Python 执行器暂不支持外部中断，正在执行的脚本会自然完成（结果丢弃）
         }
         return engine
     }

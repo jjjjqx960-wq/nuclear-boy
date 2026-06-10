@@ -42,7 +42,7 @@ object AppConstants {
     const val MAX_CONCURRENT_REQUESTS = 10
     const val REQUEST_TIMEOUT_SECONDS = 120L
 
-    /** Python sandbox */
+    /** Python execution */
     const val PYTHON_EXECUTION_TIMEOUT_SECONDS = 120L
     const val PYTHON_MAX_OUTPUT_CHARS = 100_000
 

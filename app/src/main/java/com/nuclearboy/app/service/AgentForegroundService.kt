@@ -91,7 +91,7 @@ class AgentForegroundService : Service() {
         }
 
         fun update(context: Context, summary: String, project: String? = null) {
-            android.util.Log.e("NuclearBoy", "[FGService] companion update — summary=${summary.take(80)}, project=$project")
+            android.util.Log.e("NuclearBoy", "[FGService] companion update — summaryLen=${summary.length}, project=$project")
             val intent = Intent(context, AgentForegroundService::class.java).apply {
                 putExtra("action", "ready")
                 putExtra("project", project ?: "")

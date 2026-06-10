@@ -90,7 +90,7 @@ fun String.withMoodEmoji(): String {
     // Simple heuristic: don't add if already has emoji
     if (any { it.code > 0x1F300 }) return this
     return when {
-        contains("错") || contains("失败") -> "$this 😅"
+        contains("错") || contains("失败") || contains("问题") -> "$this 😅"
         contains("成功") || contains("好了") || contains("搞定") -> "$this ✨"
         contains("试") || contains("稍等") -> "$this ⏳"
         contains("注意") || contains("小心") -> "$this ⚠️"

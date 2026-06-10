@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.common.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -73,6 +75,7 @@ fun ChatScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    val apiKeyState by viewModel.apiKeyState.collectAsState()
     val context = LocalContext.current
     LaunchedEffect(Unit) {
         android.util.Log.e("NuclearBoy", "[ChatScreen] ChatScreen composed projectId=$projectId")
@@ -132,6 +135,10 @@ fun ChatScreen(
                     IconButton(onClick = onMenuClick, modifier = Modifier.size(44.dp)) {
                         Icon(Icons.Default.Menu, "菜单", tint = NuclearBoyTheme.colorScheme.material.primary, modifier = Modifier.size(26.dp))
                     }
+                    TopModelSelector(
+                        state = apiKeyState,
+                        onSelect = { viewModel.selectModel(it) },
+                    )
                     Spacer(Modifier.weight(1f))
                     // 顶栏标题
                     if (projectId == "__general__") {
@@ -224,7 +231,7 @@ fun ChatScreen(
                                 Text("我可以帮你：", fontSize = 14.sp, color = NuclearBoyTheme.colorScheme.material.onSurface)
                                 Spacer(Modifier.height(8.dp))
                                 WelcomeItem("🔍", "搜资料", "Bing + 百度双引擎搜索最新信息")
-                                WelcomeItem("🐍", "写代码", "Python 3.11 沙箱 + Java 桥接控制手机")
+                                WelcomeItem("🐍", "写代码", "Python 3.11 执行器 + Java 桥接控制手机")
                                 WelcomeItem("📄", "生成文档", "Word / Excel / PPT 一键生成")
                                 WelcomeItem("📁", "管项目", "多项目切换，文件浏览编辑")
                                 WelcomeItem("📱", "控硬件", "闪光灯、闹钟、通知、日历… 全搞定")
@@ -691,6 +698,107 @@ private fun WelcomeItem(emoji: String, title: String, desc: String) {
 }
 
 @Composable
+private fun TopModelSelector(
+    state: ApiKeyManager.ApiKeyState,
+    onSelect: (String) -> Unit,
+) {
+    val nc = NuclearBoyTheme.colorScheme
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(nc.material.primary.copy(alpha = 0.08f))
+                .clickable { expanded = true }
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = if (state.customProviderEnabled) Icons.Default.Cloud else Icons.Default.AutoAwesome,
+                contentDescription = null,
+                tint = nc.material.primary,
+                modifier = Modifier.size(15.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = state.activeModelLabel,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = nc.material.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 112.dp),
+            )
+            Icon(
+                Icons.Default.ArrowDropDown,
+                contentDescription = "选择模型",
+                tint = nc.material.primary.copy(alpha = 0.65f),
+                modifier = Modifier.size(15.dp),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = nc.material.surface,
+        ) {
+            DropdownMenuItem(
+                text = {
+                    ModelMenuText(
+                        title = "DeepSeek 官方",
+                        subtitle = "官方 API · 支持聊天/思考/专家模式",
+                    )
+                },
+                onClick = {
+                    onSelect(ApiKeyManager.OFFICIAL_MODEL_ID)
+                    expanded = false
+                },
+                leadingIcon = if (state.activeModelId == ApiKeyManager.OFFICIAL_MODEL_ID) {
+                    { Icon(Icons.Default.Check, contentDescription = "选中", tint = nc.material.primary) }
+                } else null,
+            )
+            state.customModels.forEach { model ->
+                DropdownMenuItem(
+                    text = {
+                        ModelMenuText(
+                            title = model.displayName,
+                            subtitle = "${model.protocol.displayName} · ${model.modelName}",
+                        )
+                    },
+                    onClick = {
+                        onSelect(model.id)
+                        expanded = false
+                    },
+                    leadingIcon = if (state.activeModelId == model.id) {
+                        { Icon(Icons.Default.Check, contentDescription = "选中", tint = nc.material.primary) }
+                    } else null,
+                )
+            }
+            if (state.customModels.isEmpty()) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            "到设置里添加第三方模型",
+                            fontSize = 12.sp,
+                            color = nc.material.onSurfaceVariant,
+                        )
+                    },
+                    onClick = { expanded = false },
+                    enabled = false,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModelMenuText(title: String, subtitle: String) {
+    Column {
+        Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text(subtitle, fontSize = 10.sp, color = NuclearBoyTheme.colorScheme.material.onSurfaceVariant)
+    }
+}
+
+@Composable
 private fun TypingPrompt(text: String, color: Color) {
     var visibleChars by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
@@ -784,7 +892,7 @@ private fun ChatInputBar(
                         .border(2.dp, if (canSend) nc.material.primary
                             else nc.material.outline.copy(alpha = 0.3f), CircleShape),
                 ) {
-                    Icon(Icons.Filled.Send, "发送", modifier = Modifier.size(16.dp),
+                    Icon(Icons.AutoMirrored.Filled.Send, "发送", modifier = Modifier.size(16.dp),
                         tint = if (canSend) Color.Black else nc.material.onSurfaceVariant.copy(alpha = 0.3f))
                 }
             }

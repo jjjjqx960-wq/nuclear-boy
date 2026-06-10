@@ -161,5 +161,13 @@
             android:name="com.nuclearboy.app.update.DownloadReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".diagnostics.DiagnosticsReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.nuclearboy.app.RUN_DIAGNOSTICS" />
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>

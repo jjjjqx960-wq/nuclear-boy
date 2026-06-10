@@ -145,9 +145,8 @@ class TokenTracker {
         _snapshot.update { current ->
             val newPromptTotal = current.promptTokensTotal + usage.promptTokens
             val newCacheTotal = current.cachedTokensTotal + cachedTokens
-            // Show per-request cache rate (not cumulative) — more useful for UX
-            val cacheRate = if (usage.promptTokens > 0) {
-                cachedTokens.toDouble() / usage.promptTokens.toDouble()
+            val cacheRate = if (newPromptTotal > 0) {
+                newCacheTotal.toDouble() / newPromptTotal.toDouble()
             } else 0.0
 
             val newContextUsed = usage.promptTokens

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,11 +13,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -32,20 +35,48 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import com.nuclearboy.api.deepseek.ApiKeyManager
+import com.nuclearboy.api.deepseek.DeepSeekApiClient
+import com.nuclearboy.api.deepseek.ProviderProtocol
 import com.nuclearboy.app.R
+import com.nuclearboy.app.diagnostics.AppDiagnostics
+import com.nuclearboy.app.diagnostics.DiagnosticResult
+import com.nuclearboy.app.diagnostics.DiagnosticStatus
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
+import com.nuclearboy.common.AppResult
 import com.nuclearboy.common.ModelTier
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+data class ModelTestUiState(
+    val targetId: String? = null,
+    val inProgress: Boolean = false,
+    val success: Boolean? = null,
+    val message: String = "",
+    val detail: String = "",
+)
+
+data class FullDiagnosticsUiState(
+    val running: Boolean = false,
+    val results: List<DiagnosticResult> = emptyList(),
+)
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     val apiKeyManager: ApiKeyManager,
+    private val apiClient: DeepSeekApiClient,
+    private val appDiagnostics: AppDiagnostics,
 ) : androidx.lifecycle.ViewModel() {
 
     val apiKeyState = apiKeyManager.state
+    private val _modelTestState = MutableStateFlow(ModelTestUiState())
+    val modelTestState: StateFlow<ModelTestUiState> = _modelTestState.asStateFlow()
+    private val _fullDiagnosticsState = MutableStateFlow(FullDiagnosticsUiState())
+    val fullDiagnosticsState: StateFlow<FullDiagnosticsUiState> = _fullDiagnosticsState.asStateFlow()
 
     fun setApiKey(key: String) {
         viewModelScope.launch {
@@ -62,13 +93,115 @@ class SettingsViewModel @Inject constructor(
     fun setAutoSwitch(enabled: Boolean) { apiKeyManager.setAutoSwitch(enabled) }
     fun setSimpleTasksUseFlash(enabled: Boolean) { apiKeyManager.setSimpleTasksUseFlash(enabled) }
 
-    fun setSandboxEnabled(enabled: Boolean) { apiKeyManager.setSandboxEnabled(enabled) }
-
     fun setCustomProviderEnabled(enabled: Boolean) { apiKeyManager.setCustomProviderEnabled(enabled) }
 
     /** key 传 null 表示保留已存的 Key 不变 */
     fun saveCustomProviderConfig(baseUrl: String, model: String, key: String?) {
         apiKeyManager.setCustomProviderConfig(baseUrl, model, key)
+    }
+
+    fun saveCustomModel(displayName: String, baseUrl: String, model: String, protocol: ProviderProtocol, key: String?) {
+        apiKeyManager.saveCustomModel(
+            existingId = null,
+            displayName = displayName,
+            baseUrl = baseUrl,
+            modelName = model,
+            protocol = protocol,
+            apiKey = key,
+            selectAfterSave = true,
+        )
+    }
+
+    fun selectModel(modelId: String) { apiKeyManager.selectModel(modelId) }
+
+    fun deleteCustomModel(modelId: String) { apiKeyManager.deleteCustomModel(modelId) }
+
+    fun testCustomModelInput(baseUrl: String, model: String, protocol: ProviderProtocol, key: String?) {
+        runCustomModelTest(
+            targetId = NEW_MODEL_TEST_ID,
+            baseUrl = baseUrl,
+            model = model,
+            protocol = protocol,
+            key = key,
+            label = model.ifBlank { "未命名模型" },
+        )
+    }
+
+    fun testSavedCustomModel(modelId: String) {
+        val config = apiKeyManager.getCustomModelConfig(modelId)
+        if (config == null) {
+            _modelTestState.value = ModelTestUiState(
+                targetId = modelId,
+                success = false,
+                message = "找不到这个模型配置",
+                detail = "它可能已经被删除，请刷新设置页后重试。",
+            )
+            return
+        }
+        runCustomModelTest(
+            targetId = modelId,
+            baseUrl = config.baseUrl,
+            model = config.modelName,
+            protocol = config.protocol,
+            key = config.apiKey,
+            label = config.displayName,
+        )
+    }
+
+    private fun runCustomModelTest(
+        targetId: String,
+        baseUrl: String,
+        model: String,
+        protocol: ProviderProtocol,
+        key: String?,
+        label: String,
+    ) {
+        val normalizedBaseUrl = baseUrl.trim()
+        val normalizedModel = model.trim()
+        if (normalizedBaseUrl.isBlank() || normalizedModel.isBlank()) {
+            _modelTestState.value = ModelTestUiState(
+                targetId = targetId,
+                success = false,
+                message = "请先填写服务地址和模型名",
+                detail = "服务地址示例：http://your-gateway:20128/v1；模型名示例：nvidia/minimaxai/minimax-m2.7",
+            )
+            return
+        }
+        _modelTestState.value = ModelTestUiState(
+            targetId = targetId,
+            inProgress = true,
+            message = "正在测试 $label",
+            detail = "会发送一条 max_tokens=8 的 ping 请求，不会保存或输出明文 Key。",
+        )
+        viewModelScope.launch {
+            _modelTestState.value = when (val result = apiClient.testCustomProvider(
+                baseUrl = normalizedBaseUrl,
+                modelName = normalizedModel,
+                apiKey = key,
+                protocol = protocol,
+            )) {
+                is AppResult.Success -> ModelTestUiState(
+                    targetId = targetId,
+                    success = true,
+                    message = "模型连接成功",
+                    detail = buildString {
+                        append("端点：${result.data.endpoint}\n")
+                        append("模型：${result.data.modelName}\n")
+                        append("协议：${result.data.protocol.displayName}\n")
+                        append("耗时：${result.data.latencyMs} ms")
+                        if (result.data.replyPreview.isNotBlank()) {
+                            append("\n响应：${result.data.replyPreview}")
+                        }
+                    },
+                )
+                is AppResult.Failure -> ModelTestUiState(
+                    targetId = targetId,
+                    success = false,
+                    message = result.error.humanMessage,
+                    detail = result.technicalDetail ?: "没有更多错误细节。",
+                )
+            }
+        }
     }
 
     fun testConnection() {
@@ -77,6 +210,22 @@ class SettingsViewModel @Inject constructor(
             // Validate by making a lightweight API call
             apiKeyManager.updateBalance("测试中…")
         }
+    }
+
+    fun runFullDiagnostics() {
+        if (_fullDiagnosticsState.value.running) return
+        _fullDiagnosticsState.value = _fullDiagnosticsState.value.copy(running = true)
+        viewModelScope.launch {
+            val results = appDiagnostics.runAll()
+            _fullDiagnosticsState.value = FullDiagnosticsUiState(
+                running = false,
+                results = results,
+            )
+        }
+    }
+
+    companion object {
+        const val NEW_MODEL_TEST_ID = "__new_custom_model__"
     }
 }
 
@@ -90,6 +239,8 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val apiKeyState by viewModel.apiKeyState.collectAsState()
+    val modelTestState by viewModel.modelTestState.collectAsState()
+    val fullDiagnosticsState by viewModel.fullDiagnosticsState.collectAsState()
     val scrollState = rememberScrollState()
     var showSponsorDialog by remember { mutableStateOf(false) }
 
@@ -238,7 +389,7 @@ fun SettingsScreen(
             }
 
             // ── Third-Party Provider Section ─────────────
-            Text("🌐 第三方模型（OpenAI 兼容）",
+            Text("🌐 第三方模型（OpenAI / Anthropic 兼容）",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
@@ -246,84 +397,178 @@ fun SettingsScreen(
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("接入自建模型服务", style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium)
-                            Text("支持 9router 等 OpenAI 兼容网关，开启后替代 DeepSeek 官方 API",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(
-                            checked = apiKeyState.customProviderEnabled,
-                            onCheckedChange = { viewModel.setCustomProviderEnabled(it) },
+                    Text("当前模型：${apiKeyState.activeModelLabel}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium)
+                    Text("支持保存多个 OpenAI 或 Anthropic 兼容模型，列表中点选即可切换。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("HTTP 私有网关也可测试；若网关暴露在公网，优先建议配置 HTTPS。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    Spacer(Modifier.height(12.dp))
+                    ModelOptionRow(
+                        title = "DeepSeek 官方",
+                        subtitle = "使用官方 API Key，模式仍由聊天/思考/专家控制",
+                        selected = apiKeyState.activeModelId == ApiKeyManager.OFFICIAL_MODEL_ID,
+                        onSelect = { viewModel.selectModel(ApiKeyManager.OFFICIAL_MODEL_ID) },
+                    )
+
+                    apiKeyState.customModels.forEach { model ->
+                        Spacer(Modifier.height(6.dp))
+                        ModelOptionRow(
+                            title = model.displayName,
+                            subtitle = "${model.protocol.displayName} · ${model.modelName} · ${model.baseUrl}",
+                            selected = apiKeyState.activeModelId == model.id,
+                            keyText = if (model.hasKey) model.keyMasked else "无鉴权",
+                            testing = modelTestState.inProgress && modelTestState.targetId == model.id,
+                            onSelect = { viewModel.selectModel(model.id) },
+                            onTest = { viewModel.testSavedCustomModel(model.id) },
+                            onDelete = { viewModel.deleteCustomModel(model.id) },
                         )
                     }
 
-                    if (apiKeyState.customProviderEnabled) {
-                        Spacer(Modifier.height(12.dp))
-                        var baseUrlInput by remember(apiKeyState.customBaseUrl) {
-                            mutableStateOf(apiKeyState.customBaseUrl)
-                        }
-                        var modelInput by remember(apiKeyState.customModelName) {
-                            mutableStateOf(apiKeyState.customModelName)
-                        }
-                        var customKeyInput by remember { mutableStateOf("") }
+                    if (modelTestState.message.isNotBlank() &&
+                        modelTestState.targetId != SettingsViewModel.NEW_MODEL_TEST_ID
+                    ) {
+                        Spacer(Modifier.height(10.dp))
+                        ModelTestResultBox(modelTestState)
+                    }
 
-                        OutlinedTextField(
-                            value = baseUrlInput,
-                            onValueChange = { baseUrlInput = it },
-                            label = { Text("服务地址（如 https://my-9router.com）") },
-                            placeholder = { Text("https://...") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = modelInput,
-                            onValueChange = { modelInput = it },
-                            label = { Text("模型名（如 gpt-4o / deepseek-chat）") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = customKeyInput,
-                            onValueChange = { customKeyInput = it },
-                            label = {
-                                Text(if (apiKeyState.hasCustomKey)
-                                    "API Key（已保存 ${apiKeyState.customKeyMasked}，留空则不变）"
-                                else "API Key（可留空，部分自建网关不需要）")
+                    Spacer(Modifier.height(14.dp))
+                    var displayNameInput by remember { mutableStateOf("") }
+                    var baseUrlInput by remember { mutableStateOf("") }
+                    var modelInput by remember { mutableStateOf("") }
+                    var protocolInput by remember { mutableStateOf(ProviderProtocol.AUTO) }
+                    var customKeyInput by remember { mutableStateOf("") }
+
+                    Text("添加模型",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = displayNameInput,
+                        onValueChange = { displayNameInput = it },
+                        label = { Text("显示名称（如 9router Claude）") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = baseUrlInput,
+                        onValueChange = { baseUrlInput = it },
+                        label = { Text("服务地址（如 https://my-9router.com）") },
+                        placeholder = { Text("https://...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = modelInput,
+                        onValueChange = { modelInput = it },
+                        label = { Text("模型名（如 gpt-4o / claude-3-5-sonnet）") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text("协议",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ProviderProtocol.entries.forEach { protocol ->
+                            FilterChip(
+                                selected = protocolInput == protocol,
+                                onClick = { protocolInput = protocol },
+                                label = { Text(protocol.displayName) },
+                            )
+                        }
+                    }
+                    Text(protocolInput.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = customKeyInput,
+                        onValueChange = { customKeyInput = it },
+                        label = { Text("API Key（可留空，部分网关不需要）") },
+                        modifier = Modifier.fillMaxWidth(),
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        singleLine = true,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.testCustomModelInput(
+                                    baseUrlInput.trim(),
+                                    modelInput.trim(),
+                                    protocolInput,
+                                    customKeyInput.trim(),
+                                )
                             },
-                            modifier = Modifier.fillMaxWidth(),
-                            visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                            singleLine = true,
-                        )
-                        Spacer(Modifier.height(8.dp))
+                            modifier = Modifier.weight(1f),
+                            enabled = baseUrlInput.isNotBlank() &&
+                                modelInput.isNotBlank() &&
+                                !(modelTestState.inProgress &&
+                                    modelTestState.targetId == SettingsViewModel.NEW_MODEL_TEST_ID),
+                        ) {
+                            if (modelTestState.inProgress &&
+                                modelTestState.targetId == SettingsViewModel.NEW_MODEL_TEST_ID
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Filled.WifiTethering, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            Text("测试填写")
+                        }
                         Button(
                             onClick = {
-                                // Key 留空且之前已保存过 → 传 null 保持原 Key
-                                val keyToSave = if (customKeyInput.isBlank() && apiKeyState.hasCustomKey) null
-                                    else customKeyInput.trim()
-                                viewModel.saveCustomProviderConfig(
-                                    baseUrlInput.trim(), modelInput.trim(), keyToSave)
+                                viewModel.saveCustomModel(
+                                    displayNameInput.trim().ifBlank { modelInput.trim() },
+                                    baseUrlInput.trim(),
+                                    modelInput.trim(),
+                                    protocolInput,
+                                    customKeyInput.trim(),
+                                )
+                                displayNameInput = ""
+                                baseUrlInput = ""
+                                modelInput = ""
+                                protocolInput = ProviderProtocol.AUTO
                                 customKeyInput = ""
                             },
-                            enabled = baseUrlInput.isNotBlank(),
+                            modifier = Modifier.weight(1f),
+                            enabled = baseUrlInput.isNotBlank() && modelInput.isNotBlank(),
                         ) {
-                            Text("保存配置")
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("添加并选中")
                         }
-                        Spacer(Modifier.height(4.dp))
-                        Text("提示：地址末尾不用带 /v1，会自动拼接。思考模式等 DeepSeek 专属参数对第三方模型自动禁用。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    if (modelTestState.message.isNotBlank() &&
+                        modelTestState.targetId == SettingsViewModel.NEW_MODEL_TEST_ID
+                    ) {
+                        Spacer(Modifier.height(10.dp))
+                        ModelTestResultBox(modelTestState)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text("OpenAI 地址会自动拼接 chat/completions；Anthropic 地址会自动拼接 messages；第三方模型会自动关闭 DeepSeek 专属思考参数。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
-            // ── Python Sandbox Section ───────────────────
-            Text("🛡️ Python 沙箱",
+            // ── Diagnostics Section ──────────────────────
+            Text("🧪 功能自检",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
@@ -331,30 +576,40 @@ fun SettingsScreen(
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("沙箱模式", style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium)
-                            Text(
-                                if (apiKeyState.sandboxEnabled)
-                                    "开启中：Python 脚本只能读写工作区内文件，禁止 shell 调用"
-                                else
-                                    "已关闭：脚本不受路径和 shell 限制，请确认你信任执行的代码",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (apiKeyState.sandboxEnabled)
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                else MaterialTheme.colorScheme.error,
-                            )
-                        }
-                        Switch(
-                            checked = apiKeyState.sandboxEnabled,
-                            onCheckedChange = { viewModel.setSandboxEnabled(it) },
-                        )
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Text("聊天中也可以用 /sandbox on、/sandbox off 快速切换",
+                    Text("一键检查模型配置、第三方接口、Python 执行器、文件工具和 Agent 工具链。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = { viewModel.runFullDiagnostics() },
+                        enabled = !fullDiagnosticsState.running,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (fullDiagnosticsState.running) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Filled.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (fullDiagnosticsState.running) "自检中..." else "运行全量自检")
+                    }
+
+                    if (fullDiagnosticsState.results.isNotEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        val failed = fullDiagnosticsState.results.count { it.status == DiagnosticStatus.FAIL }
+                        val warned = fullDiagnosticsState.results.count { it.status == DiagnosticStatus.WARN }
+                        Text(
+                            "结果：${fullDiagnosticsState.results.size} 项，失败 $failed，警告 $warned",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            fullDiagnosticsState.results.forEach { result ->
+                                DiagnosticResultRow(result)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -379,7 +634,7 @@ fun SettingsScreen(
                         onClick = onNavigateToTutorial,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676), contentColor = Color(0xFF08090B)),
                     ) {
-                        Icon(Icons.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("查看图文教程", fontWeight = FontWeight.Bold)
                     }
@@ -600,6 +855,162 @@ private fun SponsorTierButton(
             Text(emoji, fontSize = 18.sp)
             Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(amount, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00E676))
+        }
+    }
+}
+
+@Composable
+private fun ModelTestResultBox(state: ModelTestUiState) {
+    val color = when (state.success) {
+        true -> MaterialTheme.colorScheme.primary
+        false -> MaterialTheme.colorScheme.error
+        null -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = color.copy(alpha = 0.08f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.28f)),
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (state.inProgress) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = color,
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (state.success == true) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    state.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = color,
+                )
+            }
+            if (state.detail.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    state.detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticResultRow(result: DiagnosticResult) {
+    val color = when (result.status) {
+        DiagnosticStatus.PASS -> MaterialTheme.colorScheme.primary
+        DiagnosticStatus.WARN -> Color(0xFFFFB020)
+        DiagnosticStatus.FAIL -> MaterialTheme.colorScheme.error
+    }
+    val icon = when (result.status) {
+        DiagnosticStatus.PASS -> Icons.Filled.CheckCircle
+        DiagnosticStatus.WARN -> Icons.Filled.Warning
+        DiagnosticStatus.FAIL -> Icons.Filled.Error
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = color.copy(alpha = 0.08f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.24f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "${result.name} · ${result.message}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = color,
+                )
+                Text(
+                    "耗时 ${result.durationMs} ms",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (result.detail.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        result.detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModelOptionRow(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    keyText: String? = null,
+    testing: Boolean = false,
+    onSelect: () -> Unit,
+    onTest: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.35f)
+            )
+            .clickable(onClick = onSelect)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = onSelect)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            if (!keyText.isNullOrBlank()) {
+                Text(keyText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (onTest != null) {
+            IconButton(
+                onClick = onTest,
+                enabled = !testing,
+                modifier = Modifier.size(36.dp),
+            ) {
+                if (testing) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Filled.WifiTethering, contentDescription = "测试模型")
+                }
+            }
+        }
+        if (onDelete != null) {
+            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Filled.Delete, contentDescription = "删除模型", tint = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }

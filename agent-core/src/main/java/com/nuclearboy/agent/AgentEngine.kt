@@ -111,7 +111,7 @@ private class ToolCallAccumulator {
                     )
                 )
             }
-        android.util.Log.e("NuclearBoy", "[Accumulator] toCompletedCalls() partialCount=${partialCalls.size} completedCount=${completed.size} calls=${completed.map { "${it.function.name}(${it.function.arguments.take(80)})" }}")
+        android.util.Log.e("NuclearBoy", "[Accumulator] toCompletedCalls() partialCount=${partialCalls.size} completedCount=${completed.size} calls=${completed.map { "${it.function.name}(argsLen=${it.function.arguments.length})" }}")
         return completed
     }
 
@@ -369,7 +369,7 @@ class AgentEngine(
                             emit(AgentEvent.TokenUpdate(usage))
                         }
                         is StreamEvent.Error -> {
-                            android.util.Log.e("NuclearBoy", "[AgentEngine] run() Stream Error appError=${streamEvent.appError} detail=${streamEvent.technicalDetail}")
+                            android.util.Log.e("NuclearBoy", "[AgentEngine] run() Stream Error appError=${streamEvent.appError} detailLen=${streamEvent.technicalDetail?.length ?: 0}")
                             emit(AgentEvent.Error(streamEvent.appError, streamEvent.technicalDetail))
                         }
                     }
@@ -763,7 +763,7 @@ class AgentEngine(
                         emit(event)
                     }
                     is StreamEvent.Error -> {
-                        android.util.Log.e("NuclearBoy", "[AgentEngine] callApiStreaming() Error appError=${event.appError} detail=${event.technicalDetail}")
+                        android.util.Log.e("NuclearBoy", "[AgentEngine] callApiStreaming() Error appError=${event.appError} detailLen=${event.technicalDetail?.length ?: 0}")
                         emit(event)
                     }
                 }
@@ -781,7 +781,7 @@ class AgentEngine(
      * Parse a JSON string of tool call arguments into a Map.
      */
     private fun parseToolParams(arguments: String): Map<String, String> {
-        android.util.Log.e("NuclearBoy", "[AgentEngine] parseToolParams() ENTRY rawArgsLen=${arguments.length} rawArgsFirst100=${arguments.take(100)}")
+        android.util.Log.e("NuclearBoy", "[AgentEngine] parseToolParams() ENTRY rawArgsLen=${arguments.length}")
         if (arguments.isBlank()) {
             android.util.Log.e("NuclearBoy", "[AgentEngine] parseToolParams() EXIT blank args, returning empty")
             return emptyMap()

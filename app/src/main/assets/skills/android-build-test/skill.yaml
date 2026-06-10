@@ -1,0 +1,43 @@
+name: android-build-test
+version: 1.0.2
+description: "Android 编译测试助手：为核弹男孩工程生成或执行 Gradle 编译、单元测试、模块测试和 ADB 真机自检流程"
+author: "NUCLEAR BOY Built-in"
+entry_point: "main:run"
+
+permissions:
+  filesystem:
+    read: [workspace/**]
+    write: [workspace/**]
+  network:
+    allowed: false
+  packages:
+    allowed: []
+  shell:
+    allowed: true
+
+parameters:
+  - name: action
+    type: string
+    description: "操作：doctor、assemble、unit-test、app-test、api-test、adb-diag、all、clean"
+    required: false
+    default: "doctor"
+  - name: execute
+    type: string
+    description: "是否实际执行命令：true/false；默认 false 只输出计划"
+    required: false
+    default: "false"
+  - name: variant
+    type: string
+    description: "构建变体：debug 或 release"
+    required: false
+    default: "debug"
+  - name: project_dir
+    type: string
+    description: "项目根目录；默认从当前目录向上查找 settings.gradle.kts"
+    required: false
+    default: "."
+  - name: module
+    type: string
+    description: "目标模块；默认 app"
+    required: false
+    default: "app"

@@ -111,17 +111,17 @@ private object ComplexityEvaluator {
             else -> 3
         }
 
-        // File count (0-2 points) — only matters for longer messages
-        if (messageLength >= 50) {
-            score += when {
-                fileCount <= 3 -> 0
-                fileCount in 4..10 -> 1
-                else -> 2
-            }
+        // File count (0-2 points). Multi-file edits usually need stronger reasoning
+        // even when the user describes the request briefly.
+        score += when {
+            fileCount == 0 -> 0
+            fileCount <= 2 -> 1
+            fileCount <= 5 -> 2
+            else -> 3
         }
 
-        // Architecture decision (0-2 points)
-        if (isArchitecture) score += 2
+        // Architecture decision (0-3 points)
+        if (isArchitecture) score += 3
 
         // Conversation context size (0-2 points)
         score += when {
@@ -132,9 +132,10 @@ private object ComplexityEvaluator {
 
         // Keyword-based complexity (0-2 points)
         val complexityKeywords = listOf("架构", "设计", "重构", "分析", "优化", "debug", "调试",
+            "修复", "bug", "错误", "异常", "涉及", "多个文件",
             "architecture", "design", "refactor", "analyze", "optimize", "review", "审查")
-        if (messageLength > 30 && complexityKeywords.any { it in userMessage.lowercase() }) {
-            score += 1
+        if (complexityKeywords.any { it in userMessage.lowercase() }) {
+            score += 2
         }
 
         // Keywords bonus

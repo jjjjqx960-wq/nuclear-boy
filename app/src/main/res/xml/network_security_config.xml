@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Allow cleartext for local development -->
+    <!-- Official endpoints stay HTTPS-only. -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">api.deepseek.com</domain>
         <domain includeSubdomains="true">platform.deepseek.com</domain>
         <domain includeSubdomains="true">cdn.deepseek.com</domain>
     </domain-config>
-    <!-- Default: disallow cleartext -->
-    <base-config cleartextTrafficPermitted="false">
+    <!-- User-configured OpenAI-compatible gateways may be private HTTP services. -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

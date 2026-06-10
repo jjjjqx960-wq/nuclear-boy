@@ -25,7 +25,7 @@ import java.util.zip.ZipInputStream
  * Manages the full lifecycle of installable skills:
  * - Discovery & parsing of skill.yaml manifests
  * - Installation from local paths or remote URLs
- * - Python dependency installation via the sandbox
+ * - Python dependency installation via the Python executor
  * - Execution of skill entry points
  * - Registration as agent tools via [ToolRegistry][com.nuclearboy.agent.ToolRegistry]
  *

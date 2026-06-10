@@ -47,8 +47,8 @@ data class SkillPermissions(
         get() = filesystem != null || network != null || packages != null || shell != null
 
     /**
-     * Checks if the skill is effectively sandboxed (no network, no shell,
-     * filesystem restricted to workspace).
+     * Checks if the skill is effectively restricted (no network, no shell,
+     * filesystem limited to workspace paths).
      */
     val isSandboxed: Boolean
         get() {
@@ -67,7 +67,7 @@ data class SkillPermissions(
 
 /**
  * Filesystem permission scopes. Each entry is a glob-style path pattern.
- * The default allows only the sandbox workspace.
+ * The default allows only workspace paths.
  */
 @Serializable
 data class FilesystemPermissions(
@@ -92,6 +92,7 @@ data class FilesystemPermissions(
         fun matchesGlob(path: String, pattern: String): Boolean {
             val normalizedPath = path.trimStart('/').replace('\\', '/')
             val normalizedPattern = pattern.trimStart('/').replace('\\', '/')
+            if (normalizedPath.split('/').any { it == ".." }) return false
 
             // Full ** match
             if (normalizedPattern == "**") return true
@@ -178,18 +179,21 @@ data class SkillParameter(
     val description: String,
     val required: Boolean = true,
     val default: String? = null,
+    val allowedValues: List<String> = emptyList(),
 ) {
     /**
      * Validates a parameter value against the expected type.
      */
     fun validate(value: String?): Boolean {
         if (value == null) return !required
+        val normalized = value.trim()
+        if (normalized.isEmpty()) return !required
         return when (type.lowercase()) {
             "string" -> true
-            "int", "integer" -> value.toIntOrNull() != null
-            "float", "double", "number" -> value.toDoubleOrNull() != null
-            "bool", "boolean" -> value.lowercase() in setOf("true", "false", "1", "0")
-            "choice" -> true // validated against default choices elsewhere
+            "int", "integer" -> normalized.toIntOrNull() != null
+            "float", "double", "number" -> normalized.toDoubleOrNull() != null
+            "bool", "boolean" -> normalized.lowercase() in setOf("true", "false", "1", "0")
+            "choice" -> allowedValues.isEmpty() || normalized in allowedValues
             else -> true
         }
     }

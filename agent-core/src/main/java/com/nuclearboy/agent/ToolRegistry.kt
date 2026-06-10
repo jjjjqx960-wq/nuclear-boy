@@ -83,7 +83,7 @@ class ToolRegistry {
     /** Optional reference to the Skills module for skill-based tool execution. */
     var skillsExecutor: (suspend (String, Map<String, String>) -> ToolResult)? = null
 
-    /** Optional reference to PythonBridge for sandbox execution. */
+    /** Optional reference to PythonBridge for direct Python execution. */
     var pythonExecutor: (suspend (String, Map<String, String>) -> ToolResult)? = null
 
     // ── Registration ─────────────────────────────────────
@@ -253,7 +253,7 @@ class ToolRegistry {
             }
         }
         val duration = System.currentTimeMillis() - startTime
-        android.util.Log.e("NuclearBoy", "[ToolReg] executeSafe() result: success=${result.success} outputLen=${result.output.length} duration=${duration}ms error=${result.error}")
+        android.util.Log.e("NuclearBoy", "[ToolReg] executeSafe() result: success=${result.success} outputLen=${result.output.length} duration=${duration}ms errorLen=${result.error?.length ?: 0}")
         return result
     }
 
@@ -327,7 +327,7 @@ class ToolRegistry {
                 // --- Run Python Script ---
                 ToolDefinition(
                     name = "run_python",
-                    description = "在 Python 3.11 沙箱中直接执行 Python 代码并返回执行结果。你可以用它来运行脚本、测试代码、处理数据、生成文档等。沙箱已就绪，随时可用。",
+                    description = "在 Python 3.11 执行器中直接运行 Python 代码并返回执行结果。你可以用它来运行脚本、测试代码、处理数据、生成文档等。",
                     parameters = listOf(
                         ToolParameter("path", "string", "要执行的 Python 代码（完整脚本）", required = true),
                         ToolParameter("workingDir", "string", "工作目录", required = false, default = "."),

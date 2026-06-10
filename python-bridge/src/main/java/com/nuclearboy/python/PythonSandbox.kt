@@ -59,7 +59,7 @@ interface PythonExecutor {
 }
 
 /**
- * Python sandbox for running Python code on Android.
+ * Python execution bridge for running Python code on Android.
  *
  * Delegates actual CPython calls to a pluggable [PythonExecutor].
  * When Chaquopy is available (app module injects the real executor),
@@ -110,7 +110,10 @@ class PythonSandbox(private val context: Context) {
                 android.util.Log.e("NuclearBoy", "🐍 PythonSandbox: executor=${exec != null} started=${exec?.isStarted()}")
                 if (exec != null && exec.isStarted()) {
                     val result = exec.run(script, workingDir, env)
-                    android.util.Log.e("NuclearBoy", "🐍 PythonSandbox result: exit=${result.exitCode} out='${result.stdout}' err='${result.stderr}'")
+                    android.util.Log.e(
+                        "NuclearBoy",
+                        "🐍 PythonSandbox result: exit=${result.exitCode} stdoutLen=${result.stdout.length} stderrLen=${result.stderr.length}",
+                    )
                     result
                 } else {
                     PythonResult.failure(

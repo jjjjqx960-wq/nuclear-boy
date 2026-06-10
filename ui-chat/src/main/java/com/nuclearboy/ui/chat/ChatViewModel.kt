@@ -14,8 +14,10 @@ import com.nuclearboy.common.AppConstants
 import com.nuclearboy.common.AppResult
 import com.nuclearboy.memory.MemoryStore
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
@@ -83,8 +85,10 @@ class ChatViewModel @Inject constructor(
     private var sessionGoal: String? = null
     private val _projectName = MutableStateFlow("")
     val projectName: StateFlow<String> = _projectName.asStateFlow()
+    val apiKeyState: StateFlow<com.nuclearboy.api.deepseek.ApiKeyManager.ApiKeyState> = apiKeyManager.state
 
     fun setMode(mode: Int) { selectedMode = mode.coerceIn(0, 2) }
+    fun selectModel(modelId: String) { apiKeyManager.selectModel(modelId) }
 
     private val _projectFiles = MutableStateFlow<List<FileInfo>>(emptyList())
     val projectFiles: StateFlow<List<FileInfo>> = _projectFiles.asStateFlow()
@@ -96,6 +100,7 @@ class ChatViewModel @Inject constructor(
         currentProjectId = projectId
         val root = fileOperations.projectRoot()
         _projectName.value = if (projectId == "__general__") "核弹男孩" else root.name
+        sessionGoal = loadSessionGoal(projectId)
         // 每次切换都重新加载消息
         val loaded = try { loadPersistedMessages(projectId) }
             catch (e: Exception) { android.util.Log.e("NuclearBoy", "加载历史失败: ${e.message}"); emptyList() }
@@ -235,10 +240,13 @@ class ChatViewModel @Inject constructor(
      * 被 [sendMessage]（单轮）和 /loop（多轮循环）复用。
      * @return 最终 ASSISTANT 回复内容（供循环模式判断目标是否达成）。
      */
-    private suspend fun executeTurn(trimmed: String): String {
+    private suspend fun executeTurn(
+        trimmed: String,
+        clearAgentJobOnFinalize: Boolean = true,
+    ): String {
         // Check API key
         val key = apiKeyManager.getActiveKey()
-        android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() apiKey status: hasKey=${key != null} keyPreview=${key?.take(10)}")
+        android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() credential status: configured=${key != null} blank=${key?.isBlank() == true}")
         if (key == null) {
             android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() no API key, showing tip")
             val userMessage = ChatMessage(role = MessageRole.USER, content = trimmed, status = MessageStatus.COMPLETE)
@@ -317,7 +325,7 @@ class ChatViewModel @Inject constructor(
                 handleAgentEvent(event, assistantId)
             }
             android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() flow completed normally")
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() cancelled")
             updateAssistantMessage(assistantId) { msg ->
                 if (msg.content.isEmpty()) msg.copy(content = "", status = MessageStatus.CANCELLED)
@@ -329,7 +337,7 @@ class ChatViewModel @Inject constructor(
             handleAgentError(e, assistantId)
         } finally {
             android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() entering finally block")
-            finalizeProcessing(assistantId)
+            finalizeProcessing(assistantId, clearAgentJob = clearAgentJobOnFinalize)
         }
         return _messages.value.findLast { it.role == MessageRole.ASSISTANT }?.content ?: ""
     }
@@ -376,7 +384,7 @@ class ChatViewModel @Inject constructor(
 
     private fun handleSlashCommand(input: String) {
         val (cmd, args) = parseSlashCommand(input)
-        android.util.Log.e("NuclearBoy", "[ChatVM] slashCommand cmd=$cmd args=${args.take(50)}")
+        android.util.Log.e("NuclearBoy", "[ChatVM] slashCommand cmd=$cmd argsLen=${args.length}")
         when (cmd) {
             "help" -> addSystemMessage(SLASH_HELP)
             "stop" -> {
@@ -387,7 +395,7 @@ class ChatViewModel @Inject constructor(
                 clearConversation()
                 addSystemMessage("🧹 对话已清空，重新开始吧")
             }
-            "sandbox" -> handleSandboxCommand(args)
+            "sandbox" -> addSystemMessage("Python 现在固定为非隔离执行模式，/sandbox 开关已移除。")
             "model" -> handleModelCommand()
             "goal" -> handleGoalCommand(args)
             "rewind" -> {
@@ -414,26 +422,6 @@ class ChatViewModel @Inject constructor(
         return false
     }
 
-    private fun handleSandboxCommand(args: String) {
-        when (args.lowercase()) {
-            "on", "开", "开启" -> {
-                apiKeyManager.setSandboxEnabled(true)
-                addSystemMessage("🛡️ 沙箱模式已开启\nPython 脚本的文件访问将限制在工作区内，并禁止 shell 调用")
-            }
-            "off", "关", "关闭" -> {
-                apiKeyManager.setSandboxEnabled(false)
-                addSystemMessage("⚠️ 沙箱模式已关闭\nPython 脚本将不受路径和 shell 限制，请确认你信任要执行的代码。随时可用 /sandbox on 重新开启")
-            }
-            else -> {
-                val enabled = apiKeyManager.isSandboxEnabled()
-                addSystemMessage(
-                    if (enabled) "🛡️ 沙箱模式：开启中\n用 /sandbox off 可关闭（解除文件路径和 shell 限制）"
-                    else "⚠️ 沙箱模式：已关闭\n用 /sandbox on 可重新开启"
-                )
-            }
-        }
-    }
-
     private fun handleModelCommand() {
         val state = apiKeyManager.state.value
         val modeText = when (selectedMode) {
@@ -442,19 +430,22 @@ class ChatViewModel @Inject constructor(
             else -> "聊天模式 (V4 Flash · 快速)"
         }
         val text = if (state.customProviderEnabled) {
+            val activeCustom = state.customModels.firstOrNull { it.id == state.activeModelId }
             buildString {
                 appendLine("🌐 当前使用第三方模型服务")
+                appendLine("· 显示名称：${state.activeModelLabel}")
+                appendLine("· 协议：${activeCustom?.protocol?.displayName ?: "自动"}")
                 appendLine("· 服务地址：${state.customBaseUrl.ifBlank { "(未配置)" }}")
-                appendLine("· 模型：${state.customModelName.ifBlank { "(未配置，将回退 DeepSeek 模型名)" }}")
+                appendLine("· 模型：${state.customModelName.ifBlank { "(未配置)" }}")
                 appendLine("· Key：${if (state.hasCustomKey) state.customKeyMasked else "(未配置)"}")
-                append("可在「设置 → 第三方模型」中修改")
+                append("可在左上角模型菜单或「设置 → 第三方模型」中切换")
             }
         } else {
             buildString {
                 appendLine("🧠 当前使用 DeepSeek 官方 API")
                 appendLine("· 模式：$modeText")
                 appendLine("· Key：${if (state.hasPrimaryKey) state.primaryKeyMasked else "(未配置)"}")
-                append("要接入自建服务（如 9router），到「设置 → 第三方模型」开启")
+                append("要接入自建服务（如 9router），到「设置 → 第三方模型」添加")
             }
         }
         addSystemMessage(text)
@@ -471,10 +462,12 @@ class ChatViewModel @Inject constructor(
             }
             args.equals("clear", ignoreCase = true) || args == "清除" -> {
                 sessionGoal = null
+                saveSessionGoal()
                 addSystemMessage("🎯 目标已清除")
             }
             else -> {
                 sessionGoal = args
+                saveSessionGoal()
                 addSystemMessage("🎯 目标已设定：$args\n之后每轮对话我都会朝这个目标推进。用 /goal clear 可清除")
             }
         }
@@ -504,28 +497,36 @@ class ChatViewModel @Inject constructor(
         addSystemMessage("🔁 进入循环模式（最多 $maxIterations 轮）\n目标：$task\n随时输入 /stop 中断")
         agentJob = viewModelScope.launch(Dispatchers.IO) {
             var completed = false
-            for (i in 1..maxIterations) {
-                addSystemMessage("🔁 第 $i / $maxIterations 轮")
-                val prompt = if (i == 1) {
-                    "$task\n\n【循环模式】这是一个多轮自动任务。本轮尽量推进；结束时自查目标是否已完全达成，" +
-                        "若已达成，在回复末尾单独一行输出 $LOOP_DONE_MARKER"
-                } else {
-                    "继续推进目标：$task\n检查之前的进度和遗留问题，完成剩余工作。" +
-                        "若目标已完全达成，在回复末尾单独一行输出 $LOOP_DONE_MARKER"
+            try {
+                for (i in 1..maxIterations) {
+                    if (!isActive) break
+                    addSystemMessage("🔁 第 $i / $maxIterations 轮")
+                    val prompt = if (i == 1) {
+                        "$task\n\n【循环模式】这是一个多轮自动任务。本轮尽量推进；结束时自查目标是否已完全达成，" +
+                            "若已达成，在回复末尾单独一行输出 $LOOP_DONE_MARKER"
+                    } else {
+                        "继续推进目标：$task\n检查之前的进度和遗留问题，完成剩余工作。" +
+                            "若目标已完全达成，在回复末尾单独一行输出 $LOOP_DONE_MARKER"
+                    }
+                    val reply = executeTurn(prompt, clearAgentJobOnFinalize = false)
+                    if (reply.contains(LOOP_DONE_MARKER)) {
+                        completed = true
+                        addSystemMessage("✅ 循环结束：目标已达成（共 $i 轮）")
+                        break
+                    }
+                    if (reply.isBlank()) {
+                        addSystemMessage("⚠️ 循环中断：本轮没有得到有效回复（第 $i 轮）")
+                        break
+                    }
                 }
-                val reply = executeTurn(prompt)
-                if (reply.contains(LOOP_DONE_MARKER)) {
-                    completed = true
-                    addSystemMessage("✅ 循环结束：目标已达成（共 $i 轮）")
-                    break
+                if (!completed && isActive) {
+                    addSystemMessage("🔁 循环结束：已达最大轮数 $maxIterations，目标可能未完全达成。可再次 /loop 继续")
                 }
-                if (reply.isBlank()) {
-                    addSystemMessage("⚠️ 循环中断：本轮没有得到有效回复（第 $i 轮）")
-                    break
-                }
-            }
-            if (!completed) {
-                addSystemMessage("🔁 循环结束：已达最大轮数 $maxIterations，目标可能未完全达成。可再次 /loop 继续")
+            } catch (e: CancellationException) {
+                throw e
+            } finally {
+                agentJob = null
+                _isProcessing.value = false
             }
         }
     }
@@ -622,6 +623,33 @@ class ChatViewModel @Inject constructor(
             it + ChatMessage(role = MessageRole.SYSTEM, content = text, status = MessageStatus.COMPLETE)
         }
         _scrollToBottom.value++
+    }
+
+    private fun goalFile(projectId: String = currentProjectId ?: "__general__"): java.io.File =
+        java.io.File(fileOperations.getWorkspaceRoot(), "$projectId/.agent/session_goal.txt")
+
+    private fun loadSessionGoal(projectId: String): String? {
+        return try {
+            goalFile(projectId).takeIf { it.isFile }?.readText()?.trim()?.takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            android.util.Log.e("NuclearBoy", "[ChatVM] loadSessionGoal failed: ${e.message}")
+            null
+        }
+    }
+
+    private fun saveSessionGoal() {
+        try {
+            val file = goalFile()
+            file.parentFile?.mkdirs()
+            val goal = sessionGoal?.trim()
+            if (goal.isNullOrBlank()) {
+                if (file.exists()) file.delete()
+            } else {
+                file.writeText(goal)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("NuclearBoy", "[ChatVM] saveSessionGoal failed: ${e.message}")
+        }
     }
 
     // ── Private: event handling ─────────────────────────────────────────
@@ -812,9 +840,9 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun finalizeProcessing(thinkingId: String) {
+    private fun finalizeProcessing(thinkingId: String, clearAgentJob: Boolean = true) {
         _isProcessing.value = false
-        agentJob = null
+        if (clearAgentJob) agentJob = null
         // Mark thinking placeholder as COMPLETE
         updateAssistantMessage(thinkingId) { msg ->
             if (msg.status == MessageStatus.THINKING) msg.copy(status = MessageStatus.COMPLETE)

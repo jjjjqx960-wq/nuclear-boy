@@ -27,6 +27,10 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -38,4 +42,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.core.ktx)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    testImplementation(libs.junit)
 }

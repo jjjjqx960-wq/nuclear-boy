@@ -132,7 +132,7 @@ class ContextWindowManager {
         return CompressionResult(
             tokensSaved = targetReduction,
             newBudget = newBudget,
-            message = "我帮你整理了一下前面的对话，节省了 ${targetReduction / 1000}K tokens 的上下文空间 ✨"
+            message = "我帮你压缩整理了一下前面的对话，节省了 ${targetReduction / 1000}K tokens 的上下文空间 ✨"
         )
     }
 

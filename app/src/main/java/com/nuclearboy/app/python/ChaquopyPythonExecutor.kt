@@ -126,7 +126,6 @@ class ChaquopyPythonExecutor : PythonExecutor {
 
             val duration = System.currentTimeMillis() - startTime
             android.util.Log.e("NuclearBoy", "[Chaquopy] run — duration=${duration}ms, exitCode=$exitCode, stdoutLen=${stdout.length}, stderrLen=${stderr.length}")
-            android.util.Log.e("NuclearBoy", "🐍 subprocess: exit=$exitCode out='${stdout.take(200)}' err='${stderr.take(200)}'")
 
             // Clean up
             try { outFile.delete() } catch (_: Exception) {}

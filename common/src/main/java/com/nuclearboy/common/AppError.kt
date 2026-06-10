@@ -24,11 +24,11 @@ enum class AppError(
     FileReadError("文件读取出错了 📄", "ERR_FILE_READ"),
     StorageFull("存储空间不够了（剩余 %.0f MB），清理一下？🗑️", "ERR_STORAGE_FULL"),
 
-    // Python Sandbox
+    // Python execution
     PythonRuntimeError("Python 运行出错了 🔧", "ERR_PYTHON_RT"),
     PythonTimeout("Python 脚本跑了太久，我把它停了 ⏰", "ERR_PYTHON_TIMEOUT"),
     PythonPackageError("安装 Python 包失败了 📦", "ERR_PYTHON_PKG"),
-    SandboxPermissionDenied("这个操作不被沙箱允许 🛡️", "ERR_SANDBOX_PERM"),
+    SandboxPermissionDenied("这个操作不被兼容执行策略允许 🛡️", "ERR_SANDBOX_PERM"),
 
     // Skills
     SkillNotFound("找不到这个 Skill 🧩", "ERR_SKILL_NOT_FOUND"),
