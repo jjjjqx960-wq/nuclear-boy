@@ -27,17 +27,6 @@ internal fun buildFileReferencesPrompt(
     }
 }
 
-internal fun toggleSelectedFilePath(
-    selectedPaths: List<String>,
-    filePath: String,
-): List<String> {
-    return if (filePath in selectedPaths) {
-        selectedPaths.filterNot { it == filePath }
-    } else {
-        selectedPaths + filePath
-    }
-}
-
 internal fun appendToChatDraft(
     currentDraft: String,
     addition: String,

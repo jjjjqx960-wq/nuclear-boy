@@ -2,6 +2,7 @@ package com.nuclearboy.ui.chat.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +34,9 @@ import com.nuclearboy.ui.chat.NuclearBoyTheme
 @Composable
 internal fun FileSelectionActionBar(
     selectedCount: Int,
+    selectedVisibleCount: Int,
+    visibleFileCount: Int,
+    onSelectVisible: () -> Unit,
     onReferenceSelected: () -> Unit,
     onClearSelection: () -> Unit,
     modifier: Modifier = Modifier,
@@ -48,8 +53,9 @@ internal fun FileSelectionActionBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            val hasSelection = selectedCount > 0
             Text(
-                text = "已选 $selectedCount 个",
+                text = if (hasSelection) "已选 $selectedCount 个" else "可选 $visibleFileCount 个",
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontFamily = FontFamily.Monospace,
@@ -58,22 +64,41 @@ internal fun FileSelectionActionBar(
                     color = nc.material.primary,
                 ),
             )
-            IconButton(
-                onClick = onClearSelection,
-                modifier = Modifier.size(28.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "清空选择",
-                    modifier = Modifier.size(15.dp),
-                    tint = nc.material.onSurfaceVariant,
-                )
+            if (hasSelection) {
+                IconButton(
+                    onClick = onClearSelection,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "清空选择",
+                        modifier = Modifier.size(15.dp),
+                        tint = nc.material.onSurfaceVariant,
+                    )
+                }
+            }
+            if (selectedVisibleCount < visibleFileCount) {
+                OutlinedButton(
+                    onClick = onSelectVisible,
+                    modifier = Modifier.height(30.dp),
+                    shape = RoundedCornerShape(7.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    border = BorderStroke(1.dp, nc.material.primary.copy(alpha = 0.35f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = nc.material.primary),
+                ) {
+                    Text(
+                        text = if (hasSelection) "全选" else "全选可见",
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
             }
             Button(
                 onClick = onReferenceSelected,
+                enabled = hasSelection,
                 modifier = Modifier.height(30.dp),
                 shape = RoundedCornerShape(7.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = nc.material.primary),
             ) {
                 Icon(

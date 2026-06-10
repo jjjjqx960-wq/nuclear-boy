@@ -1,5 +1,6 @@
 package com.nuclearboy.ui.chat.parts
 
+import com.nuclearboy.common.FileInfo
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -42,5 +43,19 @@ class FileReferencePromptTest {
 
         assertEquals(listOf("app/src/Main.kt"), selected)
         assertEquals(emptyList<String>(), cleared)
+    }
+
+    @Test
+    fun `select visible file paths skips directories and keeps existing selection`() {
+        val selected = selectVisibleFilePaths(
+            selectedPaths = listOf("README.md"),
+            visibleFiles = listOf(
+                FileInfo(path = "app/src", name = "src", isDirectory = true),
+                FileInfo(path = "app/src/Main.kt", name = "Main.kt", extension = "kt"),
+                FileInfo(path = "README.md", name = "README.md", extension = "md"),
+            ),
+        )
+
+        assertEquals(listOf("README.md", "app/src/Main.kt"), selected)
     }
 }

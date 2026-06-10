@@ -68,6 +68,7 @@ import com.nuclearboy.ui.chat.parts.buildFileReferencesPrompt
 import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
 import com.nuclearboy.ui.chat.parts.FilePanelSortMode
+import com.nuclearboy.ui.chat.parts.selectVisibleFilePaths
 import com.nuclearboy.ui.chat.parts.sortFilePanelEntries
 import com.nuclearboy.ui.chat.parts.shouldFollowChatScroll
 import com.nuclearboy.ui.chat.parts.shouldShowJumpToBottom
@@ -412,6 +413,12 @@ private fun ProjectFilePanel(
     val filePanelOverview = remember(visibleFiles) {
         buildFilePanelOverview(visibleFiles)
     }
+    val visibleSelectableFiles = remember(visibleFiles) {
+        visibleFiles.filterNot { it.isDirectory }
+    }
+    val selectedVisibleCount = remember(visibleSelectableFiles, selectedPathSet) {
+        visibleSelectableFiles.count { it.path in selectedPathSet }
+    }
     val selectedFiles = remember(files, selectedPathSet, sortMode) {
         sortFilePanelEntries(
             files.filter { !it.isDirectory && it.path in selectedPathSet },
@@ -511,9 +518,17 @@ private fun ProjectFilePanel(
                     onModeSelected = { sortMode = it },
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
-                if (selectedFiles.isNotEmpty()) {
+                if (visibleSelectableFiles.isNotEmpty()) {
                     FileSelectionActionBar(
                         selectedCount = selectedFiles.size,
+                        selectedVisibleCount = selectedVisibleCount,
+                        visibleFileCount = visibleSelectableFiles.size,
+                        onSelectVisible = {
+                            selectedFilePaths = selectVisibleFilePaths(
+                                selectedPaths = selectedFilePaths,
+                                visibleFiles = visibleFiles,
+                            )
+                        },
                         onReferenceSelected = {
                             onReferenceFiles(selectedFiles)
                             selectedFilePaths = emptyList()
