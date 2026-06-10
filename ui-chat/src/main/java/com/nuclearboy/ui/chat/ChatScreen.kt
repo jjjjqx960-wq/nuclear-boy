@@ -54,6 +54,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.common.*
 import com.nuclearboy.ui.chat.components.CommandShortcutBar
+import com.nuclearboy.ui.chat.components.FileReferenceIconButton
+import com.nuclearboy.ui.chat.components.FileReferenceTextButton
+import com.nuclearboy.ui.chat.parts.appendToChatDraft
+import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -90,6 +94,8 @@ fun ChatScreen(
     var selectedMode by remember { mutableIntStateOf(0) } // 0=Chat 1=Think 2=Expert
     var filePanelScrollState by remember { mutableStateOf(0f) }
     var filePanelScrollMax by remember { mutableStateOf(0f) }
+    var inputDraft by rememberSaveable(projectId) { mutableStateOf("") }
+    var inputFocusRequest by remember { mutableLongStateOf(0L) }
 
     // File picker for attachments
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -196,11 +202,14 @@ fun ChatScreen(
         },
         bottomBar = {
             ChatInputBar(
+                text = inputDraft,
+                onTextChange = { inputDraft = it },
                 isProcessing = uiState.isProcessing,
                 onSend = { text -> viewModel.sendMessage(text) },
                 onCancel = { viewModel.cancelCurrentOperation() },
                 fileCount = viewModel.projectFiles.collectAsState().value.size,
                 hasMessages = uiState.messages.any { it.role != MessageRole.SYSTEM },
+                focusRequest = inputFocusRequest,
                 placeholder = if (projectId == "__general__") "和核弹男孩对话…" else "输入指令…",
                 onAttachFile = {
                     android.util.Log.e("NuclearBoy", "[ChatScreen] filePicker launched")
@@ -283,6 +292,16 @@ fun ChatScreen(
                 onNavigateUp = { viewModel.navigateUp() },
                 context = context,
                 onClose = { showFiles = false },
+                onReferenceFile = { file ->
+                    val prompt = buildFileReferencePrompt(
+                        filePath = file.path,
+                        projectRoot = viewModel.getProjectRoot(),
+                    )
+                    inputDraft = appendToChatDraft(inputDraft, prompt)
+                    showFiles = false
+                    inputFocusRequest++
+                    Toast.makeText(context, "已引用: ${file.name}", Toast.LENGTH_SHORT).show()
+                },
             )
         }
     } // Box
@@ -298,6 +317,7 @@ private fun ProjectFilePanel(
     onRefresh: () -> Unit, onNavigateTo: (String) -> Unit, onNavigateUp: () -> Unit,
     context: Context,
     onClose: () -> Unit = {},
+    onReferenceFile: (FileInfo) -> Unit = {},
 ) {
     val nc = NuclearBoyTheme.colorScheme
     val fileListState = rememberLazyListState()
@@ -384,6 +404,7 @@ private fun ProjectFilePanel(
                                         showPreview = true
                                     }
                                 },
+                                onReference = { onReferenceFile(file) },
                             )
                         }
                     }
@@ -484,13 +505,24 @@ private fun ProjectFilePanel(
                         }
                     },
                     confirmButton = {
-                        Button(
-                            onClick = { shareFile(context, previewFile!!.path) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = nc.material.primary
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FileReferenceTextButton(
+                                onClick = {
+                                    previewFile?.let(onReferenceFile)
+                                    showPreview = false
+                                    previewContent = null
+                                },
                             )
-                        ) {
-                            Text("📤 分享")
+                            Button(
+                                onClick = { shareFile(context, previewFile!!.path) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = nc.material.primary
+                                )
+                            ) {
+                                Icon(Icons.Default.Share, "分享", modifier = Modifier.size(15.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("分享")
+                            }
                         }
                     },
                     dismissButton = {
@@ -514,6 +546,7 @@ private fun ProjectFilePanel(
 private fun FileRow(
     file: FileInfo, projectRoot: String, context: Context,
     onClick: () -> Unit,
+    onReference: () -> Unit = {},
 ) {
     val nc = NuclearBoyTheme.colorScheme
     Row(
@@ -532,6 +565,10 @@ private fun FileRow(
             color = if (file.isDirectory) nc.material.primary else nc.material.onSurface)
         Text(file.size.toFileSizeString(), fontSize = 10.sp, fontFamily = FontFamily.Monospace,
             color = nc.material.onSurfaceVariant.copy(alpha = 0.6f))
+        if (!file.isDirectory) {
+            Spacer(Modifier.width(4.dp))
+            FileReferenceIconButton(onClick = onReference)
+        }
     }
 }
 
@@ -829,16 +866,21 @@ private fun TypingPrompt(text: String, color: Color) {
 
 @Composable
 private fun ChatInputBar(
+    text: String,
+    onTextChange: (String) -> Unit,
     isProcessing: Boolean, onSend: (String) -> Unit, onCancel: () -> Unit,
     fileCount: Int = 0,
     hasMessages: Boolean = false,
+    focusRequest: Long = 0L,
     onAttachFile: (() -> Unit)? = null,
     placeholder: String = "输入指令…",
 ) {
-    var text by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
     val nc = NuclearBoyTheme.colorScheme
+    LaunchedEffect(focusRequest) {
+        if (focusRequest > 0) focusRequester.requestFocus()
+    }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -856,11 +898,11 @@ private fun ChatInputBar(
                 hasMessages = hasMessages,
                 onCommandSelected = { command ->
                     if (command.submitImmediately) {
-                        text = ""
+                        onTextChange("")
                         focusManager.clearFocus()
                         if (command.commandText == "/stop") onCancel() else onSend(command.commandText)
                     } else {
-                        text = command.commandText
+                        onTextChange(command.commandText)
                         focusRequester.requestFocus()
                     }
                 },
@@ -897,7 +939,7 @@ private fun ChatInputBar(
                 modifier = Modifier.padding(start = 2.dp))
 
             OutlinedTextField(
-                value = text, onValueChange = { text = it },
+                value = text, onValueChange = onTextChange,
                 modifier = Modifier.weight(1f).focusRequester(focusRequester),
                 placeholder = { Text(placeholder, style = MaterialTheme.typography.bodyMedium.copy(
                     fontFamily = FontFamily.Monospace, fontSize = 13.sp,
@@ -922,7 +964,7 @@ private fun ChatInputBar(
                     onClick = {
                         if (canSend) {
                             android.util.Log.e("NuclearBoy", "[ChatScreen] sendButton clicked textLen=${text.length}")
-                            onSend(text); text = ""; focusManager.clearFocus()
+                            onSend(text); onTextChange(""); focusManager.clearFocus()
                         }
                     },
                     modifier = Modifier.size(36.dp).clip(CircleShape)
