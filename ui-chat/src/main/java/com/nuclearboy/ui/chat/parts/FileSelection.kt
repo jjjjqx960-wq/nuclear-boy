@@ -69,6 +69,19 @@ internal fun shouldShowUnselectVisibleAction(
         (!showSelectedOnly || hasFilterQuery)
 }
 
+internal fun shouldShowReferenceMatchedAction(
+    selectedCount: Int,
+    selectedVisibleCount: Int,
+    showSelectedOnly: Boolean,
+    hasFilterQuery: Boolean,
+): Boolean {
+    return selectedCount > 0 &&
+        selectedVisibleCount > 0 &&
+        selectedVisibleCount < selectedCount &&
+        showSelectedOnly &&
+        hasFilterQuery
+}
+
 internal fun fileSelectionStatusLabel(
     selectedCount: Int,
     selectedVisibleCount: Int,

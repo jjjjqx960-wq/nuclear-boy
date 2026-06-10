@@ -172,6 +172,42 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `reference matched action shows for selected only filter subset`() {
+        val shouldShow = shouldShowReferenceMatchedAction(
+            selectedCount = 7,
+            selectedVisibleCount = 3,
+            showSelectedOnly = true,
+            hasFilterQuery = true,
+        )
+
+        assertEquals(true, shouldShow)
+    }
+
+    @Test
+    fun `reference matched action hides when every selected file matches`() {
+        val shouldShow = shouldShowReferenceMatchedAction(
+            selectedCount = 7,
+            selectedVisibleCount = 7,
+            showSelectedOnly = true,
+            hasFilterQuery = true,
+        )
+
+        assertEquals(false, shouldShow)
+    }
+
+    @Test
+    fun `reference matched action hides outside selected only filter mode`() {
+        val shouldShow = shouldShowReferenceMatchedAction(
+            selectedCount = 7,
+            selectedVisibleCount = 3,
+            showSelectedOnly = false,
+            hasFilterQuery = true,
+        )
+
+        assertEquals(false, shouldShow)
+    }
+
+    @Test
     fun `file selection status label shows selected visible progress`() {
         val label = fileSelectionStatusLabel(
             selectedCount = 7,

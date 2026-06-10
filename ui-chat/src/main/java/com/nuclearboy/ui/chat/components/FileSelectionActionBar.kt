@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuclearboy.ui.chat.NuclearBoyTheme
+import com.nuclearboy.ui.chat.parts.shouldShowReferenceMatchedAction
 import com.nuclearboy.ui.chat.parts.shouldShowUnselectVisibleAction
 
 @Composable
@@ -48,6 +50,7 @@ internal fun FileSelectionActionBar(
     onUnselectVisible: () -> Unit,
     onUnselectHidden: () -> Unit,
     onShowSelectedOnlyChange: (Boolean) -> Unit,
+    onReferenceVisible: () -> Unit,
     onReferenceSelected: () -> Unit,
     onClearSelection: () -> Unit,
     modifier: Modifier = Modifier,
@@ -68,6 +71,12 @@ internal fun FileSelectionActionBar(
             hasFilterQuery = hasFilterQuery,
         )
         val canUnselectHidden = hasSelection && hiddenSelectedCount > 0 && !showSelectedOnly
+        val canReferenceMatched = shouldShowReferenceMatchedAction(
+            selectedCount = selectedCount,
+            selectedVisibleCount = selectedVisibleCount,
+            showSelectedOnly = showSelectedOnly,
+            hasFilterQuery = hasFilterQuery,
+        )
         if (hasSelection) {
             Column(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -150,8 +159,23 @@ internal fun FileSelectionActionBar(
                         }
                     }
                     Spacer(Modifier.weight(1f))
+                    if (canReferenceMatched) {
+                        FileSelectionReferenceButton(
+                            enabled = true,
+                            label = "匹配",
+                            contentDescription = "引用当前匹配选择到输入",
+                            onClick = onReferenceVisible,
+                            outlined = true,
+                        )
+                    }
                     FileSelectionReferenceButton(
                         enabled = true,
+                        label = if (canReferenceMatched) "全部" else "引用",
+                        contentDescription = if (canReferenceMatched) {
+                            "引用全部已选文件到输入"
+                        } else {
+                            "批量引用到输入"
+                        },
                         onClick = onReferenceSelected,
                     )
                 }
@@ -182,6 +206,8 @@ internal fun FileSelectionActionBar(
                 }
                 FileSelectionReferenceButton(
                     enabled = false,
+                    label = "引用",
+                    contentDescription = "批量引用到输入",
                     onClick = onReferenceSelected,
                 )
             }
@@ -212,27 +238,56 @@ private fun FileSelectionStatusText(
 @Composable
 private fun FileSelectionReferenceButton(
     enabled: Boolean,
+    label: String,
+    contentDescription: String,
     onClick: () -> Unit,
+    outlined: Boolean = false,
 ) {
     val nc = NuclearBoyTheme.colorScheme
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.height(30.dp),
-        shape = RoundedCornerShape(7.dp),
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = nc.material.primary),
-    ) {
-        Icon(
-            imageVector = Icons.Default.Add,
-            contentDescription = "批量引用到输入",
-            modifier = Modifier.size(14.dp),
-        )
-        Spacer(Modifier.width(4.dp))
-        Text(
-            text = "引用",
-            fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace,
+    val content: @Composable RowScope.() -> Unit = {
+        FileSelectionReferenceButtonContent(
+            label = label,
+            contentDescription = contentDescription,
         )
     }
+    if (outlined) {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier.height(30.dp),
+            shape = RoundedCornerShape(7.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+            border = BorderStroke(1.dp, nc.material.primary.copy(alpha = 0.35f)),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = nc.material.primary),
+            content = content,
+        )
+    } else {
+        Button(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier.height(30.dp),
+            shape = RoundedCornerShape(7.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = nc.material.primary),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun FileSelectionReferenceButtonContent(
+    label: String,
+    contentDescription: String,
+) {
+    Icon(
+        imageVector = Icons.Default.Add,
+        contentDescription = contentDescription,
+        modifier = Modifier.size(14.dp),
+    )
+    Spacer(Modifier.width(4.dp))
+    Text(
+        text = label,
+        fontSize = 11.sp,
+        fontFamily = FontFamily.Monospace,
+    )
 }
