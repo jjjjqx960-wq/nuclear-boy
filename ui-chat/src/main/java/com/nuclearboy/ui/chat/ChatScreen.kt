@@ -56,9 +56,12 @@ import com.nuclearboy.common.*
 import com.nuclearboy.ui.chat.components.CommandShortcutBar
 import com.nuclearboy.ui.chat.components.FileReferenceIconButton
 import com.nuclearboy.ui.chat.components.FileReferenceTextButton
+import com.nuclearboy.ui.chat.components.FilePanelSearchField
 import com.nuclearboy.ui.chat.components.ScrollToBottomAction
 import com.nuclearboy.ui.chat.parts.appendToChatDraft
 import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
+import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
+import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
 import com.nuclearboy.ui.chat.parts.shouldFollowChatScroll
 import com.nuclearboy.ui.chat.parts.shouldShowJumpToBottom
 import kotlinx.coroutines.delay
@@ -377,6 +380,17 @@ private fun ProjectFilePanel(
     var showPreview by remember { mutableStateOf(false) }
     var previewFile by remember { mutableStateOf<FileInfo?>(null) }
     var previewContent by remember { mutableStateOf<String?>(null) }
+    var filterQuery by rememberSaveable(browseDir) { mutableStateOf("") }
+    val visibleFiles = remember(files, filterQuery) {
+        filterFilePanelEntries(files, filterQuery)
+    }
+    val filterSummary = remember(files.size, visibleFiles.size, filterQuery) {
+        filePanelFilterSummary(
+            totalCount = files.size,
+            filteredCount = visibleFiles.size,
+            query = filterQuery,
+        )
+    }
 
     Surface(
         modifier = Modifier
@@ -434,16 +448,31 @@ private fun ProjectFilePanel(
                         tint = nc.material.onSurfaceVariant)
                 }
             }
+            FilePanelSearchField(
+                query = filterQuery,
+                resultSummary = filterSummary,
+                onQueryChange = { filterQuery = it },
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
             // File list
             if (files.isEmpty()) {
                 Text("  空目录", style = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = FontFamily.Monospace),
                     color = nc.material.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp))
+            } else if (visibleFiles.isEmpty()) {
+                Text(
+                    "  没有匹配「${filterQuery.trim()}」的文件",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                    ),
+                    color = nc.material.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
             } else {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                     LazyColumn(state = fileListState, modifier = Modifier.fillMaxSize()) {
-                        items(files, key = { it.path }) { file ->
+                        items(visibleFiles, key = { it.path }) { file ->
                             FileRow(
                                 file = file, projectRoot = projectRoot, context = context,
                                 onClick = {
