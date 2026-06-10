@@ -69,6 +69,7 @@ import com.nuclearboy.ui.chat.parts.fileSelectionStatusLabel
 import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
 import com.nuclearboy.ui.chat.parts.FilePanelSortMode
+import com.nuclearboy.ui.chat.parts.removeReferencedFilePaths
 import com.nuclearboy.ui.chat.parts.selectedFileTotalSizeBytes
 import com.nuclearboy.ui.chat.parts.selectVisibleFilePaths
 import com.nuclearboy.ui.chat.parts.selectedFilePanelEntries
@@ -372,14 +373,16 @@ fun ChatScreen(
                     inputFocusRequest++
                     Toast.makeText(context, "已引用: ${file.name}", Toast.LENGTH_SHORT).show()
                 },
-                onReferenceFiles = { files ->
+                onReferenceFiles = { files, closePanel ->
                     val prompt = buildFileReferencesPrompt(
                         filePaths = files.map { it.path },
                         projectRoot = viewModel.getProjectRoot(),
                     )
                     inputDraft = appendToChatDraft(inputDraft, prompt)
-                    showFiles = false
-                    inputFocusRequest++
+                    if (closePanel) {
+                        showFiles = false
+                        inputFocusRequest++
+                    }
                     Toast.makeText(context, "已引用 ${files.size} 个文件", Toast.LENGTH_SHORT).show()
                 },
             )
@@ -398,7 +401,7 @@ private fun ProjectFilePanel(
     context: Context,
     onClose: () -> Unit = {},
     onReferenceFile: (FileInfo) -> Unit = {},
-    onReferenceFiles: (List<FileInfo>) -> Unit = {},
+    onReferenceFiles: (List<FileInfo>, Boolean) -> Unit = { _, _ -> },
 ) {
     val nc = NuclearBoyTheme.colorScheme
     val fileListState = rememberLazyListState()
@@ -600,11 +603,14 @@ private fun ProjectFilePanel(
                     onReferenceVisible = {
                         val matchedSelectedFiles = visibleSelectableFiles
                             .filter { it.path in selectedPathSet }
-                        onReferenceFiles(matchedSelectedFiles)
-                        selectedFilePaths = emptyList()
+                        onReferenceFiles(matchedSelectedFiles, false)
+                        selectedFilePaths = removeReferencedFilePaths(
+                            selectedPaths = selectedFilePaths,
+                            referencedFiles = matchedSelectedFiles,
+                        )
                     },
                     onReferenceSelected = {
-                        onReferenceFiles(selectedFiles)
+                        onReferenceFiles(selectedFiles, true)
                         selectedFilePaths = emptyList()
                     },
                     onClearSelection = { selectedFilePaths = emptyList() },

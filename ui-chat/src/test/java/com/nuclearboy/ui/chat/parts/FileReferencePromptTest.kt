@@ -88,6 +88,31 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `remove referenced file paths keeps unreferenced selection`() {
+        val selected = removeReferencedFilePaths(
+            selectedPaths = listOf("README.md", "app/src/Main.kt", "app/src/Hidden.kt"),
+            referencedFiles = listOf(
+                FileInfo(path = "app/src/Main.kt", name = "Main.kt", extension = "kt"),
+                FileInfo(path = "README.md", name = "README.md", extension = "md"),
+            ),
+        )
+
+        assertEquals(listOf("app/src/Hidden.kt"), selected)
+    }
+
+    @Test
+    fun `remove referenced file paths ignores referenced directories`() {
+        val selected = removeReferencedFilePaths(
+            selectedPaths = listOf("app/src", "app/src/Main.kt"),
+            referencedFiles = listOf(
+                FileInfo(path = "app/src", name = "src", isDirectory = true),
+            ),
+        )
+
+        assertEquals(listOf("app/src", "app/src/Main.kt"), selected)
+    }
+
+    @Test
     fun `selected file panel entries returns selected files only`() {
         val entries = selectedFilePanelEntries(
             files = listOf(
