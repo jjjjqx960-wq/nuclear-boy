@@ -54,11 +54,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.common.*
 import com.nuclearboy.ui.chat.components.CommandShortcutBar
+import com.nuclearboy.ui.chat.components.FilePanelOverviewBar
 import com.nuclearboy.ui.chat.components.FileReferenceIconButton
 import com.nuclearboy.ui.chat.components.FileReferenceTextButton
 import com.nuclearboy.ui.chat.components.FilePanelSearchField
 import com.nuclearboy.ui.chat.components.ScrollToBottomAction
 import com.nuclearboy.ui.chat.parts.appendToChatDraft
+import com.nuclearboy.ui.chat.parts.buildFilePanelOverview
 import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
 import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
@@ -384,6 +386,9 @@ private fun ProjectFilePanel(
     val visibleFiles = remember(files, filterQuery) {
         filterFilePanelEntries(files, filterQuery)
     }
+    val filePanelOverview = remember(visibleFiles) {
+        buildFilePanelOverview(visibleFiles)
+    }
     val filterSummary = remember(files.size, visibleFiles.size, filterQuery) {
         filePanelFilterSummary(
             totalCount = files.size,
@@ -454,6 +459,13 @@ private fun ProjectFilePanel(
                 onQueryChange = { filterQuery = it },
                 modifier = Modifier.padding(bottom = 6.dp),
             )
+            if (visibleFiles.isNotEmpty()) {
+                FilePanelOverviewBar(
+                    overview = filePanelOverview,
+                    totalSizeLabel = filePanelOverview.totalFileSizeBytes.toFileSizeString(),
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+            }
             // File list
             if (files.isEmpty()) {
                 Text("  空目录", style = MaterialTheme.typography.bodySmall.copy(
