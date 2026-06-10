@@ -1,3 +1,4 @@
+2026-06-10 1.0.2 404 诊断区分“路径不存在”和“网关模型路由失败”（model_not_found / no active credentials 等），后者提示检查模型名与上游 provider 凭证，不再误导用户切换地址模式。
 2026-06-10 1.0.2 鉴权拦截器跳过已带 Authorization/x-api-key 的请求，避免 checkBalance 等显式带 Key 的调用出现双鉴权头。
 2026-06-10 1.0.2 优化第三方网关 HTTP 405 诊断，提示完整地址模式下 `/v1` 根路径应改用智能拼接或填写最终 chat/completions/messages 接口。
 2026-06-10 1.0.2 支持第三方地址归一化、无鉴权网关请求、标准 TLS 校验、稳定的多工具 SSE delta，优化复杂任务模型路由与缓存命中率统计，并补齐模块单元测试 JUnit 依赖。
