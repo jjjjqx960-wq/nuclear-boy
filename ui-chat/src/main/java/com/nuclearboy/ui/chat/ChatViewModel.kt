@@ -1,0 +1,892 @@
+package com.nuclearboy.ui.chat
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.nuclearboy.agent.AgentEngine
+import com.nuclearboy.agent.AgentEvent
+import com.nuclearboy.agent.ProjectContext
+import com.nuclearboy.api.deepseek.ContextBudget
+import com.nuclearboy.api.deepseek.ContextWindowManager
+import com.nuclearboy.api.deepseek.TokenSnapshot
+import com.nuclearboy.api.deepseek.TokenTracker
+import com.nuclearboy.common.*
+import com.nuclearboy.common.AppConstants
+import com.nuclearboy.common.AppResult
+import com.nuclearboy.memory.MemoryStore
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
+import java.util.UUID
+import javax.inject.Inject
+
+// ── UI State ────────────────────────────────────────────────────────────────
+
+data class StreamingState(
+    val messageId: String,
+    val thinkingText: StringBuilder = StringBuilder(),
+    val responseText: StringBuilder = StringBuilder(),
+    val activeToolCalls: List<ToolCallRecord> = emptyList(),
+    val isThinking: Boolean = false,
+    val isStreaming: Boolean = false,
+)
+
+data class ChatUiState(
+    val messages: List<ChatMessage> = emptyList(),
+    val isProcessing: Boolean = false,
+    val tokenSnapshot: TokenSnapshot = TokenSnapshot(),
+    val contextBudget: ContextBudget = ContextBudget(),
+    val streamingState: StreamingState? = null,
+    val scrollToBottom: Long = 0L, // Incremented to trigger scroll
+)
+
+@HiltViewModel
+class ChatViewModel @Inject constructor(
+    private val agentEngine: AgentEngine,
+    private val tokenTracker: TokenTracker,
+    private val contextManager: ContextWindowManager,
+    private val apiKeyManager: com.nuclearboy.api.deepseek.ApiKeyManager,
+    private val apiClient: com.nuclearboy.api.deepseek.DeepSeekApiClient,
+    private val fileOperations: com.nuclearboy.tools.docgen.FileOperations,
+    private val skillManager: com.nuclearboy.skills.SkillManager,
+    private val memoryStore: MemoryStore,
+) : ViewModel() {
+
+    // 从记忆加载用户画像
+    private suspend fun loadUserProfile(): UserProfile {
+        val result = memoryStore.exportUserProfile()
+        return when (result) {
+            is AppResult.Success -> result.data
+            is AppResult.Failure -> UserProfile()
+        }
+    }
+
+    /** Set by NavHost to enable background notifications */
+    var notificationCallback: ((String, String?) -> Unit)? = null
+
+    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    private val _isProcessing = MutableStateFlow(false)
+    private val _streamingState = MutableStateFlow<StreamingState?>(null)
+    private val _scrollToBottom = MutableStateFlow(0L)
+
+    private var agentJob: Job? = null
+    private var lastUserMessage: ChatMessage? = null
+    private var currentProjectId: String? = null
+    private var currentThinkingId: String? = null
+    private var currentAssistantMsgId: String? = null
+    private var selectedMode: Int = 0
+    /** 用户通过 /goal 设定的会话目标，每轮注入上下文 */
+    private var sessionGoal: String? = null
+    private val _projectName = MutableStateFlow("")
+    val projectName: StateFlow<String> = _projectName.asStateFlow()
+
+    fun setMode(mode: Int) { selectedMode = mode.coerceIn(0, 2) }
+
+    private val _projectFiles = MutableStateFlow<List<FileInfo>>(emptyList())
+    val projectFiles: StateFlow<List<FileInfo>> = _projectFiles.asStateFlow()
+
+    fun setProject(projectId: String) {
+        android.util.Log.e("NuclearBoy", "[ChatVM] setProject() projectId=$projectId previousId=$currentProjectId currentDir=${fileOperations.currentProjectDir}")
+        // currentProjectDir 由外部 selectProject() 设置（UUID → 目录名的转换）
+        // 此处不覆盖，信任外部已设置正确
+        currentProjectId = projectId
+        val root = fileOperations.projectRoot()
+        _projectName.value = if (projectId == "__general__") "核弹男孩" else root.name
+        // 每次切换都重新加载消息
+        val loaded = try { loadPersistedMessages(projectId) }
+            catch (e: Exception) { android.util.Log.e("NuclearBoy", "加载历史失败: ${e.message}"); emptyList() }
+        android.util.Log.e("NuclearBoy", "[ChatVM] setProject() messagesLoaded=${loaded.size} root=${root.absolutePath}")
+        _messages.value = loaded
+        refreshProjectFiles()
+        if (loaded.isNotEmpty()) _scrollToBottom.value++
+        if (projectId != "__general__") {
+            try {
+                val skillsDir = java.io.File(fileOperations.projectRoot(), AppConstants.PROJECT_SKILLS_DIR)
+                skillManager.loadProjectSkills(skillsDir)
+            } catch (e: Exception) { android.util.Log.e("NuclearBoy", "[ChatVM] setProject() skills load failed: ${e.message}") }
+        }
+    }
+
+    override fun onCleared() {
+        android.util.Log.e("NuclearBoy", "[ChatVM] onCleared() ViewModel cleanup")
+        super.onCleared()
+        skillManager.unloadProjectSkills()
+    }
+
+    private val _browseDir = MutableStateFlow(".")
+    val browseDir: StateFlow<String> = _browseDir.asStateFlow()
+
+    fun refreshProjectFiles(path: String = ".") {
+        android.util.Log.e("NuclearBoy", "[ChatVM] refreshProjectFiles() path=$path")
+        viewModelScope.launch {
+            _browseDir.value = path
+            val result = fileOperations.listDirectory(path)
+            if (result is AppResult.Success) {
+                _projectFiles.value = result.data
+                android.util.Log.e("NuclearBoy", "[ChatVM] refreshProjectFiles() filesFound=${result.data.size} path=$path")
+            }
+        }
+    }
+
+    fun navigateToDir(dirName: String) {
+        val current = _browseDir.value
+        val newPath = if (current == ".") dirName else "$current/$dirName"
+        android.util.Log.e("NuclearBoy", "[ChatVM] navigateToDir() '$current' -> '$newPath'")
+        refreshProjectFiles(newPath)
+    }
+
+    fun navigateUp() {
+        val current = _browseDir.value
+        if (current == ".") return
+        val parent = current.substringBeforeLast("/", ".")
+        val newPath = if (parent.isEmpty()) "." else parent
+        android.util.Log.e("NuclearBoy", "[ChatVM] navigateUp() '$current' -> '$newPath'")
+        refreshProjectFiles(newPath)
+    }
+
+    private fun saveMessages() {
+        val pid = currentProjectId ?: return
+        android.util.Log.e("NuclearBoy", "[ChatVM] saveMessages() pid=$pid messagesCount=${_messages.value.size}")
+        try {
+            // 直接用 workspaceRoot + projectId 构建路径，不依赖 currentProjectDir
+            val dir = java.io.File(fileOperations.getWorkspaceRoot(), "$pid/.agent")
+            dir.mkdirs()
+            val data = Json.encodeToString(serializer(), _messages.value.takeLast(50))
+            val file = java.io.File(dir, "conversation.json")
+            file.writeText(data)
+            android.util.Log.e("NuclearBoy", "[ChatVM] saveMessages() saved to ${file.absolutePath}")
+        } catch (e: Exception) {
+            android.util.Log.e("NuclearBoy", "[ChatVM] saveMessages() error: ${e.message}", e)
+        }
+    }
+
+    private fun loadPersistedMessages(projectId: String): List<ChatMessage> {
+        android.util.Log.e("NuclearBoy", "[ChatVM] loadPersistedMessages() projectId=$projectId")
+        return try {
+            val file = java.io.File(fileOperations.getWorkspaceRoot(), "$projectId/.agent/conversation.json")
+            android.util.Log.e("NuclearBoy", "[ChatVM] loadPersistedMessages() path=${file.absolutePath} exists=${file.exists()}")
+            if (file.exists()) {
+                val loaded = Json.decodeFromString(serializer<List<ChatMessage>>(), file.readText())
+                android.util.Log.e("NuclearBoy", "[ChatVM] loadPersistedMessages() loaded=${loaded.size}")
+                loaded
+            } else emptyList()
+        } catch (e: Exception) {
+            android.util.Log.e("NuclearBoy", "[ChatVM] loadPersistedMessages() error: ${e.message}", e)
+            android.util.Log.e("NuclearBoy", "加载消息失败: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
+    val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
+    val streamingState: StateFlow<StreamingState?> = _streamingState.asStateFlow()
+    val scrollToBottom: StateFlow<Long> = _scrollToBottom.asStateFlow()
+
+    /** Expose project root path for file browser integration. */
+    fun getProjectRoot(): String = fileOperations.projectRoot().absolutePath
+
+    fun getActiveSkillCount(): Int = skillManager.activeSkills.value.size
+
+    val uiState: StateFlow<ChatUiState> = combine(
+        combine(_messages, _isProcessing, tokenTracker.snapshot) { msgs, processing, tokens ->
+            Triple(msgs, processing, tokens)
+        },
+        combine(contextManager.budget, _streamingState, _scrollToBottom) { budget, streaming, scroll ->
+            Triple(budget, streaming, scroll)
+        },
+    ) { (msgs, processing, tokens), (budget, streaming, scroll) ->
+        ChatUiState(
+            messages = msgs,
+            isProcessing = processing,
+            tokenSnapshot = tokens,
+            contextBudget = budget,
+            streamingState = streaming,
+            scrollToBottom = scroll,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
+
+    // ── Public actions ──────────────────────────────────────────────────
+
+    fun sendMessage(text: String) {
+        val trimmed = text.trim()
+        android.util.Log.e("NuclearBoy", "[ChatVM] sendMessage() entry textLen=${trimmed.length} isProcessing=${_isProcessing.value}")
+        if (trimmed.isEmpty()) return
+        // 斜杠命令优先处理（/stop 等命令在处理中也要可用）
+        if (trimmed.startsWith("/")) {
+            handleSlashCommand(trimmed)
+            return
+        }
+        if (_isProcessing.value) return
+
+        // Cancel any existing processing cleanly
+        cancelCurrentOperation()
+
+        agentJob = viewModelScope.launch(Dispatchers.IO) {
+            executeTurn(trimmed)
+        }
+    }
+
+    /**
+     * 执行一轮完整的 Agent 对话：用户消息 → AI 处理 → 工具调用 → 最终回复。
+     * 被 [sendMessage]（单轮）和 /loop（多轮循环）复用。
+     * @return 最终 ASSISTANT 回复内容（供循环模式判断目标是否达成）。
+     */
+    private suspend fun executeTurn(trimmed: String): String {
+        // Check API key
+        val key = apiKeyManager.getActiveKey()
+        android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() apiKey status: hasKey=${key != null} keyPreview=${key?.take(10)}")
+        if (key == null) {
+            android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() no API key, showing tip")
+            val userMessage = ChatMessage(role = MessageRole.USER, content = trimmed, status = MessageStatus.COMPLETE)
+            _messages.update { it + userMessage }
+            addSystemMessage("需要配置 DeepSeek API Key 才能开始\n\n请到右上角「设置」输入你的 Key（sk-v4- 开头），保存后即可使用。\n如果你用的是自建模型服务，也可以在设置里开启「第三方模型」")
+            return ""
+        }
+
+        val userMessage = ChatMessage(
+            role = MessageRole.USER, content = trimmed, status = MessageStatus.COMPLETE,
+        )
+        _messages.update { it + userMessage }
+        android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() userMessage created id=${userMessage.id}")
+        lastUserMessage = userMessage
+        saveMessages()
+        _scrollToBottom.value++
+        _isProcessing.value = true
+
+        // Create single ASSISTANT placeholder — all updates stream into this message
+        val assistantId = UUID.randomUUID().toString()
+        currentThinkingId = assistantId
+        currentAssistantMsgId = assistantId
+        val placeholder = ChatMessage(
+            id = assistantId, role = MessageRole.ASSISTANT,
+            content = "", status = MessageStatus.THINKING,
+        )
+        _messages.update { it + placeholder }
+        android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() assistant placeholder created id=$assistantId")
+        _streamingState.value = StreamingState(messageId = assistantId, isThinking = true)
+        _scrollToBottom.value++
+
+        // 读记忆文件
+        val memFile = java.io.File(fileOperations.getWorkspaceRoot(), "__general__/.agent/memory.json")
+        val memoryCtx = if (memFile.exists()) {
+            try {
+                val json = Json { ignoreUnknownKeys = true; isLenient = true }
+                val memories = json.decodeFromString<List<Map<String, String>>>(memFile.readText())
+                memories.takeLast(10).joinToString("\n") { "- ${it["value"]} [${it["category"]}]" }
+            } catch (_: Exception) { "" }
+        } else ""
+
+        // /goal 设定的会话目标注入上下文
+        val goal = sessionGoal
+        val memoryCtxWithGoal = buildString {
+            append(memoryCtx)
+            if (!goal.isNullOrBlank()) {
+                if (isNotEmpty()) append("\n\n")
+                append("【会话目标】用户设定的当前目标：$goal\n每次回复都要朝这个目标推进。")
+            }
+        }
+
+        // Build project context with memory
+        val projectContext = ProjectContext(
+            project = currentProjectId?.let { id ->
+                Project(id = id, name = id, rootPath = fileOperations.projectRoot().absolutePath)
+            },
+            currentFiles = _projectFiles.value,
+            userProfile = UserProfile(),
+            activeSkills = skillManager.activeSkills.value,
+            memoryContext = memoryCtxWithGoal,
+        )
+        android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() projectContext built: project=${projectContext.project?.name} files=${projectContext.currentFiles.size} skills=${projectContext.activeSkills.size}")
+
+        notificationCallback?.invoke("thinking", currentProjectId)
+
+        // 从记忆加载用户偏好
+        val loadedProfile = loadUserProfile()
+        val enrichedContext = projectContext.copy(userProfile = loadedProfile)
+        try {
+            agentEngine.processMessage(
+                userMessage = trimmed,
+                projectContext = enrichedContext,
+                conversationHistory = _messages.value.filter { it.role != MessageRole.SYSTEM },
+                userMode = selectedMode,
+            ).collect { event ->
+                handleAgentEvent(event, assistantId)
+            }
+            android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() flow completed normally")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() cancelled")
+            updateAssistantMessage(assistantId) { msg ->
+                if (msg.content.isEmpty()) msg.copy(content = "", status = MessageStatus.CANCELLED)
+                else msg.copy(status = MessageStatus.COMPLETE)
+            }
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() error: ${e.message}", e)
+            handleAgentError(e, assistantId)
+        } finally {
+            android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() entering finally block")
+            finalizeProcessing(assistantId)
+        }
+        return _messages.value.findLast { it.role == MessageRole.ASSISTANT }?.content ?: ""
+    }
+
+    fun retryLastMessage() {
+        android.util.Log.e("NuclearBoy", "[ChatVM] retryLastMessage() entry isProcessing=${_isProcessing.value}")
+        if (_isProcessing.value) return
+        val lastUser = lastUserMessage ?: return
+        val currentMessages = _messages.value.toMutableList()
+        val lastUserIndex = currentMessages.indexOfLast { it.id == lastUser.id }
+        if (lastUserIndex >= 0 && lastUserIndex < currentMessages.lastIndex) {
+            currentMessages.subList(lastUserIndex + 1, currentMessages.size).clear()
+            _messages.value = currentMessages
+        }
+        sendMessage(lastUser.content)
+    }
+
+    fun cancelCurrentOperation() {
+        val job = agentJob
+        val wasActive = job != null && job.isActive
+        android.util.Log.e("NuclearBoy", "[ChatVM] cancelCurrentOperation() jobActive=$wasActive")
+        if (job != null && job.isActive) {
+            job.cancel()
+            agentEngine.cancel()
+        }
+        agentJob = null
+        _isProcessing.value = false
+        _streamingState.value = null
+        currentThinkingId = null
+        currentAssistantMsgId = null
+    }
+
+    fun clearConversation() {
+        android.util.Log.e("NuclearBoy", "[ChatVM] clearConversation() entry messagesCount=${_messages.value.size}")
+        cancelCurrentOperation()
+        _messages.value = emptyList()
+        lastUserMessage = null
+        contextManager.reset()
+        currentThinkingId = null
+        currentAssistantMsgId = null
+    }
+
+    // ── Slash Commands（/loop /goal /compact /rewind 等）──────────────────
+
+    private fun handleSlashCommand(input: String) {
+        val (cmd, args) = parseSlashCommand(input)
+        android.util.Log.e("NuclearBoy", "[ChatVM] slashCommand cmd=$cmd args=${args.take(50)}")
+        when (cmd) {
+            "help" -> addSystemMessage(SLASH_HELP)
+            "stop" -> {
+                cancelCurrentOperation()
+                addSystemMessage("⏹️ 已停止当前任务")
+            }
+            "clear" -> {
+                clearConversation()
+                addSystemMessage("🧹 对话已清空，重新开始吧")
+            }
+            "sandbox" -> handleSandboxCommand(args)
+            "model" -> handleModelCommand()
+            "goal" -> handleGoalCommand(args)
+            "rewind" -> {
+                if (busyGuard()) return
+                rewindConversation(args.toIntOrNull() ?: 1)
+            }
+            "compact" -> {
+                if (busyGuard()) return
+                compactConversation()
+            }
+            "loop" -> {
+                if (busyGuard()) return
+                handleLoopCommand(args)
+            }
+            else -> addSystemMessage("❓ 不认识的命令 /$cmd\n\n$SLASH_HELP")
+        }
+    }
+
+    private fun busyGuard(): Boolean {
+        if (_isProcessing.value) {
+            addSystemMessage("⏳ 正在处理中，先用 /stop 停止当前任务再试")
+            return true
+        }
+        return false
+    }
+
+    private fun handleSandboxCommand(args: String) {
+        when (args.lowercase()) {
+            "on", "开", "开启" -> {
+                apiKeyManager.setSandboxEnabled(true)
+                addSystemMessage("🛡️ 沙箱模式已开启\nPython 脚本的文件访问将限制在工作区内，并禁止 shell 调用")
+            }
+            "off", "关", "关闭" -> {
+                apiKeyManager.setSandboxEnabled(false)
+                addSystemMessage("⚠️ 沙箱模式已关闭\nPython 脚本将不受路径和 shell 限制，请确认你信任要执行的代码。随时可用 /sandbox on 重新开启")
+            }
+            else -> {
+                val enabled = apiKeyManager.isSandboxEnabled()
+                addSystemMessage(
+                    if (enabled) "🛡️ 沙箱模式：开启中\n用 /sandbox off 可关闭（解除文件路径和 shell 限制）"
+                    else "⚠️ 沙箱模式：已关闭\n用 /sandbox on 可重新开启"
+                )
+            }
+        }
+    }
+
+    private fun handleModelCommand() {
+        val state = apiKeyManager.state.value
+        val modeText = when (selectedMode) {
+            1 -> "思考模式 (V4 Pro · 深度思考)"
+            2 -> "专家模式 (V4 Pro · 极致推理)"
+            else -> "聊天模式 (V4 Flash · 快速)"
+        }
+        val text = if (state.customProviderEnabled) {
+            buildString {
+                appendLine("🌐 当前使用第三方模型服务")
+                appendLine("· 服务地址：${state.customBaseUrl.ifBlank { "(未配置)" }}")
+                appendLine("· 模型：${state.customModelName.ifBlank { "(未配置，将回退 DeepSeek 模型名)" }}")
+                appendLine("· Key：${if (state.hasCustomKey) state.customKeyMasked else "(未配置)"}")
+                append("可在「设置 → 第三方模型」中修改")
+            }
+        } else {
+            buildString {
+                appendLine("🧠 当前使用 DeepSeek 官方 API")
+                appendLine("· 模式：$modeText")
+                appendLine("· Key：${if (state.hasPrimaryKey) state.primaryKeyMasked else "(未配置)"}")
+                append("要接入自建服务（如 9router），到「设置 → 第三方模型」开启")
+            }
+        }
+        addSystemMessage(text)
+    }
+
+    private fun handleGoalCommand(args: String) {
+        when {
+            args.isBlank() -> {
+                val goal = sessionGoal
+                addSystemMessage(
+                    if (goal.isNullOrBlank()) "🎯 当前没有设定目标\n用 /goal <目标描述> 来设定一个"
+                    else "🎯 当前目标：$goal\n用 /goal clear 可清除"
+                )
+            }
+            args.equals("clear", ignoreCase = true) || args == "清除" -> {
+                sessionGoal = null
+                addSystemMessage("🎯 目标已清除")
+            }
+            else -> {
+                sessionGoal = args
+                addSystemMessage("🎯 目标已设定：$args\n之后每轮对话我都会朝这个目标推进。用 /goal clear 可清除")
+            }
+        }
+    }
+
+    private fun handleLoopCommand(args: String) {
+        if (args.isBlank()) {
+            addSystemMessage("用法：/loop [轮数] <任务描述>\n例如：/loop 5 写一个贪吃蛇游戏并自测通过\n轮数默认 5，最多 $LOOP_MAX_ITERATIONS")
+            return
+        }
+        val tokens = args.split(Regex("\\s+"), limit = 2)
+        val explicitCount = tokens[0].toIntOrNull()
+        val (maxIterations, task) = if (explicitCount != null && tokens.size > 1) {
+            explicitCount.coerceIn(1, LOOP_MAX_ITERATIONS) to tokens[1].trim()
+        } else {
+            LOOP_DEFAULT_ITERATIONS to args
+        }
+        if (task.isBlank()) {
+            addSystemMessage("循环任务描述不能为空。用法：/loop [轮数] <任务描述>")
+            return
+        }
+        startLoop(maxIterations, task)
+    }
+
+    private fun startLoop(maxIterations: Int, task: String) {
+        cancelCurrentOperation()
+        addSystemMessage("🔁 进入循环模式（最多 $maxIterations 轮）\n目标：$task\n随时输入 /stop 中断")
+        agentJob = viewModelScope.launch(Dispatchers.IO) {
+            var completed = false
+            for (i in 1..maxIterations) {
+                addSystemMessage("🔁 第 $i / $maxIterations 轮")
+                val prompt = if (i == 1) {
+                    "$task\n\n【循环模式】这是一个多轮自动任务。本轮尽量推进；结束时自查目标是否已完全达成，" +
+                        "若已达成，在回复末尾单独一行输出 $LOOP_DONE_MARKER"
+                } else {
+                    "继续推进目标：$task\n检查之前的进度和遗留问题，完成剩余工作。" +
+                        "若目标已完全达成，在回复末尾单独一行输出 $LOOP_DONE_MARKER"
+                }
+                val reply = executeTurn(prompt)
+                if (reply.contains(LOOP_DONE_MARKER)) {
+                    completed = true
+                    addSystemMessage("✅ 循环结束：目标已达成（共 $i 轮）")
+                    break
+                }
+                if (reply.isBlank()) {
+                    addSystemMessage("⚠️ 循环中断：本轮没有得到有效回复（第 $i 轮）")
+                    break
+                }
+            }
+            if (!completed) {
+                addSystemMessage("🔁 循环结束：已达最大轮数 $maxIterations，目标可能未完全达成。可再次 /loop 继续")
+            }
+        }
+    }
+
+    /** /compact：用 Flash 模型把对话历史压缩成摘要，替换原始消息，释放上下文 */
+    private fun compactConversation() {
+        val msgs = _messages.value.filter { it.role != MessageRole.SYSTEM && it.content.isNotBlank() }
+        if (msgs.size < 4) {
+            addSystemMessage("📦 对话还很短，暂时不需要压缩")
+            return
+        }
+        cancelCurrentOperation()
+        _isProcessing.value = true
+        addSystemMessage("📦 正在压缩对话历史…")
+        agentJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val transcript = msgs.joinToString("\n\n") { m ->
+                    val who = if (m.role == MessageRole.USER) "用户" else "助手"
+                    "$who: ${m.content.take(COMPACT_PER_MESSAGE_CHARS)}"
+                }.take(COMPACT_TRANSCRIPT_CHARS)
+
+                val summary = StringBuilder()
+                apiClient.streamChat(
+                    messages = listOf(
+                        com.nuclearboy.api.deepseek.MessageDto(
+                            role = "system",
+                            content = "你是对话压缩助手。把下面的对话历史压缩成精炼摘要，必须保留：" +
+                                "1) 用户的目标和需求 2) 已做出的关键决定 3) 涉及的文件/代码改动 4) 未完成的事项。" +
+                                "用要点列出，500 字以内，不要加开场白。",
+                        ),
+                        com.nuclearboy.api.deepseek.MessageDto(role = "user", content = transcript),
+                    ),
+                    modelTier = ModelTier.V4_FLASH,
+                    thinkingMode = ThinkingMode.DISABLED,
+                    tools = null,
+                ).collect { event ->
+                    when (event) {
+                        is com.nuclearboy.api.deepseek.StreamEvent.Content ->
+                            if (!event.isReasoning) summary.append(event.text)
+                        is com.nuclearboy.api.deepseek.StreamEvent.Error ->
+                            throw RuntimeException(event.appError.humanMessage)
+                        else -> {}
+                    }
+                }
+
+                if (summary.isBlank()) throw RuntimeException("摘要为空")
+                val summaryMsg = ChatMessage(
+                    role = MessageRole.ASSISTANT,
+                    content = "📦 对话已压缩，以下是之前内容的摘要：\n\n$summary",
+                    status = MessageStatus.COMPLETE,
+                )
+                _messages.value = listOf(summaryMsg)
+                contextManager.reset()
+                lastUserMessage = null
+                saveMessages()
+                _scrollToBottom.value++
+                android.util.Log.e("NuclearBoy", "[ChatVM] compact done, summaryLen=${summary.length}")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("NuclearBoy", "[ChatVM] compact failed: ${e.message}", e)
+                addSystemMessage("📦 压缩失败：${e.message?.take(100) ?: "未知错误"}，对话保持原样")
+            } finally {
+                _isProcessing.value = false
+                agentJob = null
+            }
+        }
+    }
+
+    /** /rewind [n]：回退最近 n 轮对话（一轮 = 一条用户消息及其后的所有回复） */
+    private fun rewindConversation(rounds: Int) {
+        val n = rounds.coerceIn(1, 20)
+        val msgs = _messages.value.toMutableList()
+        var removed = 0
+        repeat(n) {
+            val idx = msgs.indexOfLast { it.role == MessageRole.USER }
+            if (idx < 0) return@repeat
+            while (msgs.size > idx) msgs.removeAt(msgs.size - 1)
+            removed++
+        }
+        if (removed == 0) {
+            addSystemMessage("⏪ 没有可回退的对话")
+            return
+        }
+        _messages.value = msgs
+        lastUserMessage = msgs.findLast { it.role == MessageRole.USER }
+        saveMessages()
+        _scrollToBottom.value++
+        addSystemMessage("⏪ 已回退 $removed 轮对话")
+    }
+
+    private fun addSystemMessage(text: String) {
+        _messages.update {
+            it + ChatMessage(role = MessageRole.SYSTEM, content = text, status = MessageStatus.COMPLETE)
+        }
+        _scrollToBottom.value++
+    }
+
+    // ── Private: event handling ─────────────────────────────────────────
+
+    private suspend fun handleAgentEvent(event: AgentEvent, thinkingId: String) {
+        when (event) {
+            is AgentEvent.Thinking -> {
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() Thinking msgLen=${event.message.length}")
+                _streamingState.update { current ->
+                    (current ?: StreamingState(thinkingId)).copy(
+                        isThinking = true,
+                        thinkingText = (current?.thinkingText ?: StringBuilder()).append(event.message),
+                    )
+                }
+                updateAssistantMessage(thinkingId) { msg ->
+                    msg.copy(
+                        status = MessageStatus.THINKING,
+                        reasoningContent = _streamingState.value?.thinkingText?.toString(),
+                    )
+                }
+            }
+
+            is AgentEvent.StreamContent -> {
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() StreamContent textLen=${event.text.length}")
+                _streamingState.update { current ->
+                    (current ?: StreamingState(thinkingId)).copy(
+                        isThinking = false,
+                        isStreaming = true,
+                        responseText = (current?.responseText ?: StringBuilder()).append(event.text),
+                    )
+                }
+                val streamedContent = _streamingState.value?.responseText?.toString() ?: event.text
+                updateAssistantMessage(thinkingId) { msg ->
+                    msg.copy(
+                        content = streamedContent,
+                        status = MessageStatus.STREAMING,
+                    )
+                }
+            }
+
+            is AgentEvent.Response -> {
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() Response contentLen=${event.message.content.length} toolCalls=${event.message.toolCalls.size}")
+                updateAssistantMessage(thinkingId) { msg ->
+                    val finalContent = if (event.message.content.isNotBlank())
+                        event.message.content else msg.content
+                    msg.copy(
+                        content = finalContent,
+                        reasoningContent = event.message.reasoningContent,
+                        toolCalls = event.message.toolCalls.ifEmpty { msg.toolCalls },
+                        tokenUsage = event.message.tokenUsage,
+                        status = MessageStatus.COMPLETE,
+                    )
+                }
+            }
+
+            is AgentEvent.ToolExecution -> {
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() ToolExecution toolName=${event.toolName} status=${event.status} toolCallId=${event.toolCallId}")
+                val record = ToolCallRecord(
+                    toolName = event.toolName,
+                    input = "",
+                    status = event.status,
+                    toolCallId = event.toolCallId,
+                )
+                _streamingState.update { current ->
+                    (current ?: StreamingState(thinkingId)).copy(
+                        activeToolCalls = (current?.activeToolCalls ?: emptyList()) + record,
+                    )
+                }
+                updateAssistantMessage(thinkingId) { msg ->
+                    val existingIdx = msg.toolCalls.indexOfFirst { it.toolCallId == event.toolCallId && it.toolCallId != null }
+                    val updatedCalls = if (existingIdx >= 0) {
+                        msg.toolCalls.toMutableList().also { it[existingIdx] = record }
+                    } else {
+                        msg.toolCalls + record
+                    }
+                    msg.copy(
+                        toolCalls = updatedCalls,
+                        status = MessageStatus.EXECUTING,
+                    )
+                }
+            }
+
+            is AgentEvent.ToolResultEvent -> {
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() ToolResultEvent toolName=${event.toolName} success=${event.result.success} outputLen=${event.result.output.length}")
+                updateAssistantMessage(thinkingId) { msg ->
+                    val updatedCalls = msg.toolCalls.map { call ->
+                        if (call.toolName == event.toolName && call.output == null) {
+                            call.copy(
+                                output = event.result.output,
+                                status = if (event.result.success) ToolCallStatus.COMPLETED
+                                    else ToolCallStatus.FAILED,
+                                completedAt = System.currentTimeMillis(),
+                            )
+                        } else call
+                    }
+                    msg.copy(toolCalls = updatedCalls)
+                }
+            }
+
+            is AgentEvent.FileChanged -> {
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() FileChanged count=${event.changes.size} paths=${event.changes.take(3).joinToString { it.filePath }}")
+                refreshProjectFiles()
+                // Reload skills if skill files changed
+                if (event.changes.any { it.filePath.contains(".agent/skills/") || it.filePath.contains("skill.yaml") }) {
+                    val skillsDir = java.io.File(fileOperations.projectRoot(), AppConstants.PROJECT_SKILLS_DIR)
+                    skillManager.loadProjectSkills(skillsDir)
+                }
+                if (event.changes.isNotEmpty()) {
+                    currentAssistantMsgId?.let { id ->
+                        updateAssistantMessage(id) { msg ->
+                            msg.copy(fileChanges = event.changes)
+                        }
+                    }
+                }
+            }
+
+            is AgentEvent.ContextWarning -> {
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() ContextWarning level=${event.level}")
+                val sysMsg = ChatMessage(
+                    role = MessageRole.SYSTEM,
+                    content = when (event.level) {
+                        com.nuclearboy.api.deepseek.ContextWarningLevel.YELLOW ->
+                            "上下文空间稍显紧张，已自动整理早期对话"
+                        com.nuclearboy.api.deepseek.ContextWarningLevel.RED ->
+                            "上下文即将用完，已进行深度压缩"
+                        else -> event.message
+                    },
+                    status = MessageStatus.COMPLETE,
+                )
+                _messages.update { it + sysMsg }
+                _scrollToBottom.value++
+            }
+
+            is AgentEvent.TokenUpdate -> {
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() TokenUpdate prompt=${event.usage.promptTokens} completion=${event.usage.completionTokens} total=${event.usage.totalTokens}")
+                currentAssistantMsgId?.let { id ->
+                    updateAssistantMessage(id) { msg ->
+                        msg.copy(tokenUsage = event.usage)
+                    }
+                }
+            }
+
+            is AgentEvent.Error -> {
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() Error message=${event.error.humanMessage}")
+                val errorMsg = ChatMessage(
+                    role = MessageRole.SYSTEM,
+                    content = "处理时遇到了问题：${event.error.humanMessage}",
+                    status = MessageStatus.ERROR,
+                )
+                _messages.update { it + errorMsg }
+                _scrollToBottom.value++
+            }
+
+            is AgentEvent.Complete -> {
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() Complete")
+                /* Finalization handled in finally block */
+            }
+
+            is AgentEvent.Retrying -> {
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() Retrying")
+                updateAssistantMessage(thinkingId) { msg ->
+                    msg.copy(status = MessageStatus.THINKING)
+                }
+            }
+        }
+    }
+
+    private fun handleAgentError(error: Throwable, thinkingId: String) {
+        val friendlyMsg = when (error) {
+            is kotlinx.coroutines.CancellationException -> "已取消"
+            else -> "出了一点小问题…${error.message?.take(100) ?: ""}"
+        }
+        // Update thinking placeholder with error
+        updateAssistantMessage(thinkingId) { msg ->
+            msg.copy(
+                content = friendlyMsg,
+                status = MessageStatus.ERROR,
+            )
+        }
+        // Also update assistant message if one was created
+        currentAssistantMsgId?.let { id ->
+            updateAssistantMessage(id) { msg ->
+                if (msg.content.isEmpty()) msg.copy(
+                    content = friendlyMsg,
+                    status = MessageStatus.ERROR,
+                ) else msg
+            }
+        }
+    }
+
+    private fun finalizeProcessing(thinkingId: String) {
+        _isProcessing.value = false
+        agentJob = null
+        // Mark thinking placeholder as COMPLETE
+        updateAssistantMessage(thinkingId) { msg ->
+            if (msg.status == MessageStatus.THINKING) msg.copy(status = MessageStatus.COMPLETE)
+            else msg
+        }
+        // Finalize assistant message if one was created
+        val streamState = _streamingState.value
+        currentAssistantMsgId?.let { id ->
+            val finalStatus = if (streamState?.responseText?.isEmpty() != false) "ERROR" else "COMPLETE"
+            android.util.Log.e("NuclearBoy", "[ChatVM] finalizeProcessing() assistantId=$id finalStatus=$finalStatus responseTextLen=${streamState?.responseText?.length ?: 0}")
+            updateAssistantMessage(id) { msg ->
+                if (msg.content.isEmpty() && (streamState?.responseText?.isEmpty() != false)) {
+                    msg.copy(content = "没能生成回复，请换个方式描述你的需求", status = MessageStatus.ERROR)
+                } else if (msg.status == MessageStatus.STREAMING || msg.status == MessageStatus.THINKING) {
+                    msg.copy(status = MessageStatus.COMPLETE)
+                } else {
+                    msg
+                }
+            }
+        }
+        _streamingState.value = null
+        // Reset class-level tracking
+        currentThinkingId = null
+        currentAssistantMsgId = null
+        // Show "ready" notification with content summary — find last ASSISTANT message
+        val lastAssistant = _messages.value.findLast { it.role == MessageRole.ASSISTANT }
+        val notificationSent = lastAssistant != null && lastAssistant.content.isNotBlank()
+        android.util.Log.e("NuclearBoy", "[ChatVM] finalizeProcessing() notificationSent=$notificationSent lastAssistantRole=${lastAssistant?.role}")
+        if (lastAssistant != null && lastAssistant.content.isNotBlank()) {
+            notificationCallback?.invoke(lastAssistant.content, currentProjectId)
+        }
+        saveMessages()
+        // 自动提取记忆：从本次对话中学习用户偏好和项目信息
+        val projectId = currentProjectId ?: "default"
+        val lastUser = lastUserMessage?.content ?: ""
+        val lastAi = lastAssistant?.content ?: ""
+        if (lastAi.isNotBlank()) {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val r1 = memoryStore.updateUserProfile("last_project", projectId, "interaction", 0.9f)
+                    android.util.Log.e("NuclearBoy", "[ChatVM] memoryWrite last_project=$projectId result=$r1")
+                    val convResult = memoryStore.getProfileValue("total_conversations")
+                    val convCount = if (convResult is AppResult.Success) (convResult.data?.toIntOrNull() ?: 0) + 1 else 1
+                    val r2 = memoryStore.updateUserProfile("total_conversations", convCount.toString(), "interaction", 0.9f)
+                    android.util.Log.e("NuclearBoy", "[ChatVM] memoryWrite total_conversations=$convCount result=$r2")
+                    val r3 = memoryStore.autoExtractMemories(projectId, lastUser, lastAi)
+                    android.util.Log.e("NuclearBoy", "[ChatVM] memoryWrite autoExtractMemories result=$r3")
+                } catch (e: Exception) {
+                    android.util.Log.e("NuclearBoy", "[ChatVM] memoryWrite FAILED: ${e.message}", e)
+                }
+            }
+        }
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    private fun updateAssistantMessage(id: String, transform: (ChatMessage) -> ChatMessage) {
+        _messages.update { messages ->
+            messages.map { msg -> if (msg.id == id) transform(msg) else msg }
+        }
+    }
+
+    companion object {
+        /** /loop 默认轮数与上限 */
+        private const val LOOP_DEFAULT_ITERATIONS = 5
+        private const val LOOP_MAX_ITERATIONS = 10
+
+        /** 循环模式下 AI 用于声明目标达成的标记 */
+        private const val LOOP_DONE_MARKER = "TASK_COMPLETE"
+
+        /** /compact 压缩时单条消息和整体文本的截断长度 */
+        private const val COMPACT_PER_MESSAGE_CHARS = 2_000
+        private const val COMPACT_TRANSCRIPT_CHARS = 60_000
+    }
+}

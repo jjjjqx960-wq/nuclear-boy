@@ -1,0 +1,202 @@
+package com.nuclearboy.app.ui.projects
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.nuclearboy.common.Project
+import com.nuclearboy.common.SkillInfo
+import com.nuclearboy.memory.MemoryStore
+import com.nuclearboy.skills.SkillManager
+import com.nuclearboy.tools.docgen.FileOperations
+import kotlinx.serialization.serializer
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import javax.inject.Inject
+
+data class WelcomeData(
+    val lastProject: String,
+    val conversationCount: Int,
+)
+
+@HiltViewModel
+class ProjectViewModel @Inject constructor(
+    private val fileOperations: FileOperations,
+    val skillManager: SkillManager,
+    private val memoryStore: MemoryStore,
+) : ViewModel() {
+    val activeSkills: StateFlow<List<SkillInfo>> = skillManager.activeSkills
+
+    private val _projects = MutableStateFlow<List<Project>>(emptyList())
+    val projects: StateFlow<List<Project>> = _projects.asStateFlow()
+
+    private val _welcomeData = MutableStateFlow<WelcomeData?>(null)
+    val welcomeData: StateFlow<WelcomeData?> = _welcomeData.asStateFlow()
+    fun clearWelcome() { _welcomeData.value = null }
+
+    /** 外部触发刷新项目列表 */
+    fun refreshProjects() { loadProjects() }
+
+    init {
+        android.util.Log.e("NuclearBoy", "[ProjectVM] ProjectViewModel created")
+        loadProjects()
+        loadWelcomeMemory()
+    }
+
+    fun createProject(name: String) {
+        android.util.Log.e("NuclearBoy", "[ProjectVM] createProject — name=$name")
+        viewModelScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                fileOperations.createProject(name)
+            }) {
+                is com.nuclearboy.common.AppResult.Success -> {
+                    val project = result.data
+                    android.util.Log.e("NuclearBoy", "[ProjectVM] createProject SUCCESS — id=${project.id}, name=${project.name}")
+                    loadProjects() // 实时刷新
+                }
+                is com.nuclearboy.common.AppResult.Failure -> {
+                    android.util.Log.e("NuclearBoy", "[ProjectVM] createProject FAILED — ${result.error.humanMessage}")
+                }
+            }
+        }
+    }
+
+    fun selectProject(projectId: String) {
+        val project = _projects.value.find { it.id == projectId }
+        if (project != null) {
+            android.util.Log.e("NuclearBoy", "[ProjectVM] selectProject — projectId=$projectId, name=${project.name} (found)")
+        } else {
+            android.util.Log.e("NuclearBoy", "[ProjectVM] selectProject — projectId=$projectId (NOT found in ${_projects.value.size} projects)")
+        }
+        fileOperations.currentProjectDir = project?.name ?: projectId
+    }
+
+    fun deleteProject(projectId: String) {
+        android.util.Log.e("NuclearBoy", "[ProjectVM] deleteProject — projectId=$projectId")
+        val project = _projects.value.find { it.id == projectId } ?: return
+        viewModelScope.launch {
+            // Must clear currentProjectDir so deleteFile resolves relative to workspaceRoot,
+            // not workspaceRoot/projectName/projectName (double-nested)
+            val saved = fileOperations.currentProjectDir
+            fileOperations.currentProjectDir = ""
+            val result = withContext(Dispatchers.IO) { fileOperations.deleteFile(project.name) }
+            fileOperations.currentProjectDir = saved
+            if (result is com.nuclearboy.common.AppResult.Success) {
+                android.util.Log.e("NuclearBoy", "[ProjectVM] deleteProject SUCCESS: ${project.name}")
+                loadProjects() // 实时刷新
+            } else {
+                val err = (result as com.nuclearboy.common.AppResult.Failure).error.humanMessage
+                android.util.Log.e("NuclearBoy", "[ProjectVM] deleteProject FAILED: ${project.name} — $err")
+            }
+        }
+    }
+
+    private fun loadWelcomeMemory() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val lastProject = memoryStore.getProfileValue("last_project")
+                val totalConv = memoryStore.getProfileValue("total_conversations")
+                @Suppress("UNCHECKED_CAST")
+                val projectName = (lastProject as? com.nuclearboy.common.AppResult.Success<*>)?.data as? String
+                @Suppress("UNCHECKED_CAST")
+                val convCount = ((totalConv as? com.nuclearboy.common.AppResult.Success<*>)?.data as? String)?.toIntOrNull() ?: 0
+                android.util.Log.e("NuclearBoy", "[ProjectVM] welcomeMemory rawLastProject=$lastProject rawConv=$totalConv")
+                android.util.Log.e("NuclearBoy", "[ProjectVM] welcomeMemory project=$projectName convCount=$convCount")
+                if (!projectName.isNullOrBlank() && projectName != "default" && convCount > 0) {
+                    _welcomeData.value = WelcomeData(projectName, convCount)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("NuclearBoy", "[ProjectVM] welcomeMemory FAILED: ${e.message}")
+            }
+        }
+    }
+
+    private fun loadProjects() {
+        android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — entry")
+        viewModelScope.launch {
+            // Load from workspace root (NOT current project dir)
+            val result = withContext(Dispatchers.IO) {
+                // Save and restore currentProjectDir to avoid contamination
+                val saved = fileOperations.currentProjectDir
+                fileOperations.currentProjectDir = ""
+                val workspaceRoot = fileOperations.getWorkspaceRoot()
+                android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — workspaceRoot=$workspaceRoot")
+                val r = fileOperations.listDirectory(".")
+                fileOperations.currentProjectDir = saved
+                r
+            }
+            when (result) {
+                is com.nuclearboy.common.AppResult.Success -> {
+                    val projectDirs = result.data.filter { it.isDirectory && it.name != "__general__" && !it.name.startsWith(".") }
+                    android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — found ${projectDirs.size} directories")
+                    _projects.value = projectDirs.mapNotNull { dir ->
+                        // Try to load persisted project metadata
+                        val meta = loadProjectMeta(dir.name)
+                        if (meta != null) {
+                            android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — loaded meta for '${dir.name}', id=${meta.id}")
+                            meta.copy(
+                                rootPath = dir.path,
+                                lastOpenedAt = dir.lastModified,
+                            )
+                        } else {
+                            // Legacy project without metadata — create it now
+                            val project = Project(
+                                name = dir.name,
+                                rootPath = dir.path,
+                                lastOpenedAt = dir.lastModified,
+                                fileCount = 0,
+                            )
+                            android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — legacy project '${dir.name}', created meta id=${project.id}")
+                            persistProjectMeta(project)
+                            project
+                        }
+                    }
+                    android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — final count=${_projects.value.size}")
+                }
+                is com.nuclearboy.common.AppResult.Failure -> {
+                    android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects FAILED — ${result.error.humanMessage}")
+                    // Empty or error
+                }
+            }
+        }
+    }
+
+    private fun persistProjectMeta(project: Project) {
+        try {
+            val metaDir = java.io.File(fileOperations.projectRoot(), ".agent")
+            // projectRoot() uses currentProjectDir which may be empty — use workspaceRoot directly
+            val projectDir = java.io.File(fileOperations.getWorkspaceRoot(), project.name)
+            val agentDir = java.io.File(projectDir, ".agent")
+            agentDir.mkdirs()
+            val metaFile = java.io.File(agentDir, "project.json")
+            val json = kotlinx.serialization.json.Json { encodeDefaults = true }
+            metaFile.writeText(json.encodeToString(Project.serializer(), project))
+            android.util.Log.e("NuclearBoy", "[ProjectVM] persistProjectMeta — name=${project.name}, id=${project.id}, path=${metaFile.absolutePath}")
+        } catch (e: Exception) {
+            android.util.Log.e("NuclearBoy", "[ProjectVM] persistProjectMeta FAILED — ${e.message}")
+        }
+    }
+
+    private fun loadProjectMeta(dirName: String): Project? {
+        return try {
+            android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjectMeta — dirName=$dirName")
+            val projectDir = java.io.File(fileOperations.getWorkspaceRoot(), dirName)
+            val metaFile = java.io.File(projectDir, ".agent/project.json")
+            if (metaFile.exists()) {
+                val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                val project = json.decodeFromString(Project.serializer(), metaFile.readText())
+                android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjectMeta — found meta file for '$dirName', id=${project.id}")
+                project
+            } else {
+                android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjectMeta — no meta file for '$dirName'")
+                null
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjectMeta FAILED — ${e.message}")
+            null
+        }
+    }
+}
