@@ -47,7 +47,9 @@ internal fun fileSelectionStatusLabel(
     selectedSizeLabel: String,
 ): String {
     return if (selectedCount > 0) {
-        "已选 $selectedCount 个 · $selectedSizeLabel · 可见 $selectedVisibleCount/$visibleFileCount"
+        val hiddenSelectedCount = (selectedCount - selectedVisibleCount).coerceAtLeast(0)
+        val hiddenLabel = if (hiddenSelectedCount > 0) " · 隐藏 $hiddenSelectedCount" else ""
+        "已选 $selectedCount 个 · $selectedSizeLabel · 可见 $selectedVisibleCount/$visibleFileCount$hiddenLabel"
     } else {
         "可选 $visibleFileCount 个"
     }

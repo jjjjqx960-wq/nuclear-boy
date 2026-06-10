@@ -110,7 +110,19 @@ class FileReferencePromptTest {
             selectedSizeLabel = "12 KB",
         )
 
-        assertEquals("已选 7 个 · 12 KB · 可见 3/5", label)
+        assertEquals("已选 7 个 · 12 KB · 可见 3/5 · 隐藏 4", label)
+    }
+
+    @Test
+    fun `file selection status label omits hidden count when all selected files are visible`() {
+        val label = fileSelectionStatusLabel(
+            selectedCount = 3,
+            selectedVisibleCount = 3,
+            visibleFileCount = 5,
+            selectedSizeLabel = "12 KB",
+        )
+
+        assertEquals("已选 3 个 · 12 KB · 可见 3/5", label)
     }
 
     @Test
