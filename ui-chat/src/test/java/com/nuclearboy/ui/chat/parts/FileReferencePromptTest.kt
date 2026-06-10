@@ -74,6 +74,20 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `unselect hidden file paths keeps visible selected files only`() {
+        val selected = unselectHiddenFilePaths(
+            selectedPaths = listOf("README.md", "app/src/Main.kt", "app/src/Hidden.kt"),
+            visibleFiles = listOf(
+                FileInfo(path = "app/src", name = "src", isDirectory = true),
+                FileInfo(path = "app/src/Main.kt", name = "Main.kt", extension = "kt"),
+                FileInfo(path = "README.md", name = "README.md", extension = "md"),
+            ),
+        )
+
+        assertEquals(listOf("README.md", "app/src/Main.kt"), selected)
+    }
+
+    @Test
     fun `selected file panel entries returns selected files only`() {
         val entries = selectedFilePanelEntries(
             files = listOf(

@@ -76,6 +76,7 @@ import com.nuclearboy.ui.chat.parts.sortFilePanelEntries
 import com.nuclearboy.ui.chat.parts.shouldFollowChatScroll
 import com.nuclearboy.ui.chat.parts.shouldShowJumpToBottom
 import com.nuclearboy.ui.chat.parts.toggleSelectedFilePath
+import com.nuclearboy.ui.chat.parts.unselectHiddenFilePaths
 import com.nuclearboy.ui.chat.parts.unselectVisibleFilePaths
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -566,6 +567,12 @@ private fun ProjectFilePanel(
                         },
                         onUnselectVisible = {
                             selectedFilePaths = unselectVisibleFilePaths(
+                                selectedPaths = selectedFilePaths,
+                                visibleFiles = visibleFiles,
+                            )
+                        },
+                        onUnselectHidden = {
+                            selectedFilePaths = unselectHiddenFilePaths(
                                 selectedPaths = selectedFilePaths,
                                 visibleFiles = visibleFiles,
                             )

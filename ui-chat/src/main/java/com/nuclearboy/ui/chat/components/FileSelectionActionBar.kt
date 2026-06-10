@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.RemoveCircleOutline
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -43,6 +44,7 @@ internal fun FileSelectionActionBar(
     showSelectedOnly: Boolean,
     onSelectVisible: () -> Unit,
     onUnselectVisible: () -> Unit,
+    onUnselectHidden: () -> Unit,
     onShowSelectedOnlyChange: (Boolean) -> Unit,
     onReferenceSelected: () -> Unit,
     onClearSelection: () -> Unit,
@@ -56,7 +58,9 @@ internal fun FileSelectionActionBar(
         border = BorderStroke(1.dp, nc.material.primary.copy(alpha = 0.28f)),
     ) {
         val hasSelection = selectedCount > 0
+        val hiddenSelectedCount = (selectedCount - selectedVisibleCount).coerceAtLeast(0)
         val canUnselectVisible = hasSelection && selectedVisibleCount > 0 && !showSelectedOnly
+        val canUnselectHidden = hasSelection && hiddenSelectedCount > 0 && !showSelectedOnly
         if (hasSelection) {
             Column(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -104,6 +108,19 @@ internal fun FileSelectionActionBar(
                             Icon(
                                 imageVector = Icons.Default.RemoveCircleOutline,
                                 contentDescription = "取消当前可见选择",
+                                modifier = Modifier.size(16.dp),
+                                tint = nc.material.secondary,
+                            )
+                        }
+                    }
+                    if (canUnselectHidden) {
+                        IconButton(
+                            onClick = onUnselectHidden,
+                            modifier = Modifier.size(28.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.VisibilityOff,
+                                contentDescription = "取消隐藏选择",
                                 modifier = Modifier.size(16.dp),
                                 tint = nc.material.secondary,
                             )

@@ -34,6 +34,17 @@ internal fun unselectVisibleFilePaths(
     return selectedPaths.filterNot { it in visibleFilePathSet }
 }
 
+internal fun unselectHiddenFilePaths(
+    selectedPaths: List<String>,
+    visibleFiles: List<FileInfo>,
+): List<String> {
+    val visibleFilePathSet = visibleFiles
+        .filterNot { it.isDirectory }
+        .map { it.path }
+        .toSet()
+    return selectedPaths.filter { it in visibleFilePathSet }
+}
+
 internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
     return files
         .filterNot { it.isDirectory }
