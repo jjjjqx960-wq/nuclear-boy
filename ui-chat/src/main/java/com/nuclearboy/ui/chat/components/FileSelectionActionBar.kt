@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -39,6 +40,7 @@ internal fun FileSelectionActionBar(
     visibleFileCount: Int,
     showSelectedOnly: Boolean,
     onSelectVisible: () -> Unit,
+    onUnselectVisible: () -> Unit,
     onShowSelectedOnlyChange: (Boolean) -> Unit,
     onReferenceSelected: () -> Unit,
     onClearSelection: () -> Unit,
@@ -57,6 +59,7 @@ internal fun FileSelectionActionBar(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             val hasSelection = selectedCount > 0
+            val canUnselectVisible = hasSelection && selectedVisibleCount > 0 && !showSelectedOnly
             Text(
                 text = if (hasSelection) "已选 $selectedCount 个" else "可选 $visibleFileCount 个",
                 modifier = Modifier.weight(1f),
@@ -94,6 +97,19 @@ internal fun FileSelectionActionBar(
                         modifier = Modifier.size(15.dp),
                         tint = nc.material.onSurfaceVariant,
                     )
+                }
+                if (canUnselectVisible) {
+                    IconButton(
+                        onClick = onUnselectVisible,
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.RemoveCircleOutline,
+                            contentDescription = "取消当前可见选择",
+                            modifier = Modifier.size(16.dp),
+                            tint = nc.material.secondary,
+                        )
+                    }
                 }
             }
             if (selectedVisibleCount < visibleFileCount) {
