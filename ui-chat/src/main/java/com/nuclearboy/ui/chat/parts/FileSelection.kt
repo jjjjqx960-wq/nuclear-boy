@@ -56,6 +56,13 @@ internal fun removeReferencedFilePaths(
     return selectedPaths.filterNot { it in referencedFilePathSet }
 }
 
+internal fun filterQueryAfterMatchedReference(
+    remainingSelectedCount: Int,
+    currentQuery: String,
+): String {
+    return if (remainingSelectedCount > 0 && currentQuery.isNotBlank()) "" else currentQuery
+}
+
 internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
     return files
         .filterNot { it.isDirectory }

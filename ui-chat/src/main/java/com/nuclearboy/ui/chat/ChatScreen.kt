@@ -67,6 +67,7 @@ import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
 import com.nuclearboy.ui.chat.parts.buildFileReferencesPrompt
 import com.nuclearboy.ui.chat.parts.fileSelectionStatusLabel
 import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
+import com.nuclearboy.ui.chat.parts.filterQueryAfterMatchedReference
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
 import com.nuclearboy.ui.chat.parts.FilePanelSortMode
 import com.nuclearboy.ui.chat.parts.removeReferencedFilePaths
@@ -604,9 +605,14 @@ private fun ProjectFilePanel(
                         val matchedSelectedFiles = visibleSelectableFiles
                             .filter { it.path in selectedPathSet }
                         onReferenceFiles(matchedSelectedFiles, false)
-                        selectedFilePaths = removeReferencedFilePaths(
+                        val remainingSelectedPaths = removeReferencedFilePaths(
                             selectedPaths = selectedFilePaths,
                             referencedFiles = matchedSelectedFiles,
+                        )
+                        selectedFilePaths = remainingSelectedPaths
+                        filterQuery = filterQueryAfterMatchedReference(
+                            remainingSelectedCount = remainingSelectedPaths.size,
+                            currentQuery = filterQuery,
                         )
                     },
                     onReferenceSelected = {

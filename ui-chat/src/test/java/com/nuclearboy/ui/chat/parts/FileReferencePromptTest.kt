@@ -113,6 +113,36 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `filter query after matched reference clears when selection remains`() {
+        val query = filterQueryAfterMatchedReference(
+            remainingSelectedCount = 3,
+            currentQuery = "viewmodel",
+        )
+
+        assertEquals("", query)
+    }
+
+    @Test
+    fun `filter query after matched reference stays when no selection remains`() {
+        val query = filterQueryAfterMatchedReference(
+            remainingSelectedCount = 0,
+            currentQuery = "viewmodel",
+        )
+
+        assertEquals("viewmodel", query)
+    }
+
+    @Test
+    fun `filter query after matched reference keeps blank query`() {
+        val query = filterQueryAfterMatchedReference(
+            remainingSelectedCount = 3,
+            currentQuery = "",
+        )
+
+        assertEquals("", query)
+    }
+
+    @Test
     fun `selected file panel entries returns selected files only`() {
         val entries = selectedFilePanelEntries(
             files = listOf(
