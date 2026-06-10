@@ -56,11 +56,15 @@ import com.nuclearboy.common.*
 import com.nuclearboy.ui.chat.components.CommandShortcutBar
 import com.nuclearboy.ui.chat.components.FileReferenceIconButton
 import com.nuclearboy.ui.chat.components.FileReferenceTextButton
+import com.nuclearboy.ui.chat.components.ScrollToBottomAction
 import com.nuclearboy.ui.chat.parts.appendToChatDraft
 import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
+import com.nuclearboy.ui.chat.parts.shouldFollowChatScroll
+import com.nuclearboy.ui.chat.parts.shouldShowJumpToBottom
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalTime
 
@@ -90,12 +94,40 @@ fun ChatScreen(
         viewModel.notificationCallback = onNotification
     }
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     var showFiles by remember { mutableStateOf(false) }
     var selectedMode by remember { mutableIntStateOf(0) } // 0=Chat 1=Think 2=Expert
     var filePanelScrollState by remember { mutableStateOf(0f) }
     var filePanelScrollMax by remember { mutableStateOf(0f) }
     var inputDraft by rememberSaveable(projectId) { mutableStateOf("") }
     var inputFocusRequest by remember { mutableLongStateOf(0L) }
+    var forceNextScrollToBottom by remember { mutableStateOf(true) }
+    val totalListItems by remember {
+        derivedStateOf { listState.layoutInfo.totalItemsCount }
+    }
+    val lastVisibleItemIndex by remember {
+        derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+    }
+    val followChatScroll by remember {
+        derivedStateOf {
+            shouldFollowChatScroll(
+                totalItemsCount = totalListItems,
+                lastVisibleItemIndex = lastVisibleItemIndex,
+            )
+        }
+    }
+    val showJumpToBottom by remember {
+        derivedStateOf {
+            shouldShowJumpToBottom(
+                totalItemsCount = totalListItems,
+                lastVisibleItemIndex = lastVisibleItemIndex,
+            )
+        }
+    }
+    val lastMessageContentLength = uiState.messages.lastOrNull()?.content?.length ?: 0
+    LaunchedEffect(projectId) {
+        forceNextScrollToBottom = true
+    }
 
     // File picker for attachments
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -109,14 +141,20 @@ fun ChatScreen(
 
     // Instant scroll to bottom on project switch (first load)
     LaunchedEffect(uiState.scrollToBottom) {
-        if (uiState.messages.isNotEmpty()) {
+        if (uiState.messages.isNotEmpty() && (forceNextScrollToBottom || followChatScroll)) {
             listState.requestScrollToItem(uiState.messages.lastIndex)
+            forceNextScrollToBottom = false
         }
     }
-    // Follow new messages
+    // Follow new messages only while the user is already reading the latest turn.
     LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
+        if (uiState.messages.isNotEmpty() && followChatScroll) {
             listState.animateScrollToItem(uiState.messages.lastIndex)
+        }
+    }
+    LaunchedEffect(lastMessageContentLength) {
+        if (uiState.messages.isNotEmpty() && followChatScroll) {
+            listState.requestScrollToItem(uiState.messages.lastIndex)
         }
     }
 
@@ -224,54 +262,67 @@ fun ChatScreen(
                 onSuggestionClick = { text -> viewModel.sendMessage(text) },
             )
         } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
-                contentPadding = PaddingValues(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
-            ) {
-                // General Agent 欢迎卡片
-                if (projectId == "__general__" && uiState.messages.isEmpty()) {
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = NuclearBoyTheme.colorScheme.material.surfaceVariant.copy(alpha = 0.5f)),
-                            border = BorderStroke(1.dp, NuclearBoyTheme.colorScheme.material.primary.copy(alpha = 0.2f)),
-                        ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
-                                Text("☢️ 欢迎来到核弹男孩", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = NuclearBoyTheme.colorScheme.material.primary)
-                                Spacer(Modifier.height(12.dp))
-                                Text("我可以帮你：", fontSize = 14.sp, color = NuclearBoyTheme.colorScheme.material.onSurface)
-                                Spacer(Modifier.height(8.dp))
-                                WelcomeItem("🔍", "搜资料", "Bing + 百度双引擎搜索最新信息")
-                                WelcomeItem("🐍", "写代码", "Python 3.11 执行器 + Java 桥接控制手机")
-                                WelcomeItem("📄", "生成文档", "Word / Excel / PPT 一键生成")
-                                WelcomeItem("📁", "管项目", "多项目切换，文件浏览编辑")
-                                WelcomeItem("📱", "控硬件", "闪光灯、闹钟、通知、日历… 全搞定")
-                                Spacer(Modifier.height(12.dp))
-                                Text("直接跟我说你想做什么，开干吧 💪", fontSize = 12.sp, color = NuclearBoyTheme.colorScheme.material.onSurfaceVariant)
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
+                    // General Agent 欢迎卡片
+                    if (projectId == "__general__" && uiState.messages.isEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = NuclearBoyTheme.colorScheme.material.surfaceVariant.copy(alpha = 0.5f)),
+                                border = BorderStroke(1.dp, NuclearBoyTheme.colorScheme.material.primary.copy(alpha = 0.2f)),
+                            ) {
+                                Column(modifier = Modifier.padding(20.dp)) {
+                                    Text("☢️ 欢迎来到核弹男孩", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = NuclearBoyTheme.colorScheme.material.primary)
+                                    Spacer(Modifier.height(12.dp))
+                                    Text("我可以帮你：", fontSize = 14.sp, color = NuclearBoyTheme.colorScheme.material.onSurface)
+                                    Spacer(Modifier.height(8.dp))
+                                    WelcomeItem("🔍", "搜资料", "Bing + 百度双引擎搜索最新信息")
+                                    WelcomeItem("🐍", "写代码", "Python 3.11 执行器 + Java 桥接控制手机")
+                                    WelcomeItem("📄", "生成文档", "Word / Excel / PPT 一键生成")
+                                    WelcomeItem("📁", "管项目", "多项目切换，文件浏览编辑")
+                                    WelcomeItem("📱", "控硬件", "闪光灯、闹钟、通知、日历… 全搞定")
+                                    Spacer(Modifier.height(12.dp))
+                                    Text("直接跟我说你想做什么，开干吧 💪", fontSize = 12.sp, color = NuclearBoyTheme.colorScheme.material.onSurfaceVariant)
+                                }
                             }
                         }
                     }
-                }
-                items(items = uiState.messages, key = { it.id }) { message ->
-                    val isLast = message.id == uiState.messages.lastOrNull()?.id
-                    val isStreaming = isLast && uiState.streamingState?.isStreaming == true
+                    items(items = uiState.messages, key = { it.id }) { message ->
+                        val isLast = message.id == uiState.messages.lastOrNull()?.id
+                        val isStreaming = isLast && uiState.streamingState?.isStreaming == true
 
-                    MessageBubble(
-                        message = message,
-                        isStreaming = isStreaming,
-                        onRetry = {
-                            if (message.role == MessageRole.ASSISTANT) viewModel.retryLastMessage()
-                        },
-                        onCopy = { text ->
-                            copyToClipboard(context, text)
-                            Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
-                        },
-                    )
+                        MessageBubble(
+                            message = message,
+                            isStreaming = isStreaming,
+                            onRetry = {
+                                if (message.role == MessageRole.ASSISTANT) viewModel.retryLastMessage()
+                            },
+                            onCopy = { text ->
+                                copyToClipboard(context, text)
+                                Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                            },
+                        )
+                    }
+                    item { Spacer(Modifier.height(4.dp)) }
                 }
-                item { Spacer(Modifier.height(4.dp)) }
+                ScrollToBottomAction(
+                    visible = showJumpToBottom,
+                    onClick = {
+                        scope.launch {
+                            if (uiState.messages.isNotEmpty()) {
+                                listState.animateScrollToItem(uiState.messages.lastIndex)
+                            }
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
+                )
             }
         }
     }
