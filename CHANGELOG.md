@@ -6,3 +6,4 @@
 2026-06-10 1.0.2 统一第三方 Chat Completions endpoint 构造，实测兼容中转站、MiniMax、DeepSeek 和火山 Ark 常用地址。
 2026-06-10 1.0.2 第三方模型新增自动/OpenAI/Anthropic 协议兼容，Anthropic Messages 流式文本和 tool_use 会转换到现有 Agent 工具链。
 2026-06-10 1.0.2 新增 Android 编译测试内置技能和核弹男孩 LLMwiki 树状索引，技能支持 ADB 自检 logcat 结果采集，并补充对应目录 AGENTS.md。
+2026-06-10 1.0.2 调整 debug APK 版本名，安装后显示为 1.0.2。
