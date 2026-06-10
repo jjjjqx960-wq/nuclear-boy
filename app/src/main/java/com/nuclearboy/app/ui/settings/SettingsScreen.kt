@@ -36,6 +36,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.api.deepseek.DeepSeekApiClient
+import com.nuclearboy.api.deepseek.ProviderEndpointMode
 import com.nuclearboy.api.deepseek.ProviderProtocol
 import com.nuclearboy.app.R
 import com.nuclearboy.app.diagnostics.AppDiagnostics
@@ -100,13 +101,21 @@ class SettingsViewModel @Inject constructor(
         apiKeyManager.setCustomProviderConfig(baseUrl, model, key)
     }
 
-    fun saveCustomModel(displayName: String, baseUrl: String, model: String, protocol: ProviderProtocol, key: String?) {
+    fun saveCustomModel(
+        displayName: String,
+        baseUrl: String,
+        model: String,
+        protocol: ProviderProtocol,
+        endpointMode: ProviderEndpointMode,
+        key: String?,
+    ) {
         apiKeyManager.saveCustomModel(
             existingId = null,
             displayName = displayName,
             baseUrl = baseUrl,
             modelName = model,
             protocol = protocol,
+            endpointMode = endpointMode,
             apiKey = key,
             selectAfterSave = true,
         )
@@ -116,12 +125,19 @@ class SettingsViewModel @Inject constructor(
 
     fun deleteCustomModel(modelId: String) { apiKeyManager.deleteCustomModel(modelId) }
 
-    fun testCustomModelInput(baseUrl: String, model: String, protocol: ProviderProtocol, key: String?) {
+    fun testCustomModelInput(
+        baseUrl: String,
+        model: String,
+        protocol: ProviderProtocol,
+        endpointMode: ProviderEndpointMode,
+        key: String?,
+    ) {
         runCustomModelTest(
             targetId = NEW_MODEL_TEST_ID,
             baseUrl = baseUrl,
             model = model,
             protocol = protocol,
+            endpointMode = endpointMode,
             key = key,
             label = model.ifBlank { "未命名模型" },
         )
@@ -143,6 +159,7 @@ class SettingsViewModel @Inject constructor(
             baseUrl = config.baseUrl,
             model = config.modelName,
             protocol = config.protocol,
+            endpointMode = config.endpointMode,
             key = config.apiKey,
             label = config.displayName,
         )
@@ -153,6 +170,7 @@ class SettingsViewModel @Inject constructor(
         baseUrl: String,
         model: String,
         protocol: ProviderProtocol,
+        endpointMode: ProviderEndpointMode,
         key: String?,
         label: String,
     ) {
@@ -179,6 +197,7 @@ class SettingsViewModel @Inject constructor(
                 modelName = normalizedModel,
                 apiKey = key,
                 protocol = protocol,
+                endpointMode = endpointMode,
             )) {
                 is AppResult.Success -> ModelTestUiState(
                     targetId = targetId,
@@ -188,6 +207,7 @@ class SettingsViewModel @Inject constructor(
                         append("端点：${result.data.endpoint}\n")
                         append("模型：${result.data.modelName}\n")
                         append("协议：${result.data.protocol.displayName}\n")
+                        append("地址模式：${result.data.endpointMode.displayName}\n")
                         append("耗时：${result.data.latencyMs} ms")
                         if (result.data.replyPreview.isNotBlank()) {
                             append("\n响应：${result.data.replyPreview}")
@@ -419,7 +439,7 @@ fun SettingsScreen(
                         Spacer(Modifier.height(6.dp))
                         ModelOptionRow(
                             title = model.displayName,
-                            subtitle = "${model.protocol.displayName} · ${model.modelName} · ${model.baseUrl}",
+                            subtitle = "${model.protocol.displayName} · ${model.endpointMode.displayName} · ${model.modelName} · ${model.baseUrl}",
                             selected = apiKeyState.activeModelId == model.id,
                             keyText = if (model.hasKey) model.keyMasked else "无鉴权",
                             testing = modelTestState.inProgress && modelTestState.targetId == model.id,
@@ -441,6 +461,7 @@ fun SettingsScreen(
                     var baseUrlInput by remember { mutableStateOf("") }
                     var modelInput by remember { mutableStateOf("") }
                     var protocolInput by remember { mutableStateOf(ProviderProtocol.AUTO) }
+                    var endpointModeInput by remember { mutableStateOf(ProviderEndpointMode.AUTO) }
                     var customKeyInput by remember { mutableStateOf("") }
 
                     Text("添加模型",
@@ -492,6 +513,26 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
+                    Text("地址模式",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ProviderEndpointMode.entries.forEach { mode ->
+                            FilterChip(
+                                selected = endpointModeInput == mode,
+                                onClick = { endpointModeInput = mode },
+                                label = { Text(mode.displayName) },
+                            )
+                        }
+                    }
+                    Text(endpointModeInput.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = customKeyInput,
                         onValueChange = { customKeyInput = it },
@@ -512,6 +553,7 @@ fun SettingsScreen(
                                     baseUrlInput.trim(),
                                     modelInput.trim(),
                                     protocolInput,
+                                    endpointModeInput,
                                     customKeyInput.trim(),
                                 )
                             },
@@ -538,12 +580,14 @@ fun SettingsScreen(
                                     baseUrlInput.trim(),
                                     modelInput.trim(),
                                     protocolInput,
+                                    endpointModeInput,
                                     customKeyInput.trim(),
                                 )
                                 displayNameInput = ""
                                 baseUrlInput = ""
                                 modelInput = ""
                                 protocolInput = ProviderProtocol.AUTO
+                                endpointModeInput = ProviderEndpointMode.AUTO
                                 customKeyInput = ""
                             },
                             modifier = Modifier.weight(1f),
@@ -561,7 +605,7 @@ fun SettingsScreen(
                         ModelTestResultBox(modelTestState)
                     }
                     Spacer(Modifier.height(4.dp))
-                    Text("OpenAI 地址会自动拼接 chat/completions；Anthropic 地址会自动拼接 messages；第三方模型会自动关闭 DeepSeek 专属思考参数。",
+                    Text("智能拼接会按协议补全标准路径；完整地址会原样请求你填写的 URL，适合非标准第三方网关。第三方模型会自动关闭 DeepSeek 专属思考参数。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

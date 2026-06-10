@@ -69,6 +69,7 @@ class ApiKeyManager(context: Context) {
         val baseUrl: String,
         val modelName: String,
         val protocol: ProviderProtocol,
+        val endpointMode: ProviderEndpointMode,
         val hasKey: Boolean,
         val keyMasked: String,
     )
@@ -79,6 +80,7 @@ class ApiKeyManager(context: Context) {
         val baseUrl: String,
         val modelName: String,
         val protocol: ProviderProtocol,
+        val endpointMode: ProviderEndpointMode,
         val apiKey: String,
     )
 
@@ -89,6 +91,7 @@ class ApiKeyManager(context: Context) {
         val baseUrl: String,
         val modelName: String,
         val protocol: ProviderProtocol = ProviderProtocol.AUTO,
+        val endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
         val apiKey: String = "",
     )
 
@@ -152,13 +155,19 @@ class ApiKeyManager(context: Context) {
      * @param modelName Model id passed in the request body, e.g. "gpt-4o" / "deepseek-chat".
      * @param apiKey null = keep the currently stored key; blank = clear it (gateways without auth).
      */
-    fun setCustomProviderConfig(baseUrl: String, modelName: String, apiKey: String?) {
+    fun setCustomProviderConfig(
+        baseUrl: String,
+        modelName: String,
+        apiKey: String?,
+        endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
+    ) {
         saveCustomModel(
             existingId = getActiveCustomModel()?.id,
             displayName = modelName.trim().ifBlank { "自定义模型" },
             baseUrl = baseUrl,
             modelName = modelName,
             protocol = ProviderProtocol.AUTO,
+            endpointMode = endpointMode,
             apiKey = apiKey,
             selectAfterSave = true,
         )
@@ -170,12 +179,13 @@ class ApiKeyManager(context: Context) {
         baseUrl: String,
         modelName: String,
         protocol: ProviderProtocol = ProviderProtocol.AUTO,
+        endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
         apiKey: String?,
         selectAfterSave: Boolean = true,
     ): String {
         val normalizedModelName = modelName.trim()
         val resolvedProtocol = ProviderProtocol.resolve(protocol, baseUrl, normalizedModelName)
-        val normalizedBaseUrl = normalizeCustomBaseUrl(baseUrl, resolvedProtocol)
+        val normalizedBaseUrl = normalizeCustomBaseUrl(baseUrl, resolvedProtocol, endpointMode)
         val id = existingId?.takeIf { it.isNotBlank() } ?: "custom_${UUID.randomUUID()}"
         val currentModels = loadCustomModels()
         val previous = currentModels.firstOrNull { it.id == id }
@@ -189,6 +199,7 @@ class ApiKeyManager(context: Context) {
             baseUrl = normalizedBaseUrl,
             modelName = normalizedModelName,
             protocol = protocol,
+            endpointMode = endpointMode,
             apiKey = normalizedKey,
         )
         val models = currentModels
@@ -244,6 +255,7 @@ class ApiKeyManager(context: Context) {
                 baseUrl = it.baseUrl,
                 modelName = it.modelName,
                 protocol = it.protocol,
+                endpointMode = it.endpointMode,
                 apiKey = it.apiKey,
             )
         }
@@ -256,7 +268,7 @@ class ApiKeyManager(context: Context) {
     fun getActiveBaseUrl(): String {
         val custom = getActiveCustomModel()
         if (custom != null) {
-            val url = normalizeCustomBaseUrl(custom.baseUrl, getResolvedProtocol(custom))
+            val url = normalizeCustomBaseUrl(custom.baseUrl, getResolvedProtocol(custom), custom.endpointMode)
             if (url.isNotBlank()) return url
         }
         return AppConstants.DEEPSEEK_BASE_URL
@@ -264,6 +276,9 @@ class ApiKeyManager(context: Context) {
 
     fun getActiveProviderProtocol(): ProviderProtocol =
         getActiveCustomModel()?.let { getResolvedProtocol(it) } ?: ProviderProtocol.OPENAI
+
+    fun getActiveProviderEndpointMode(): ProviderEndpointMode =
+        getActiveCustomModel()?.endpointMode ?: ProviderEndpointMode.AUTO
 
     /**
      * Model id override. Non-null only when the custom provider is active and configured —
@@ -376,7 +391,12 @@ class ApiKeyManager(context: Context) {
     private val customKey: String?
         get() = getActiveCustomModel()?.apiKey?.takeIf { it.isNotBlank() }
 
-    private fun normalizeCustomBaseUrl(raw: String, protocol: ProviderProtocol): String {
+    private fun normalizeCustomBaseUrl(
+        raw: String,
+        protocol: ProviderProtocol,
+        endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
+    ): String {
+        if (endpointMode == ProviderEndpointMode.EXACT) return raw.trim()
         return when (protocol) {
             ProviderProtocol.ANTHROPIC -> DeepSeekApiClient.normalizeAnthropicBaseUrl(raw)
             ProviderProtocol.OPENAI -> DeepSeekApiClient.normalizeOpenAiBaseUrl(raw)
@@ -427,6 +447,7 @@ class ApiKeyManager(context: Context) {
                 baseUrl = legacyBaseUrl,
                 modelName = legacyModel,
                 protocol = ProviderProtocol.AUTO,
+                endpointMode = ProviderEndpointMode.AUTO,
                 apiKey = prefs.getString(KEY_CUSTOM_KEY, "").orEmpty().trim(),
             )
         )
@@ -461,6 +482,7 @@ class ApiKeyManager(context: Context) {
                     baseUrl = it.baseUrl,
                     modelName = it.modelName,
                     protocol = it.protocol,
+                    endpointMode = it.endpointMode,
                     hasKey = it.apiKey.isNotBlank(),
                     keyMasked = it.apiKey.takeIf { key -> key.isNotBlank() }?.maskApiKey() ?: "",
                 )

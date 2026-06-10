@@ -31,6 +31,7 @@ class DeepSeekApiClient(
     private val baseUrlProvider: () -> String = { AppConstants.DEEPSEEK_BASE_URL },
     private val modelOverrideProvider: () -> String? = { null },
     private val providerProtocolProvider: () -> ProviderProtocol = { ProviderProtocol.OPENAI },
+    private val providerEndpointModeProvider: () -> ProviderEndpointMode = { ProviderEndpointMode.AUTO },
 ) {
 
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
@@ -310,23 +311,20 @@ class DeepSeekApiClient(
         modelName: String,
         apiKey: String?,
         protocol: ProviderProtocol = ProviderProtocol.AUTO,
+        endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
     ): AppResult<ProviderTestResult> = withContext(Dispatchers.IO) {
         val normalizedModel = modelName.trim()
         val resolvedProtocol = ProviderProtocol.resolve(protocol, baseUrl, normalizedModel)
-        val normalizedBaseUrl = when (resolvedProtocol) {
-            ProviderProtocol.ANTHROPIC -> normalizeAnthropicBaseUrl(baseUrl)
-            else -> normalizeOpenAiBaseUrl(baseUrl)
-        }
-        if (normalizedBaseUrl.isBlank()) {
-            return@withContext AppResult.failure(AppError.InvalidRequest, "服务地址不能为空")
-        }
         if (normalizedModel.isBlank()) {
             return@withContext AppResult.failure(AppError.InvalidRequest, "模型名不能为空")
         }
 
         val endpoint = when (resolvedProtocol) {
-            ProviderProtocol.ANTHROPIC -> buildAnthropicMessagesEndpoint(normalizedBaseUrl)
-            else -> buildOpenAiChatCompletionsEndpoint(normalizedBaseUrl)
+            ProviderProtocol.ANTHROPIC -> buildAnthropicMessagesEndpoint(baseUrl, endpointMode)
+            else -> buildOpenAiChatCompletionsEndpoint(baseUrl, endpointMode)
+        }
+        if (endpoint.isBlank()) {
+            return@withContext AppResult.failure(AppError.InvalidRequest, "服务地址不能为空")
         }
         val startedAt = System.currentTimeMillis()
         try {
@@ -336,6 +334,7 @@ class DeepSeekApiClient(
                     modelName = normalizedModel,
                     apiKey = apiKey,
                     startedAt = startedAt,
+                    endpointMode = endpointMode,
                 )
             }
             val request = ChatCompletionRequest(
@@ -389,6 +388,7 @@ class DeepSeekApiClient(
                     endpoint = endpoint,
                     modelName = parsed.model.ifBlank { normalizedModel },
                     protocol = ProviderProtocol.OPENAI,
+                    endpointMode = endpointMode,
                     latencyMs = elapsedMs,
                     replyPreview = content.take(120),
                 )
@@ -456,7 +456,7 @@ class DeepSeekApiClient(
                 )
                 val requestBody = body.toRequestBody("application/json".toMediaType())
                 val httpRequest = Request.Builder()
-                    .url(buildAnthropicMessagesEndpoint(baseUrlProvider()))
+                    .url(buildAnthropicMessagesEndpoint(baseUrlProvider(), activeProviderEndpointMode()))
                     .header(internalProtocolHeader, ProviderProtocol.ANTHROPIC.name)
                     .post(requestBody)
                     .build()
@@ -586,6 +586,7 @@ class DeepSeekApiClient(
         modelName: String,
         apiKey: String?,
         startedAt: Long,
+        endpointMode: ProviderEndpointMode,
     ): AppResult<ProviderTestResult> {
         val body = buildAnthropicRequestBody(
             messages = listOf(MessageDto(role = "user", content = "ping")),
@@ -640,6 +641,7 @@ class DeepSeekApiClient(
                 endpoint = endpoint,
                 modelName = parsed["model"]?.jsonPrimitive?.contentOrNull?.ifBlank { modelName } ?: modelName,
                 protocol = ProviderProtocol.ANTHROPIC,
+                endpointMode = endpointMode,
                 latencyMs = elapsedMs,
                 replyPreview = content.take(120),
             )
@@ -655,6 +657,9 @@ class DeepSeekApiClient(
             ProviderProtocol.resolve(providerProtocolProvider(), baseUrlProvider(), modelName)
         }
     }
+
+    private fun activeProviderEndpointMode(): ProviderEndpointMode =
+        if (modelOverrideProvider() == null) ProviderEndpointMode.AUTO else providerEndpointModeProvider()
 
     private fun buildAnthropicRequestBody(
         messages: List<MessageDto>,
@@ -807,7 +812,7 @@ class DeepSeekApiClient(
         val body = json.encodeToString(ChatCompletionRequest.serializer(), request)
         android.util.Log.e("NuclearBoy", "[ApiClient] buildHttpRequest() bodySize=${body.length} bytes")
         val requestBody = body.toRequestBody("application/json".toMediaType())
-        val endpoint = buildOpenAiChatCompletionsEndpoint(baseUrlProvider())
+        val endpoint = buildOpenAiChatCompletionsEndpoint(baseUrlProvider(), activeProviderEndpointMode())
 
         return okhttp3.Request.Builder()
             .url(endpoint)
@@ -835,7 +840,7 @@ class DeepSeekApiClient(
         val hint = when (httpCode) {
             400, 422 -> "请求格式或模型名可能不被网关接受。请核对模型名：$modelName。"
             401, 403 -> "鉴权失败。请检查 API Key、网关是否要求 Bearer Token，以及账号是否有该模型权限。"
-            404 -> "接口路径不存在。当前会请求 $endpoint；服务地址可填根地址或 /v1，不要填网页地址。"
+            404 -> "接口路径不存在。当前会请求 $endpoint；若你的网关提供完整接口地址，请在地址模式里选择“完整地址”。"
             402 -> "账号余额或额度不足。"
             429 -> "请求过快或额度被限流，稍后再试。"
             in 500..599 -> "网关服务端报错。请查看网关日志，确认上游模型可用。"
@@ -925,7 +930,11 @@ class DeepSeekApiClient(
     }
 
     companion object {
-        fun normalizeOpenAiBaseUrl(raw: String): String {
+        fun normalizeOpenAiBaseUrl(
+            raw: String,
+            endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
+        ): String {
+            if (endpointMode == ProviderEndpointMode.EXACT) return raw.trim()
             var url = raw.trim().trimEnd('/')
             if (url.isBlank()) return ""
             val lower = url.lowercase()
@@ -950,7 +959,11 @@ class DeepSeekApiClient(
             return url
         }
 
-        fun buildOpenAiChatCompletionsEndpoint(raw: String): String {
+        fun buildOpenAiChatCompletionsEndpoint(
+            raw: String,
+            endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
+        ): String {
+            if (endpointMode == ProviderEndpointMode.EXACT) return raw.trim()
             val baseUrl = normalizeOpenAiBaseUrl(raw).trimEnd('/')
             if (baseUrl.isBlank()) return ""
             val lower = baseUrl.lowercase()
@@ -962,7 +975,11 @@ class DeepSeekApiClient(
             }
         }
 
-        fun normalizeAnthropicBaseUrl(raw: String): String {
+        fun normalizeAnthropicBaseUrl(
+            raw: String,
+            endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
+        ): String {
+            if (endpointMode == ProviderEndpointMode.EXACT) return raw.trim()
             var url = raw.trim().trimEnd('/')
             if (url.isBlank()) return ""
             val suffixes = listOf(
@@ -978,7 +995,11 @@ class DeepSeekApiClient(
             return url
         }
 
-        fun buildAnthropicMessagesEndpoint(raw: String): String {
+        fun buildAnthropicMessagesEndpoint(
+            raw: String,
+            endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
+        ): String {
+            if (endpointMode == ProviderEndpointMode.EXACT) return raw.trim()
             val baseUrl = normalizeAnthropicBaseUrl(raw).trimEnd('/')
             if (baseUrl.isBlank()) return ""
             return if (baseUrl.lowercase().endsWith("/v1")) {
@@ -996,6 +1017,7 @@ data class ProviderTestResult(
     val endpoint: String,
     val modelName: String,
     val protocol: ProviderProtocol,
+    val endpointMode: ProviderEndpointMode,
     val latencyMs: Long,
     val replyPreview: String,
 )

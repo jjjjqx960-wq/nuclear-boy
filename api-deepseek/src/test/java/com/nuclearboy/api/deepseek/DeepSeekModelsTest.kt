@@ -126,6 +126,26 @@ class DeepSeekModelsTest {
     }
 
     @Test
+    fun `exact endpoint mode does not rewrite OpenAI compatible address`() {
+        val exact = "https://gateway.example.com/custom/nonstandard/model/path"
+        assertEquals(
+            exact,
+            DeepSeekApiClient.normalizeOpenAiBaseUrl(exact, ProviderEndpointMode.EXACT)
+        )
+        assertEquals(
+            exact,
+            DeepSeekApiClient.buildOpenAiChatCompletionsEndpoint(exact, ProviderEndpointMode.EXACT)
+        )
+        assertEquals(
+            "https://ark.cn-beijing.volces.com/api/compatible",
+            DeepSeekApiClient.buildOpenAiChatCompletionsEndpoint(
+                "https://ark.cn-beijing.volces.com/api/compatible",
+                ProviderEndpointMode.EXACT,
+            )
+        )
+    }
+
+    @Test
     fun `Anthropic endpoint builder preserves anthropic roots`() {
         assertEquals(
             "https://api.minimaxi.com/anthropic/v1/messages",
@@ -138,6 +158,19 @@ class DeepSeekModelsTest {
         assertEquals(
             "https://gateway.example.com/v1/messages",
             DeepSeekApiClient.buildAnthropicMessagesEndpoint("https://gateway.example.com")
+        )
+    }
+
+    @Test
+    fun `exact endpoint mode does not rewrite Anthropic address`() {
+        val exact = "https://gateway.example.com/provider/messages/custom"
+        assertEquals(
+            exact,
+            DeepSeekApiClient.normalizeAnthropicBaseUrl(exact, ProviderEndpointMode.EXACT)
+        )
+        assertEquals(
+            exact,
+            DeepSeekApiClient.buildAnthropicMessagesEndpoint(exact, ProviderEndpointMode.EXACT)
         )
     }
 

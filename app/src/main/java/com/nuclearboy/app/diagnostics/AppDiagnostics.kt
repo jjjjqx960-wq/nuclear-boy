@@ -100,6 +100,7 @@ class AppDiagnostics @Inject constructor(
                 baseUrl = "http://127.0.0.1:9/v1",
                 modelName = "diagnostic-temp-model",
                 protocol = com.nuclearboy.api.deepseek.ProviderProtocol.OPENAI,
+                endpointMode = com.nuclearboy.api.deepseek.ProviderEndpointMode.AUTO,
                 apiKey = "",
                 selectAfterSave = true,
             )
@@ -181,7 +182,13 @@ class AppDiagnostics @Inject constructor(
                 failures.add("${model.displayName}: 配置缺失")
                 return@forEach
             }
-            when (val result = apiClient.testCustomProvider(config.baseUrl, config.modelName, config.apiKey, config.protocol)) {
+            when (val result = apiClient.testCustomProvider(
+                config.baseUrl,
+                config.modelName,
+                config.apiKey,
+                config.protocol,
+                config.endpointMode,
+            )) {
                 is AppResult.Success -> passCount++
                 is AppResult.Failure -> failures.add(
                     "${model.displayName}: ${result.error.code} ${result.technicalDetail.orEmpty().take(160)}"

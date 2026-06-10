@@ -76,6 +76,7 @@ object AppModule {
             baseUrlProvider = { apiKeyManager.getActiveBaseUrl() },
             modelOverrideProvider = { apiKeyManager.getModelOverride() },
             providerProtocolProvider = { apiKeyManager.getActiveProviderProtocol() },
+            providerEndpointModeProvider = { apiKeyManager.getActiveProviderEndpointMode() },
         )
     }
 
