@@ -58,7 +58,7 @@ enum class AppError(
 
     companion object {
         fun fromHttpCode(code: Int): AppError = when (code) {
-            400 -> InvalidRequest
+            400, 404, 405, 422 -> InvalidRequest
             401 -> ApiKeyInvalid
             402 -> InsufficientBalance
             429 -> RateLimited

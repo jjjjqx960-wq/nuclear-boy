@@ -161,13 +161,8 @@
             android:name="com.nuclearboy.app.update.DownloadReceiver"
             android:exported="false" />
 
-        <receiver
-            android:name=".diagnostics.DiagnosticsReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.nuclearboy.app.RUN_DIAGNOSTICS" />
-            </intent-filter>
-        </receiver>
+        <!-- DiagnosticsReceiver 只在 debug 构建注册（见 src/debug/AndroidManifest.xml），
+             release 包不暴露任何可被第三方 App 触发的导出组件 -->
 
     </application>
 </manifest>

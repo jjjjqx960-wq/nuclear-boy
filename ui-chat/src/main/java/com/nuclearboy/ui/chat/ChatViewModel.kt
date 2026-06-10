@@ -396,7 +396,7 @@ class ChatViewModel @Inject constructor(
                 addSystemMessage("🧹 对话已清空，重新开始吧")
             }
             "sandbox" -> addSystemMessage("Python 现在固定为非隔离执行模式，/sandbox 开关已移除。")
-            "model" -> handleModelCommand()
+            "model" -> handleModelCommand(args)
             "goal" -> handleGoalCommand(args)
             "rewind" -> {
                 if (busyGuard()) return
@@ -422,7 +422,11 @@ class ChatViewModel @Inject constructor(
         return false
     }
 
-    private fun handleModelCommand() {
+    private fun handleModelCommand(args: String = "") {
+        if (args.isNotBlank()) {
+            switchModelByCommand(args)
+            return
+        }
         val state = apiKeyManager.state.value
         val modeText = when (selectedMode) {
             1 -> "思考模式 (V4 Pro · 深度思考)"
@@ -448,7 +452,43 @@ class ChatViewModel @Inject constructor(
                 append("要接入自建服务（如 9router），到「设置 → 第三方模型」添加")
             }
         }
-        addSystemMessage(text)
+        val listing = if (state.customModels.isEmpty()) "" else buildString {
+            appendLine()
+            appendLine()
+            appendLine("可切换的模型（/model <序号或名称>）：")
+            val officialMark = if (state.activeModelId == com.nuclearboy.api.deepseek.ApiKeyManager.OFFICIAL_MODEL_ID) " ✅" else ""
+            appendLine("0. DeepSeek 官方$officialMark")
+            state.customModels.forEachIndexed { i, m ->
+                val mark = if (state.activeModelId == m.id) " ✅" else ""
+                appendLine("${i + 1}. ${m.displayName}（${m.modelName}）$mark")
+            }
+        }.trimEnd()
+        addSystemMessage(text + listing)
+    }
+
+    /** /model <序号或名称>：切换当前模型。0/官方 = DeepSeek 官方，其余按列表序号或名称模糊匹配 */
+    private fun switchModelByCommand(args: String) {
+        val state = apiKeyManager.state.value
+        val query = args.trim()
+        val officialAliases = setOf("0", "官方", "official", "deepseek")
+        if (query.lowercase() in officialAliases) {
+            apiKeyManager.selectModel(com.nuclearboy.api.deepseek.ApiKeyManager.OFFICIAL_MODEL_ID)
+            addSystemMessage("✅ 已切换到 DeepSeek 官方 API")
+            return
+        }
+        val byIndex = query.toIntOrNull()?.let { idx ->
+            state.customModels.getOrNull(idx - 1)
+        }
+        val target = byIndex ?: state.customModels.firstOrNull {
+            it.displayName.contains(query, ignoreCase = true) ||
+                it.modelName.contains(query, ignoreCase = true)
+        }
+        if (target == null) {
+            addSystemMessage("❓ 没找到匹配「$query」的模型\n用 /model 查看可用列表")
+            return
+        }
+        apiKeyManager.selectModel(target.id)
+        addSystemMessage("✅ 已切换到 ${target.displayName}（${target.protocol.displayName} · ${target.modelName}）")
     }
 
     private fun handleGoalCommand(args: String) {

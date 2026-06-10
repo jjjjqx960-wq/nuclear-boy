@@ -35,5 +35,6 @@ internal const val SLASH_HELP = """📖 可用命令：
 /clear　　　  清空全部对话
 /stop　　　　停止当前任务（含循环）
 
-/model　　　　　 查看当前模型与 API 服务配置
+/model　　　　　 查看当前模型与可切换列表
+/model <序号/名称>　切换模型（0 = DeepSeek 官方）
 /help　　　　　　显示本帮助"""

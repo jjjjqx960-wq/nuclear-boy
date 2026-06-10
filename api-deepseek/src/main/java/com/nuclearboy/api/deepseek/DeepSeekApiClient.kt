@@ -56,12 +56,17 @@ class DeepSeekApiClient(
                 val apiKey = apiKeyProvider() ?: run {
                     throw IOException("API Key not configured")
                 }
-                val providerProtocol = chain.request().header(internalProtocolHeader)
-                val requestBuilder = chain.request().newBuilder()
+                val original = chain.request()
+                val providerProtocol = original.header(internalProtocolHeader)
+                // Requests that already carry credentials (e.g. checkBalance with an
+                // explicit key) keep them — adding a second auth header confuses gateways.
+                val alreadyAuthed = original.header("Authorization") != null ||
+                    original.header("x-api-key") != null
+                val requestBuilder = original.newBuilder()
                     .removeHeader(internalProtocolHeader)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "text/event-stream")
-                if (apiKey.isNotBlank()) {
+                if (apiKey.isNotBlank() && !alreadyAuthed) {
                     if (providerProtocol == ProviderProtocol.ANTHROPIC.name) {
                         requestBuilder.addHeader("x-api-key", apiKey)
                         requestBuilder.addHeader("anthropic-version", "2023-06-01")
@@ -821,7 +826,7 @@ class DeepSeekApiClient(
     }
 
     private fun providerHttpError(code: Int): AppError = when (code) {
-        400, 404, 422 -> AppError.InvalidRequest
+        400, 404, 405, 422 -> AppError.InvalidRequest
         401, 403 -> AppError.ApiKeyInvalid
         402 -> AppError.InsufficientBalance
         429 -> AppError.RateLimited
@@ -841,6 +846,7 @@ class DeepSeekApiClient(
             400, 422 -> "请求格式或模型名可能不被网关接受。请核对模型名：$modelName。"
             401, 403 -> "鉴权失败。请检查 API Key、网关是否要求 Bearer Token，以及账号是否有该模型权限。"
             404 -> "接口路径不存在。当前会请求 $endpoint；若你的网关提供完整接口地址，请在地址模式里选择“完整地址”。"
+            405 -> buildMethodNotAllowedHint(endpoint)
             402 -> "账号余额或额度不足。"
             429 -> "请求过快或额度被限流，稍后再试。"
             in 500..599 -> "网关服务端报错。请查看网关日志，确认上游模型可用。"
@@ -860,6 +866,25 @@ class DeepSeekApiClient(
                 append("\n返回片段：")
                 append(preview)
             }
+        }
+    }
+
+    private fun buildMethodNotAllowedHint(endpoint: String): String {
+        val normalized = endpoint.trimEnd('/')
+        val lower = normalized.lowercase()
+        return when {
+            lower.endsWith("/v1") ->
+                "接口存在但不接受当前 POST 请求。你可能在“完整地址”模式里只填到了服务根路径 /v1。" +
+                    "OpenAI 兼容网关请切换到“智能拼接”，或把完整地址改成 $normalized/chat/completions。"
+            lower.endsWith("/anthropic") ->
+                "接口存在但不接受当前 POST 请求。Anthropic 兼容网关的完整地址通常需要填到 $normalized/v1/messages。"
+            lower.endsWith("/messages") ->
+                "接口存在但不接受当前请求方法。请确认协议选择为 Anthropic，并确认网关支持 Messages POST。"
+            lower.endsWith("/chat/completions") ->
+                "接口存在但不接受当前请求方法。请确认协议选择为 OpenAI，并确认网关支持 Chat Completions POST。"
+            else ->
+                "接口存在但不接受当前 POST 请求。若你选择了“完整地址”，请确认它是最终接口路径：" +
+                    "OpenAI 使用 /v1/chat/completions，Anthropic 使用 /v1/messages；否则请改用“智能拼接”。"
         }
     }
 

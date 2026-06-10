@@ -95,9 +95,10 @@ class ChaquopyPythonExecutor : PythonExecutor {
                 appendLine("sys.stderr = _err_fp")
                 appendLine("_nb_exit_code = 0")
                 appendLine("try:")
-                for (line in script.lines()) {
-                    appendLine("    $line")
-                }
+                // Execute the raw script object injected via the namespace dict —
+                // indenting source lines here would corrupt the bodies of
+                // triple-quoted strings inside the user script.
+                appendLine("    exec(compile(_nb_user_script, '<nuclear-boy-script>', 'exec'), globals())")
                 appendLine("except SystemExit as e:")
                 appendLine("    _nb_exit_code = e.code if e.code is not None else 0")
                 appendLine("except:")
@@ -116,6 +117,7 @@ class ChaquopyPythonExecutor : PythonExecutor {
 
             val locals = py.getModule("builtins").callAttr("dict")
             locals.callAttr("__setitem__", "__name__", "__main__")  // Fix: exec() runs as __main__
+            locals.callAttr("__setitem__", "_nb_user_script", script)  // Raw script — no source rewriting
             py.getModule("builtins").callAttr("exec", wrappedScript, locals)
 
             val exitCode = (locals.callAttr("get", "_nb_exit_code", 0) as? Int) ?: 0

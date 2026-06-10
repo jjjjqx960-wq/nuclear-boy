@@ -146,6 +146,16 @@ class DeepSeekModelsTest {
     }
 
     @Test
+    fun `exact endpoint mode preserves OpenAI root and requires caller intent`() {
+        val root = "http://192.0.2.10:20128/v1"
+        assertEquals(root, DeepSeekApiClient.buildOpenAiChatCompletionsEndpoint(root, ProviderEndpointMode.EXACT))
+        assertEquals(
+            "http://192.0.2.10:20128/v1/chat/completions",
+            DeepSeekApiClient.buildOpenAiChatCompletionsEndpoint(root, ProviderEndpointMode.AUTO)
+        )
+    }
+
+    @Test
     fun `Anthropic endpoint builder preserves anthropic roots`() {
         assertEquals(
             "https://api.minimaxi.com/anthropic/v1/messages",

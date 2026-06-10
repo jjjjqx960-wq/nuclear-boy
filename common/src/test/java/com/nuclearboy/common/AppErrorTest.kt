@@ -11,6 +11,14 @@ class AppErrorTest {
     }
 
     @Test
+    fun `request shape errors map to InvalidRequest`() {
+        assertEquals(AppError.InvalidRequest, AppError.fromHttpCode(400))
+        assertEquals(AppError.InvalidRequest, AppError.fromHttpCode(404))
+        assertEquals(AppError.InvalidRequest, AppError.fromHttpCode(405))
+        assertEquals(AppError.InvalidRequest, AppError.fromHttpCode(422))
+    }
+
+    @Test
     fun `402 maps to InsufficientBalance`() {
         assertEquals(AppError.InsufficientBalance, AppError.fromHttpCode(402))
     }

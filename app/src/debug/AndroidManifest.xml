@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- 调试诊断入口：adb shell am broadcast -a com.nuclearboy.app.RUN_DIAGNOSTICS
+             仅 debug 构建注册；接收器代码内部也有 BuildConfig.DEBUG 双重校验 -->
+        <receiver
+            android:name="com.nuclearboy.app.diagnostics.DiagnosticsReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.nuclearboy.app.RUN_DIAGNOSTICS" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>
