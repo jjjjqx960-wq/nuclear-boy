@@ -21,6 +21,30 @@ class FilePanelFilterTest {
     }
 
     @Test
+    fun `visible file panel entries filters selected files in selected only mode`() {
+        val visibleFiles = visibleFilePanelEntries(
+            filteredFiles = files,
+            selectedFiles = listOf(files[0], files[1]),
+            showSelectedOnly = true,
+            query = "read",
+        )
+
+        assertEquals(listOf("README.md"), visibleFiles.map { it.name })
+    }
+
+    @Test
+    fun `visible file panel entries uses filtered files outside selected only mode`() {
+        val visibleFiles = visibleFilePanelEntries(
+            filteredFiles = listOf(files[2]),
+            selectedFiles = listOf(files[0], files[1]),
+            showSelectedOnly = false,
+            query = "read",
+        )
+
+        assertEquals(listOf("libs.versions.toml"), visibleFiles.map { it.name })
+    }
+
+    @Test
     fun `file panel filter summary uses filtered result count`() {
         val summary = filePanelFilterSummary(
             totalCount = files.size,

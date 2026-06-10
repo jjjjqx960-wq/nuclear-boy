@@ -16,6 +16,19 @@ internal fun filterFilePanelEntries(
     }
 }
 
+internal fun visibleFilePanelEntries(
+    filteredFiles: List<FileInfo>,
+    selectedFiles: List<FileInfo>,
+    showSelectedOnly: Boolean,
+    query: String,
+): List<FileInfo> {
+    return if (showSelectedOnly) {
+        filterFilePanelEntries(selectedFiles, query)
+    } else {
+        filteredFiles
+    }
+}
+
 internal fun filePanelFilterSummary(
     totalCount: Int,
     filteredCount: Int,

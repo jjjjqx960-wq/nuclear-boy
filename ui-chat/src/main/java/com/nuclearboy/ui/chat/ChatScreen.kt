@@ -79,6 +79,7 @@ import com.nuclearboy.ui.chat.parts.shouldShowJumpToBottom
 import com.nuclearboy.ui.chat.parts.toggleSelectedFilePath
 import com.nuclearboy.ui.chat.parts.unselectHiddenFilePaths
 import com.nuclearboy.ui.chat.parts.unselectVisibleFilePaths
+import com.nuclearboy.ui.chat.parts.visibleFilePanelEntries
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -426,8 +427,13 @@ private fun ProjectFilePanel(
             sortMode,
         )
     }
-    val visibleFiles = remember(sortedFilteredFiles, selectedFiles, showSelectedOnly) {
-        if (showSelectedOnly) selectedFiles else sortedFilteredFiles
+    val visibleFiles = remember(sortedFilteredFiles, selectedFiles, showSelectedOnly, filterQuery) {
+        visibleFilePanelEntries(
+            filteredFiles = sortedFilteredFiles,
+            selectedFiles = selectedFiles,
+            showSelectedOnly = showSelectedOnly,
+            query = filterQuery,
+        )
     }
     val selectedTotalSizeLabel = remember(selectedFiles) {
         selectedFileTotalSizeBytes(selectedFiles).toFileSizeString()
