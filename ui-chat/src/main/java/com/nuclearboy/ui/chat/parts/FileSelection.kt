@@ -40,6 +40,19 @@ internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
         .sumOf { it.size.coerceAtLeast(0L) }
 }
 
+internal fun fileSelectionStatusLabel(
+    selectedCount: Int,
+    selectedVisibleCount: Int,
+    visibleFileCount: Int,
+    selectedSizeLabel: String,
+): String {
+    return if (selectedCount > 0) {
+        "已选 $selectedCount 个 · $selectedSizeLabel · 可见 $selectedVisibleCount/$visibleFileCount"
+    } else {
+        "可选 $visibleFileCount 个"
+    }
+}
+
 internal fun selectedFilePanelEntries(
     files: List<FileInfo>,
     selectedPaths: List<String>,

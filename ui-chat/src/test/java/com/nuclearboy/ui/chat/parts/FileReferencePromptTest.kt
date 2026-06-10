@@ -100,4 +100,28 @@ class FileReferencePromptTest {
 
         assertEquals(3072L, totalSize)
     }
+
+    @Test
+    fun `file selection status label shows selected visible progress`() {
+        val label = fileSelectionStatusLabel(
+            selectedCount = 7,
+            selectedVisibleCount = 3,
+            visibleFileCount = 5,
+            selectedSizeLabel = "12 KB",
+        )
+
+        assertEquals("已选 7 个 · 12 KB · 可见 3/5", label)
+    }
+
+    @Test
+    fun `file selection status label stays compact without selection`() {
+        val label = fileSelectionStatusLabel(
+            selectedCount = 0,
+            selectedVisibleCount = 0,
+            visibleFileCount = 5,
+            selectedSizeLabel = "0 B",
+        )
+
+        assertEquals("可选 5 个", label)
+    }
 }

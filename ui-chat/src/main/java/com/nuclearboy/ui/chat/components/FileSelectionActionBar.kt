@@ -38,7 +38,7 @@ import com.nuclearboy.ui.chat.NuclearBoyTheme
 internal fun FileSelectionActionBar(
     selectedCount: Int,
     selectedVisibleCount: Int,
-    selectedSizeLabel: String,
+    statusLabel: String,
     visibleFileCount: Int,
     showSelectedOnly: Boolean,
     onSelectVisible: () -> Unit,
@@ -63,7 +63,7 @@ internal fun FileSelectionActionBar(
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 FileSelectionStatusText(
-                    text = "已选 $selectedCount 个 · $selectedSizeLabel",
+                    text = statusLabel,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(
@@ -139,7 +139,7 @@ internal fun FileSelectionActionBar(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 FileSelectionStatusText(
-                    text = "可选 $visibleFileCount 个",
+                    text = statusLabel,
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedButton(
