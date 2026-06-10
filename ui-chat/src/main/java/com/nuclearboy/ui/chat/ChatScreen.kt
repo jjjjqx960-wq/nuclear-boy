@@ -577,6 +577,7 @@ private fun ProjectFilePanel(
                     statusLabel = selectionStatusLabel,
                     visibleFileCount = visibleSelectableFiles.size,
                     showSelectedOnly = showSelectedOnly,
+                    hasFilterQuery = filterQuery.isNotBlank(),
                     onSelectVisible = {
                         selectedFilePaths = selectVisibleFilePaths(
                             selectedPaths = selectedFilePaths,

@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuclearboy.ui.chat.NuclearBoyTheme
+import com.nuclearboy.ui.chat.parts.shouldShowUnselectVisibleAction
 
 @Composable
 internal fun FileSelectionActionBar(
@@ -42,6 +43,7 @@ internal fun FileSelectionActionBar(
     statusLabel: String,
     visibleFileCount: Int,
     showSelectedOnly: Boolean,
+    hasFilterQuery: Boolean,
     onSelectVisible: () -> Unit,
     onUnselectVisible: () -> Unit,
     onUnselectHidden: () -> Unit,
@@ -59,7 +61,12 @@ internal fun FileSelectionActionBar(
     ) {
         val hasSelection = selectedCount > 0
         val hiddenSelectedCount = (selectedCount - selectedVisibleCount).coerceAtLeast(0)
-        val canUnselectVisible = hasSelection && selectedVisibleCount > 0 && !showSelectedOnly
+        val canUnselectVisible = shouldShowUnselectVisibleAction(
+            selectedCount = selectedCount,
+            selectedVisibleCount = selectedVisibleCount,
+            showSelectedOnly = showSelectedOnly,
+            hasFilterQuery = hasFilterQuery,
+        )
         val canUnselectHidden = hasSelection && hiddenSelectedCount > 0 && !showSelectedOnly
         if (hasSelection) {
             Column(
@@ -107,7 +114,7 @@ internal fun FileSelectionActionBar(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.RemoveCircleOutline,
-                                contentDescription = "取消当前可见选择",
+                                contentDescription = if (showSelectedOnly) "取消匹配选择" else "取消当前可见选择",
                                 modifier = Modifier.size(16.dp),
                                 tint = nc.material.secondary,
                             )

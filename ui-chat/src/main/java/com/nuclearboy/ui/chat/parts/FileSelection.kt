@@ -58,6 +58,17 @@ internal fun shouldShowFileSelectionActionBar(
     return selectedCount > 0 || visibleFileCount > 0
 }
 
+internal fun shouldShowUnselectVisibleAction(
+    selectedCount: Int,
+    selectedVisibleCount: Int,
+    showSelectedOnly: Boolean,
+    hasFilterQuery: Boolean,
+): Boolean {
+    return selectedCount > 0 &&
+        selectedVisibleCount > 0 &&
+        (!showSelectedOnly || hasFilterQuery)
+}
+
 internal fun fileSelectionStatusLabel(
     selectedCount: Int,
     selectedVisibleCount: Int,

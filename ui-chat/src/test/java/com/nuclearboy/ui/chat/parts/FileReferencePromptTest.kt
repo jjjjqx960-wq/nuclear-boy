@@ -136,6 +136,42 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `unselect visible action shows in normal mode with visible selection`() {
+        val shouldShow = shouldShowUnselectVisibleAction(
+            selectedCount = 3,
+            selectedVisibleCount = 2,
+            showSelectedOnly = false,
+            hasFilterQuery = false,
+        )
+
+        assertEquals(true, shouldShow)
+    }
+
+    @Test
+    fun `unselect visible action hides in selected only mode without filter`() {
+        val shouldShow = shouldShowUnselectVisibleAction(
+            selectedCount = 3,
+            selectedVisibleCount = 3,
+            showSelectedOnly = true,
+            hasFilterQuery = false,
+        )
+
+        assertEquals(false, shouldShow)
+    }
+
+    @Test
+    fun `unselect visible action shows in selected only filter mode with matches`() {
+        val shouldShow = shouldShowUnselectVisibleAction(
+            selectedCount = 3,
+            selectedVisibleCount = 1,
+            showSelectedOnly = true,
+            hasFilterQuery = true,
+        )
+
+        assertEquals(true, shouldShow)
+    }
+
+    @Test
     fun `file selection status label shows selected visible progress`() {
         val label = fileSelectionStatusLabel(
             selectedCount = 7,
