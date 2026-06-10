@@ -1,0 +1,24 @@
+## 目录职责
+
+`ui-chat/src/test` 承载 `ui-chat` 模块的 JVM 单元测试，用于验证零件层纯函数和轻量组件外的可测试规则。
+
+## 边界
+
+这里只放测试代码和测试辅助数据，不放生产实现。涉及 Compose 渲染或 Android 系统交互的测试应另建合适的 Android 测试目录。
+
+## 允许依赖
+
+允许依赖 `ui-chat` 主源码、`common` 测试可见模型、JUnit 和 Kotlin 标准库。
+
+## 禁止事项
+
+不要在测试中读取真实用户文件、账号、Token、签名密钥或个人数据。不要依赖本机绝对路径。
+
+## 常用命令
+
+- `./gradlew :ui-chat:testDebugUnitTest`
+- `./gradlew :ui-chat:compileDebugKotlin`
+
+## 验证方式
+
+优先验证纯函数输入输出、边界排序和空集合行为，再由模块编译验证 UI 接入。

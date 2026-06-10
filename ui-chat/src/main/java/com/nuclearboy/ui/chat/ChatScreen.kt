@@ -58,12 +58,15 @@ import com.nuclearboy.ui.chat.components.FilePanelOverviewBar
 import com.nuclearboy.ui.chat.components.FileReferenceIconButton
 import com.nuclearboy.ui.chat.components.FileReferenceTextButton
 import com.nuclearboy.ui.chat.components.FilePanelSearchField
+import com.nuclearboy.ui.chat.components.FilePanelSortBar
 import com.nuclearboy.ui.chat.components.ScrollToBottomAction
 import com.nuclearboy.ui.chat.parts.appendToChatDraft
 import com.nuclearboy.ui.chat.parts.buildFilePanelOverview
 import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
 import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
+import com.nuclearboy.ui.chat.parts.FilePanelSortMode
+import com.nuclearboy.ui.chat.parts.sortFilePanelEntries
 import com.nuclearboy.ui.chat.parts.shouldFollowChatScroll
 import com.nuclearboy.ui.chat.parts.shouldShowJumpToBottom
 import kotlinx.coroutines.delay
@@ -383,8 +386,12 @@ private fun ProjectFilePanel(
     var previewFile by remember { mutableStateOf<FileInfo?>(null) }
     var previewContent by remember { mutableStateOf<String?>(null) }
     var filterQuery by rememberSaveable(browseDir) { mutableStateOf("") }
-    val visibleFiles = remember(files, filterQuery) {
+    var sortMode by rememberSaveable(browseDir) { mutableStateOf(FilePanelSortMode.Name) }
+    val filteredFiles = remember(files, filterQuery) {
         filterFilePanelEntries(files, filterQuery)
+    }
+    val visibleFiles = remember(filteredFiles, sortMode) {
+        sortFilePanelEntries(filteredFiles, sortMode)
     }
     val filePanelOverview = remember(visibleFiles) {
         buildFilePanelOverview(visibleFiles)
@@ -395,6 +402,10 @@ private fun ProjectFilePanel(
             filteredCount = visibleFiles.size,
             query = filterQuery,
         )
+    }
+
+    LaunchedEffect(browseDir, filterQuery, sortMode) {
+        fileListState.scrollToItem(0)
     }
 
     Surface(
@@ -463,6 +474,11 @@ private fun ProjectFilePanel(
                 FilePanelOverviewBar(
                     overview = filePanelOverview,
                     totalSizeLabel = filePanelOverview.totalFileSizeBytes.toFileSizeString(),
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+                FilePanelSortBar(
+                    selectedMode = sortMode,
+                    onModeSelected = { sortMode = it },
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
             }
