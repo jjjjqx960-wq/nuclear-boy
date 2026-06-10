@@ -22,3 +22,11 @@ internal fun selectVisibleFilePaths(
         .map { it.path }
     return (selectedPaths + visibleFilePaths).distinct()
 }
+
+internal fun selectedFilePanelEntries(
+    files: List<FileInfo>,
+    selectedPaths: List<String>,
+): List<FileInfo> {
+    val selectedPathSet = selectedPaths.toSet()
+    return files.filter { !it.isDirectory && it.path in selectedPathSet }
+}

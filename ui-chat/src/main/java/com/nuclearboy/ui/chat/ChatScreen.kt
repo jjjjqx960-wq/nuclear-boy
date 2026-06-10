@@ -69,6 +69,7 @@ import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
 import com.nuclearboy.ui.chat.parts.FilePanelSortMode
 import com.nuclearboy.ui.chat.parts.selectVisibleFilePaths
+import com.nuclearboy.ui.chat.parts.selectedFilePanelEntries
 import com.nuclearboy.ui.chat.parts.sortFilePanelEntries
 import com.nuclearboy.ui.chat.parts.shouldFollowChatScroll
 import com.nuclearboy.ui.chat.parts.shouldShowJumpToBottom
@@ -403,12 +404,25 @@ private fun ProjectFilePanel(
     var filterQuery by rememberSaveable(browseDir) { mutableStateOf("") }
     var sortMode by rememberSaveable(browseDir) { mutableStateOf(FilePanelSortMode.Name) }
     var selectedFilePaths by rememberSaveable(browseDir) { mutableStateOf(emptyList<String>()) }
+    var showSelectedOnly by rememberSaveable(browseDir) { mutableStateOf(false) }
     val selectedPathSet = remember(selectedFilePaths) { selectedFilePaths.toSet() }
     val filteredFiles = remember(files, filterQuery) {
         filterFilePanelEntries(files, filterQuery)
     }
-    val visibleFiles = remember(filteredFiles, sortMode) {
+    val sortedFilteredFiles = remember(filteredFiles, sortMode) {
         sortFilePanelEntries(filteredFiles, sortMode)
+    }
+    val selectedFiles = remember(files, selectedFilePaths, sortMode) {
+        sortFilePanelEntries(
+            selectedFilePanelEntries(
+                files = files,
+                selectedPaths = selectedFilePaths,
+            ),
+            sortMode,
+        )
+    }
+    val visibleFiles = remember(sortedFilteredFiles, selectedFiles, showSelectedOnly) {
+        if (showSelectedOnly) selectedFiles else sortedFilteredFiles
     }
     val filePanelOverview = remember(visibleFiles) {
         buildFilePanelOverview(visibleFiles)
@@ -418,12 +432,6 @@ private fun ProjectFilePanel(
     }
     val selectedVisibleCount = remember(visibleSelectableFiles, selectedPathSet) {
         visibleSelectableFiles.count { it.path in selectedPathSet }
-    }
-    val selectedFiles = remember(files, selectedPathSet, sortMode) {
-        sortFilePanelEntries(
-            files.filter { !it.isDirectory && it.path in selectedPathSet },
-            sortMode,
-        )
     }
     val filterSummary = remember(files.size, visibleFiles.size, filterQuery) {
         filePanelFilterSummary(
@@ -443,6 +451,12 @@ private fun ProjectFilePanel(
             .map { it.path }
             .toSet()
         selectedFilePaths = selectedFilePaths.filter { it in validPaths }
+    }
+
+    LaunchedEffect(selectedFilePaths) {
+        if (selectedFilePaths.isEmpty()) {
+            showSelectedOnly = false
+        }
     }
 
     Surface(
@@ -523,12 +537,14 @@ private fun ProjectFilePanel(
                         selectedCount = selectedFiles.size,
                         selectedVisibleCount = selectedVisibleCount,
                         visibleFileCount = visibleSelectableFiles.size,
+                        showSelectedOnly = showSelectedOnly,
                         onSelectVisible = {
                             selectedFilePaths = selectVisibleFilePaths(
                                 selectedPaths = selectedFilePaths,
                                 visibleFiles = visibleFiles,
                             )
                         },
+                        onShowSelectedOnlyChange = { showSelectedOnly = it },
                         onReferenceSelected = {
                             onReferenceFiles(selectedFiles)
                             selectedFilePaths = emptyList()

@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuclearboy.ui.chat.NuclearBoyTheme
@@ -36,7 +37,9 @@ internal fun FileSelectionActionBar(
     selectedCount: Int,
     selectedVisibleCount: Int,
     visibleFileCount: Int,
+    showSelectedOnly: Boolean,
     onSelectVisible: () -> Unit,
+    onShowSelectedOnlyChange: (Boolean) -> Unit,
     onReferenceSelected: () -> Unit,
     onClearSelection: () -> Unit,
     modifier: Modifier = Modifier,
@@ -63,8 +66,24 @@ internal fun FileSelectionActionBar(
                     fontSize = 11.sp,
                     color = nc.material.primary,
                 ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             if (hasSelection) {
+                OutlinedButton(
+                    onClick = { onShowSelectedOnlyChange(!showSelectedOnly) },
+                    modifier = Modifier.height(30.dp),
+                    shape = RoundedCornerShape(7.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    border = BorderStroke(1.dp, nc.material.secondary.copy(alpha = 0.35f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = nc.material.secondary),
+                ) {
+                    Text(
+                        text = if (showSelectedOnly) "全部" else "只看",
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
                 IconButton(
                     onClick = onClearSelection,
                     modifier = Modifier.size(28.dp),

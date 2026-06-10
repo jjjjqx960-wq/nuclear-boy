@@ -58,4 +58,18 @@ class FileReferencePromptTest {
 
         assertEquals(listOf("README.md", "app/src/Main.kt"), selected)
     }
+
+    @Test
+    fun `selected file panel entries returns selected files only`() {
+        val entries = selectedFilePanelEntries(
+            files = listOf(
+                FileInfo(path = "app/src", name = "src", isDirectory = true),
+                FileInfo(path = "app/src/Main.kt", name = "Main.kt", extension = "kt"),
+                FileInfo(path = "README.md", name = "README.md", extension = "md"),
+            ),
+            selectedPaths = listOf("app/src", "README.md"),
+        )
+
+        assertEquals(listOf("README.md"), entries.map { it.path })
+    }
 }
