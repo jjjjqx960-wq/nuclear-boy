@@ -460,10 +460,10 @@ private fun ProjectFilePanel(
             selectedSizeLabel = selectedTotalSizeLabel,
         )
     }
-    val filterSummary = remember(files.size, visibleFiles.size, filterQuery) {
+    val filterSummary = remember(files.size, filteredFiles.size, filterQuery) {
         filePanelFilterSummary(
             totalCount = files.size,
-            filteredCount = visibleFiles.size,
+            filteredCount = filteredFiles.size,
             query = filterQuery,
         )
     }
