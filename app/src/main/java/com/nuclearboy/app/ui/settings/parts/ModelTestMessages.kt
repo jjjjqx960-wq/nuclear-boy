@@ -78,6 +78,9 @@ internal fun providerExactEndpointWarning(
     return "完整地址模式会直接 POST 到此地址；当前不像完整 $normalizedProtocol 接口，建议填写 $expectedPath 结尾的完整 URL，或切回智能拼接。"
 }
 
+internal fun providerExactEndpointRecoveryActionLabel(warning: String): String =
+    if (warning.trim().isBlank()) "" else "切回智能拼接"
+
 internal fun modelTestRequestContextSummary(
     endpoint: String,
     modelName: String,

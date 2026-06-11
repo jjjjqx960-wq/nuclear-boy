@@ -148,6 +148,15 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider exact endpoint recovery action appears only when warning exists`() {
+        assertEquals(
+            "切回智能拼接",
+            providerExactEndpointRecoveryActionLabel("完整地址模式会直接 POST 到此地址"),
+        )
+        assertEquals("", providerExactEndpointRecoveryActionLabel(" "))
+    }
+
+    @Test
     fun `model test request context includes endpoint model protocol mode and fingerprint`() {
         val summary = modelTestRequestContextSummary(
             endpoint = " http://154.12.90.249:20128/v1/chat/completions ",

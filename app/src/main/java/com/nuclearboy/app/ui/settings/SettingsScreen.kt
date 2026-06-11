@@ -52,6 +52,7 @@ import com.nuclearboy.app.ui.settings.parts.modelNameCleanupSummary
 import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
 import com.nuclearboy.app.ui.settings.parts.modelTestRequestContextSummary
+import com.nuclearboy.app.ui.settings.parts.providerExactEndpointRecoveryActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointWarning
 import com.nuclearboy.app.ui.settings.parts.providerEndpointPreviewSummary
 import com.nuclearboy.app.update.UpdateDownloader
@@ -586,6 +587,9 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    val providerEndpointRecoveryAction = remember(providerEndpointWarning) {
+                        providerExactEndpointRecoveryActionLabel(providerEndpointWarning)
+                    }
 
                     Text("添加模型",
                         style = MaterialTheme.typography.labelMedium,
@@ -676,6 +680,24 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                         )
+                    }
+                    if (providerEndpointRecoveryAction.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = {
+                                endpointModeInput = ProviderEndpointMode.AUTO
+                                Toast.makeText(context, "已切回智能拼接", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(
+                                Icons.Filled.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(providerEndpointRecoveryAction)
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
