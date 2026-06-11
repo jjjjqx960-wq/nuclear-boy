@@ -54,6 +54,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.common.*
 import com.nuclearboy.ui.chat.components.CommandShortcutBar
+import com.nuclearboy.ui.chat.components.FilePanelEmptyState
 import com.nuclearboy.ui.chat.components.FilePanelOverviewBar
 import com.nuclearboy.ui.chat.components.FileReferenceIconButton
 import com.nuclearboy.ui.chat.components.FileReferenceTextButton
@@ -69,6 +70,8 @@ import com.nuclearboy.ui.chat.parts.fileReferenceToastMessage
 import com.nuclearboy.ui.chat.parts.fileSelectionStatusLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionTotalSizeBytes
 import com.nuclearboy.ui.chat.parts.fileReferencesToastMessage
+import com.nuclearboy.ui.chat.parts.filePanelClearFilterDescription
+import com.nuclearboy.ui.chat.parts.filePanelEmptyStateMessage
 import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
 import com.nuclearboy.ui.chat.parts.filterQueryAfterMatchedReference
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
@@ -81,6 +84,7 @@ import com.nuclearboy.ui.chat.parts.shouldClosePanelAfterMatchedReference
 import com.nuclearboy.ui.chat.parts.sortFilePanelEntries
 import com.nuclearboy.ui.chat.parts.shouldFollowChatScroll
 import com.nuclearboy.ui.chat.parts.shouldShowFileSelectionActionBar
+import com.nuclearboy.ui.chat.parts.shouldShowFilePanelClearFilterAction
 import com.nuclearboy.ui.chat.parts.shouldShowJumpToBottom
 import com.nuclearboy.ui.chat.parts.toggleSelectedFilePath
 import com.nuclearboy.ui.chat.parts.unselectHiddenFilePaths
@@ -512,6 +516,15 @@ private fun ProjectFilePanel(
             query = filterQuery,
         )
     }
+    val emptyStateMessage = remember(filterQuery) {
+        filePanelEmptyStateMessage(filterQuery)
+    }
+    val shouldShowEmptyClearFilter = remember(filterQuery, visibleFiles.size) {
+        shouldShowFilePanelClearFilterAction(
+            query = filterQuery,
+            visibleCount = visibleFiles.size,
+        )
+    }
 
     LaunchedEffect(browseDir, filterQuery, sortMode) {
         fileListState.scrollToItem(0)
@@ -669,13 +682,11 @@ private fun ProjectFilePanel(
                     color = nc.material.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp))
             } else if (visibleFiles.isEmpty()) {
-                Text(
-                    "  没有匹配「${filterQuery.trim()}」的文件",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = FontFamily.Monospace,
-                    ),
-                    color = nc.material.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp),
+                FilePanelEmptyState(
+                    message = emptyStateMessage,
+                    showClearFilter = shouldShowEmptyClearFilter,
+                    clearFilterContentDescription = filePanelClearFilterDescription(filterSummary),
+                    onClearFilter = { filterQuery = "" },
                 )
             } else {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f)) {

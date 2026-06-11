@@ -42,6 +42,24 @@ internal fun filePanelFilterSummary(
     }
 }
 
+internal fun filePanelEmptyStateMessage(
+    query: String,
+): String {
+    val normalizedQuery = query.trim()
+    return if (normalizedQuery.isEmpty()) {
+        "没有可显示的文件"
+    } else {
+        "没有匹配「$normalizedQuery」的文件"
+    }
+}
+
+internal fun shouldShowFilePanelClearFilterAction(
+    query: String,
+    visibleCount: Int,
+): Boolean {
+    return query.trim().isNotEmpty() && visibleCount == 0
+}
+
 internal fun filePanelClearFilterDescription(
     resultSummary: String,
 ): String {

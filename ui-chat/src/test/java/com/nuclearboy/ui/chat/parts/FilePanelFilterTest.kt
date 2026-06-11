@@ -67,6 +67,50 @@ class FilePanelFilterTest {
     }
 
     @Test
+    fun `file panel empty state message includes trimmed query`() {
+        val message = filePanelEmptyStateMessage("  service  ")
+
+        assertEquals("没有匹配「service」的文件", message)
+    }
+
+    @Test
+    fun `file panel empty state message stays generic without query`() {
+        val message = filePanelEmptyStateMessage(" ")
+
+        assertEquals("没有可显示的文件", message)
+    }
+
+    @Test
+    fun `file panel clear filter action shows only for empty filtered results`() {
+        val shouldShow = shouldShowFilePanelClearFilterAction(
+            query = "kt",
+            visibleCount = 0,
+        )
+
+        assertEquals(true, shouldShow)
+    }
+
+    @Test
+    fun `file panel clear filter action hides when results remain`() {
+        val shouldShow = shouldShowFilePanelClearFilterAction(
+            query = "kt",
+            visibleCount = 2,
+        )
+
+        assertEquals(false, shouldShow)
+    }
+
+    @Test
+    fun `file panel clear filter action hides without query`() {
+        val shouldShow = shouldShowFilePanelClearFilterAction(
+            query = " ",
+            visibleCount = 0,
+        )
+
+        assertEquals(false, shouldShow)
+    }
+
+    @Test
     fun `file panel clear filter description includes result summary`() {
         val description = filePanelClearFilterDescription("1 / 3")
 
