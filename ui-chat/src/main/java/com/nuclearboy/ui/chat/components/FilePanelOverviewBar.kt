@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuclearboy.ui.chat.NuclearBoyTheme
 import com.nuclearboy.ui.chat.parts.FilePanelOverview
+import com.nuclearboy.ui.chat.parts.filePanelOverviewPillDescription
 
 @Composable
 internal fun FilePanelOverviewBar(
@@ -96,7 +97,7 @@ private fun FilePanelOverviewPill(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = label,
+                contentDescription = filePanelOverviewPillDescription(label, value),
                 modifier = Modifier.size(13.dp),
                 tint = contentColor,
             )

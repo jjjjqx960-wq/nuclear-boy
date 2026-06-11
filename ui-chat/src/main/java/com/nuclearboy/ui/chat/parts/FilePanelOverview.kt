@@ -14,6 +14,19 @@ internal data class FilePanelOverview(
     val typeCounts: List<FilePanelTypeCount>,
 )
 
+internal fun filePanelOverviewPillDescription(
+    label: String,
+    value: String,
+): String {
+    val normalizedLabel = label.trim()
+    val normalizedValue = value.trim()
+    return when {
+        normalizedLabel.isEmpty() -> normalizedValue.ifEmpty { "摘要" }
+        normalizedValue.isEmpty() -> normalizedLabel
+        else -> "$normalizedLabel $normalizedValue"
+    }
+}
+
 internal fun buildFilePanelOverview(
     files: List<FileInfo>,
     maxTypeCount: Int = 3,
