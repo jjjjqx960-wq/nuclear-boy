@@ -58,7 +58,9 @@ import com.nuclearboy.app.ui.settings.parts.providerExactEndpointCompletionActio
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointRecoveryActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointWarning
 import com.nuclearboy.app.ui.settings.parts.providerEndpointPreviewSummary
+import com.nuclearboy.app.ui.settings.parts.providerModelListPickerHint
 import com.nuclearboy.app.ui.settings.parts.providerModelListSummary
+import com.nuclearboy.app.ui.settings.parts.providerModelListVisibleModels
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
 import com.nuclearboy.common.AppResult
@@ -795,6 +797,7 @@ fun SettingsScreen(
                         Spacer(Modifier.height(8.dp))
                         ModelListProbeBox(
                             state = modelListProbeState,
+                            filterQuery = sanitizedModelInput,
                             onModelSelected = { selectedModel ->
                                 modelInput = selectedModel
                                 Toast.makeText(context, "已填入模型名", Toast.LENGTH_SHORT).show()
@@ -1386,10 +1389,25 @@ private fun ModelTestResultBox(state: ModelTestUiState) {
 @Composable
 private fun ModelListProbeBox(
     state: ModelListProbeUiState,
+    filterQuery: String,
     onModelSelected: (String) -> Unit,
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val visibleModelIds = remember(state.modelIds, filterQuery) {
+        providerModelListVisibleModels(
+            modelIds = state.modelIds,
+            query = filterQuery,
+            limit = 12,
+        )
+    }
+    val pickerHint = remember(state.modelIds, visibleModelIds, filterQuery) {
+        providerModelListPickerHint(
+            totalCount = state.modelIds.map { it.trim() }.filter { it.isNotBlank() }.distinct().size,
+            visibleCount = visibleModelIds.size,
+            query = filterQuery,
+        )
+    }
     val color = when (state.success) {
         true -> MaterialTheme.colorScheme.primary
         false -> MaterialTheme.colorScheme.error
@@ -1451,13 +1469,15 @@ private fun ModelListProbeBox(
             }
             if (state.modelIds.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    "点选模型名填入输入框",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (pickerHint.isNotBlank()) {
+                    Text(
+                        pickerHint,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
-                state.modelIds.take(12).forEach { modelId ->
+                visibleModelIds.forEach { modelId ->
                     TextButton(
                         onClick = { onModelSelected(modelId) },
                         modifier = Modifier.fillMaxWidth(),

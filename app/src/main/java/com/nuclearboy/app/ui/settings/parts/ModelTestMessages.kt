@@ -84,6 +84,37 @@ internal fun providerModelListSummary(
     return "模型列表：${normalizedModels.size} 个 · ${latencyMs.coerceAtLeast(0)} ms\nGET $normalizedEndpoint\n$sample$tail"
 }
 
+internal fun providerModelListVisibleModels(
+    modelIds: List<String>,
+    query: String,
+    limit: Int = 12,
+): List<String> {
+    val normalizedModels = modelIds.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+    val normalizedQuery = query.trim()
+    val filtered = if (normalizedQuery.isBlank()) {
+        normalizedModels
+    } else {
+        normalizedModels.filter { it.contains(normalizedQuery, ignoreCase = true) }
+    }
+    return filtered.take(limit.coerceAtLeast(1))
+}
+
+internal fun providerModelListPickerHint(
+    totalCount: Int,
+    visibleCount: Int,
+    query: String,
+): String {
+    val safeTotal = totalCount.coerceAtLeast(0)
+    val safeVisible = visibleCount.coerceAtLeast(0)
+    val normalizedQuery = query.trim()
+    return when {
+        safeTotal == 0 -> ""
+        normalizedQuery.isBlank() -> "点选模型名填入输入框；当前显示 $safeVisible / $safeTotal 个"
+        safeVisible == 0 -> "没有匹配“$normalizedQuery”的模型名，可删减输入框关键词再试"
+        else -> "已按“$normalizedQuery”过滤，显示 $safeVisible / $safeTotal 个匹配模型"
+    }
+}
+
 internal fun providerExactEndpointWarning(
     protocolLabel: String,
     endpoint: String,

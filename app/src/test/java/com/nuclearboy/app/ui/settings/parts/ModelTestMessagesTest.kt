@@ -173,6 +173,49 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider model list visible models filters by query before limiting`() {
+        val visible = providerModelListVisibleModels(
+            modelIds = listOf(
+                "gpt-4o",
+                "nvidia/minimaxai/minimax-m2.7",
+                "minimax-chat",
+                "claude-3-5-sonnet",
+            ),
+            query = "mini",
+            limit = 1,
+        )
+
+        assertEquals(listOf("nvidia/minimaxai/minimax-m2.7"), visible)
+    }
+
+    @Test
+    fun `provider model list visible models deduplicates and ignores blanks`() {
+        val visible = providerModelListVisibleModels(
+            modelIds = listOf("gpt-4o", " ", "gpt-4o", "claude-3-5-sonnet"),
+            query = "",
+            limit = 12,
+        )
+
+        assertEquals(listOf("gpt-4o", "claude-3-5-sonnet"), visible)
+    }
+
+    @Test
+    fun `provider model list picker hint describes filtered state`() {
+        assertEquals(
+            "点选模型名填入输入框；当前显示 12 / 38 个",
+            providerModelListPickerHint(totalCount = 38, visibleCount = 12, query = ""),
+        )
+        assertEquals(
+            "已按“mini”过滤，显示 2 / 38 个匹配模型",
+            providerModelListPickerHint(totalCount = 38, visibleCount = 2, query = " mini "),
+        )
+        assertEquals(
+            "没有匹配“qwen”的模型名，可删减输入框关键词再试",
+            providerModelListPickerHint(totalCount = 38, visibleCount = 0, query = "qwen"),
+        )
+    }
+
+    @Test
     fun `provider exact endpoint warning flags openai root endpoint`() {
         val warning = providerExactEndpointWarning(
             protocolLabel = "OpenAI",
