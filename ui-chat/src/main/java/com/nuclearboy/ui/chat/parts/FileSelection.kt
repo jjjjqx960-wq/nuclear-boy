@@ -80,6 +80,21 @@ internal fun shouldClosePanelAfterMatchedReference(
     return remainingSelectedCount <= 0
 }
 
+internal fun fileSelectionReferenceMatchedActionLabel(
+    matchedCount: Int,
+): String {
+    return "匹配 ${matchedCount.coerceAtLeast(0)}"
+}
+
+internal fun fileSelectionReferenceSelectedActionLabel(
+    selectedCount: Int,
+    hasMatchedAction: Boolean,
+): String {
+    val action = if (hasMatchedAction) "全部" else "引用"
+    val count = selectedCount.coerceAtLeast(0)
+    return if (count > 0) "$action $count" else action
+}
+
 internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
     return files
         .filterNot { it.isDirectory }

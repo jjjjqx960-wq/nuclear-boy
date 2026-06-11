@@ -35,6 +35,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuclearboy.ui.chat.NuclearBoyTheme
+import com.nuclearboy.ui.chat.parts.fileSelectionReferenceMatchedActionLabel
+import com.nuclearboy.ui.chat.parts.fileSelectionReferenceSelectedActionLabel
 import com.nuclearboy.ui.chat.parts.shouldShowReferenceMatchedAction
 import com.nuclearboy.ui.chat.parts.shouldShowUnselectVisibleAction
 
@@ -162,7 +164,7 @@ internal fun FileSelectionActionBar(
                     if (canReferenceMatched) {
                         FileSelectionReferenceButton(
                             enabled = true,
-                            label = "匹配",
+                            label = fileSelectionReferenceMatchedActionLabel(selectedVisibleCount),
                             contentDescription = "引用当前匹配选择到输入",
                             onClick = onReferenceVisible,
                             outlined = true,
@@ -170,7 +172,10 @@ internal fun FileSelectionActionBar(
                     }
                     FileSelectionReferenceButton(
                         enabled = true,
-                        label = if (canReferenceMatched) "全部" else "引用",
+                        label = fileSelectionReferenceSelectedActionLabel(
+                            selectedCount = selectedCount,
+                            hasMatchedAction = canReferenceMatched,
+                        ),
                         contentDescription = if (canReferenceMatched) {
                             "引用全部已选文件到输入"
                         } else {

@@ -181,6 +181,45 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `reference matched action label shows matched count`() {
+        val label = fileSelectionReferenceMatchedActionLabel(
+            matchedCount = 3,
+        )
+
+        assertEquals("匹配 3", label)
+    }
+
+    @Test
+    fun `reference selected action label shows all count when matched action exists`() {
+        val label = fileSelectionReferenceSelectedActionLabel(
+            selectedCount = 7,
+            hasMatchedAction = true,
+        )
+
+        assertEquals("全部 7", label)
+    }
+
+    @Test
+    fun `reference selected action label shows reference count without matched action`() {
+        val label = fileSelectionReferenceSelectedActionLabel(
+            selectedCount = 7,
+            hasMatchedAction = false,
+        )
+
+        assertEquals("引用 7", label)
+    }
+
+    @Test
+    fun `reference selected action label stays compact without selection`() {
+        val label = fileSelectionReferenceSelectedActionLabel(
+            selectedCount = 0,
+            hasMatchedAction = false,
+        )
+
+        assertEquals("引用", label)
+    }
+
+    @Test
     fun `selected file panel entries returns selected files only`() {
         val entries = selectedFilePanelEntries(
             files = listOf(
