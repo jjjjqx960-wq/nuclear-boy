@@ -22,8 +22,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -44,6 +46,7 @@ import com.nuclearboy.app.diagnostics.AppDiagnostics
 import com.nuclearboy.app.diagnostics.DiagnosticResult
 import com.nuclearboy.app.diagnostics.DiagnosticStatus
 import com.nuclearboy.app.ui.settings.parts.apiKeyFingerprintSummary
+import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelNameCleanupSummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
 import com.nuclearboy.app.update.UpdateDownloader
@@ -55,6 +58,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import android.widget.Toast
 import javax.inject.Inject
 
 data class ModelTestUiState(
@@ -943,6 +947,16 @@ private fun SponsorTierButton(
 
 @Composable
 private fun ModelTestResultBox(state: ModelTestUiState) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    val copySummary = remember(state.inProgress, state.success, state.message, state.detail) {
+        modelTestCopySummary(
+            inProgress = state.inProgress,
+            success = state.success,
+            message = state.message,
+            detail = state.detail,
+        )
+    }
     val color = when (state.success) {
         true -> MaterialTheme.colorScheme.primary
         false -> MaterialTheme.colorScheme.error
@@ -973,10 +987,25 @@ private fun ModelTestResultBox(state: ModelTestUiState) {
                 Spacer(Modifier.width(6.dp))
                 Text(
                     state.message,
+                    modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = color,
                 )
+                IconButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(copySummary))
+                        Toast.makeText(context, "已复制测试摘要", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.ContentCopy,
+                        contentDescription = "复制测试摘要",
+                        tint = color,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
             if (state.detail.isNotBlank()) {
                 Spacer(Modifier.height(6.dp))

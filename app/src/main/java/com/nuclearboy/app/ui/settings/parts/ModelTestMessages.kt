@@ -48,3 +48,37 @@ internal fun modelNameCleanupSummary(
     if (sanitized.isBlank() || raw == sanitized) return ""
     return "已自动清理模型名中的隐藏字符；实际请求使用：$sanitized"
 }
+
+internal fun modelTestCopySummary(
+    inProgress: Boolean,
+    success: Boolean?,
+    message: String,
+    detail: String,
+): String {
+    val status = when {
+        inProgress -> "测试中"
+        success == true -> "成功"
+        success == false -> "失败"
+        else -> "未完成"
+    }
+    val normalizedMessage = message.trim()
+    val normalizedDetail = redactModelTestSecrets(detail).trim()
+    return buildString {
+        append("第三方模型测试：")
+        append(status)
+        if (normalizedMessage.isNotBlank()) {
+            append('\n')
+            append("标题：")
+            append(normalizedMessage)
+        }
+        if (normalizedDetail.isNotBlank()) {
+            append('\n')
+            append("详情：")
+            append(normalizedDetail)
+        }
+    }
+}
+
+private fun redactModelTestSecrets(raw: String): String =
+    raw.replace(Regex("Bearer\\s+[A-Za-z0-9._~+/=-]+", RegexOption.IGNORE_CASE), "Bearer <REDACTED_TOKEN>")
+        .replace(Regex("sk-[A-Za-z0-9_-]{6,}"), "sk-<REDACTED_TOKEN>")
