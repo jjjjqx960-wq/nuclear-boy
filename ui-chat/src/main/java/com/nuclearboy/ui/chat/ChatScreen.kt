@@ -66,13 +66,13 @@ import com.nuclearboy.ui.chat.parts.buildFilePanelOverview
 import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
 import com.nuclearboy.ui.chat.parts.buildFileReferencesPrompt
 import com.nuclearboy.ui.chat.parts.fileSelectionStatusLabel
+import com.nuclearboy.ui.chat.parts.fileSelectionTotalSizeBytes
 import com.nuclearboy.ui.chat.parts.fileReferencesToastMessage
 import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
 import com.nuclearboy.ui.chat.parts.filterQueryAfterMatchedReference
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
 import com.nuclearboy.ui.chat.parts.FilePanelSortMode
 import com.nuclearboy.ui.chat.parts.removeReferencedFilePaths
-import com.nuclearboy.ui.chat.parts.selectedFileTotalSizeBytes
 import com.nuclearboy.ui.chat.parts.selectVisibleFilePaths
 import com.nuclearboy.ui.chat.parts.selectedFilePanelEntries
 import com.nuclearboy.ui.chat.parts.shouldClosePanelAfterMatchedReference
@@ -452,13 +452,16 @@ private fun ProjectFilePanel(
         )
     }
     val selectedTotalSizeLabel = remember(selectedFiles) {
-        selectedFileTotalSizeBytes(selectedFiles).toFileSizeString()
+        fileSelectionTotalSizeBytes(selectedFiles).toFileSizeString()
     }
     val filePanelOverview = remember(visibleFiles) {
         buildFilePanelOverview(visibleFiles)
     }
     val visibleSelectableFiles = remember(visibleFiles) {
         visibleFiles.filterNot { it.isDirectory }
+    }
+    val visibleSelectableSizeLabel = remember(visibleSelectableFiles) {
+        fileSelectionTotalSizeBytes(visibleSelectableFiles).toFileSizeString()
     }
     val selectedVisibleCount = remember(visibleSelectableFiles, selectedPathSet) {
         visibleSelectableFiles.count { it.path in selectedPathSet }
@@ -473,6 +476,7 @@ private fun ProjectFilePanel(
         selectedFiles.size,
         selectedVisibleCount,
         visibleSelectableFiles.size,
+        visibleSelectableSizeLabel,
         selectedTotalSizeLabel,
         showSelectedOnly,
         filterQuery,
@@ -484,6 +488,7 @@ private fun ProjectFilePanel(
             selectedSizeLabel = selectedTotalSizeLabel,
             showSelectedOnly = showSelectedOnly,
             hasFilterQuery = filterQuery.isNotBlank(),
+            visibleSizeLabel = visibleSelectableSizeLabel,
         )
     }
     val filterSummary = remember(files.size, filteredFiles.size, filterQuery) {

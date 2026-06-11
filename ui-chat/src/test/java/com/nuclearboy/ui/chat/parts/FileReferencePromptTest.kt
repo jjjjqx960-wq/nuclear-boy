@@ -382,6 +382,20 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `file selection total size skips directories and negative sizes`() {
+        val totalSize = fileSelectionTotalSizeBytes(
+            files = listOf(
+                FileInfo(path = "app/src", name = "src", size = 4096, isDirectory = true),
+                FileInfo(path = "app/src/Main.kt", name = "Main.kt", extension = "kt", size = 1024),
+                FileInfo(path = "README.md", name = "README.md", extension = "md", size = 2048),
+                FileInfo(path = "broken.bin", name = "broken.bin", extension = "bin", size = -1),
+            ),
+        )
+
+        assertEquals(3072L, totalSize)
+    }
+
+    @Test
     fun `file selection action bar stays visible when hidden selection exists`() {
         val shouldShow = shouldShowFileSelectionActionBar(
             selectedCount = 2,
@@ -521,5 +535,18 @@ class FileReferencePromptTest {
         )
 
         assertEquals("可选 5 个", label)
+    }
+
+    @Test
+    fun `file selection status label shows visible size without selection`() {
+        val label = fileSelectionStatusLabel(
+            selectedCount = 0,
+            selectedVisibleCount = 0,
+            visibleFileCount = 5,
+            selectedSizeLabel = "0 B",
+            visibleSizeLabel = "3 KB",
+        )
+
+        assertEquals("可选 5 个 · 3 KB", label)
     }
 }

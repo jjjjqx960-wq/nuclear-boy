@@ -159,10 +159,14 @@ internal fun fileSelectionUnselectHiddenActionDescription(
     return "取消隐藏 ${hiddenSelectedCount.coerceAtLeast(0)} 个已选文件"
 }
 
-internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
+internal fun fileSelectionTotalSizeBytes(files: List<FileInfo>): Long {
     return files
         .filterNot { it.isDirectory }
         .sumOf { it.size.coerceAtLeast(0L) }
+}
+
+internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
+    return fileSelectionTotalSizeBytes(files)
 }
 
 internal fun shouldShowFileSelectionActionBar(
@@ -203,6 +207,7 @@ internal fun fileSelectionStatusLabel(
     selectedSizeLabel: String,
     showSelectedOnly: Boolean = false,
     hasFilterQuery: Boolean = false,
+    visibleSizeLabel: String = "",
 ): String {
     return if (selectedCount > 0) {
         if (showSelectedOnly && hasFilterQuery) {
@@ -213,7 +218,8 @@ internal fun fileSelectionStatusLabel(
             "已选 $selectedCount 个 · $selectedSizeLabel · 可见 $selectedVisibleCount/$visibleFileCount$hiddenLabel"
         }
     } else {
-        "可选 $visibleFileCount 个"
+        val visibleSizeSuffix = if (visibleSizeLabel.isNotBlank()) " · $visibleSizeLabel" else ""
+        "可选 $visibleFileCount 个$visibleSizeSuffix"
     }
 }
 
