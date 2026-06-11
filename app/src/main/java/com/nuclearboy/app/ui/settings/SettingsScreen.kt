@@ -58,6 +58,7 @@ import com.nuclearboy.app.ui.settings.parts.providerExactEndpointCompletionActio
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointRecoveryActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointWarning
 import com.nuclearboy.app.ui.settings.parts.providerEndpointPreviewSummary
+import com.nuclearboy.app.ui.settings.parts.providerModelListSummary
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
 import com.nuclearboy.common.AppResult
@@ -78,6 +79,15 @@ data class ModelTestUiState(
     val detail: String = "",
 )
 
+data class ModelListProbeUiState(
+    val inProgress: Boolean = false,
+    val success: Boolean? = null,
+    val message: String = "",
+    val detail: String = "",
+    val endpoint: String = "",
+    val modelIds: List<String> = emptyList(),
+)
+
 data class FullDiagnosticsUiState(
     val running: Boolean = false,
     val results: List<DiagnosticResult> = emptyList(),
@@ -93,6 +103,8 @@ class SettingsViewModel @Inject constructor(
     val apiKeyState = apiKeyManager.state
     private val _modelTestState = MutableStateFlow(ModelTestUiState())
     val modelTestState: StateFlow<ModelTestUiState> = _modelTestState.asStateFlow()
+    private val _modelListProbeState = MutableStateFlow(ModelListProbeUiState())
+    val modelListProbeState: StateFlow<ModelListProbeUiState> = _modelListProbeState.asStateFlow()
     private val _fullDiagnosticsState = MutableStateFlow(FullDiagnosticsUiState())
     val fullDiagnosticsState: StateFlow<FullDiagnosticsUiState> = _fullDiagnosticsState.asStateFlow()
 
@@ -158,6 +170,66 @@ class SettingsViewModel @Inject constructor(
             key = key,
             label = model.ifBlank { "未命名模型" },
         )
+    }
+
+    fun probeCustomModelList(
+        baseUrl: String,
+        model: String,
+        protocol: ProviderProtocol,
+        endpointMode: ProviderEndpointMode,
+        key: String?,
+    ) {
+        val normalizedBaseUrl = sanitizeProviderBaseUrl(baseUrl)
+        val normalizedModel = sanitizeProviderModelName(model)
+        if (normalizedBaseUrl.isBlank()) {
+            _modelListProbeState.value = ModelListProbeUiState(
+                success = false,
+                message = "请先填写服务地址",
+                detail = "服务地址示例：http://your-gateway:20128/v1",
+            )
+            return
+        }
+        val resolvedProtocol = ProviderProtocol.resolve(protocol, normalizedBaseUrl, normalizedModel)
+        if (resolvedProtocol == ProviderProtocol.ANTHROPIC) {
+            _modelListProbeState.value = ModelListProbeUiState(
+                success = false,
+                message = "当前协议不支持模型列表探测",
+                detail = "模型列表探测使用 OpenAI 兼容的 GET /v1/models。Anthropic 兼容网关请在网关后台复制模型名。",
+            )
+            return
+        }
+        val endpoint = DeepSeekApiClient.buildOpenAiModelsEndpoint(normalizedBaseUrl, endpointMode)
+        _modelListProbeState.value = ModelListProbeUiState(
+            inProgress = true,
+            message = "正在获取模型列表",
+            endpoint = endpoint,
+            detail = "会请求 GET $endpoint，只展示模型 id，不输出明文 Key。",
+        )
+        viewModelScope.launch {
+            _modelListProbeState.value = when (val result = apiClient.listOpenAiProviderModels(
+                baseUrl = normalizedBaseUrl,
+                apiKey = key,
+                endpointMode = endpointMode,
+            )) {
+                is AppResult.Success -> ModelListProbeUiState(
+                    success = true,
+                    message = "发现 ${result.data.modelIds.size} 个模型",
+                    endpoint = result.data.endpoint,
+                    modelIds = result.data.modelIds,
+                    detail = providerModelListSummary(
+                        endpoint = result.data.endpoint,
+                        modelIds = result.data.modelIds,
+                        latencyMs = result.data.latencyMs,
+                    ),
+                )
+                is AppResult.Failure -> ModelListProbeUiState(
+                    success = false,
+                    message = "模型列表获取失败",
+                    endpoint = endpoint,
+                    detail = result.technicalDetail ?: "没有更多错误细节。",
+                )
+            }
+        }
     }
 
     fun testSavedCustomModel(modelId: String) {
@@ -340,6 +412,7 @@ fun SettingsScreen(
     val clipboardManager = LocalClipboardManager.current
     val apiKeyState by viewModel.apiKeyState.collectAsState()
     val modelTestState by viewModel.modelTestState.collectAsState()
+    val modelListProbeState by viewModel.modelListProbeState.collectAsState()
     val fullDiagnosticsState by viewModel.fullDiagnosticsState.collectAsState()
     val scrollState = rememberScrollState()
     var showSponsorDialog by remember { mutableStateOf(false) }
@@ -555,6 +628,15 @@ fun SettingsScreen(
                     val modelInputCleanupSummary = remember(modelInput, sanitizedModelInput) {
                         modelNameCleanupSummary(modelInput, sanitizedModelInput)
                     }
+                    val currentModelListEndpoint = remember(sanitizedBaseUrlInput, endpointModeInput) {
+                        if (sanitizedBaseUrlInput.isBlank()) {
+                            ""
+                        } else {
+                            DeepSeekApiClient.buildOpenAiModelsEndpoint(sanitizedBaseUrlInput, endpointModeInput)
+                        }
+                    }
+                    val showModelListProbeState = modelListProbeState.message.isNotBlank() &&
+                        (modelListProbeState.endpoint.isBlank() || modelListProbeState.endpoint == currentModelListEndpoint)
                     val providerEndpointPreview = remember(
                         sanitizedBaseUrlInput,
                         protocolInput,
@@ -687,6 +769,38 @@ fun SettingsScreen(
                             }
                         },
                     )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.probeCustomModelList(
+                                sanitizedBaseUrlInput,
+                                sanitizedModelInput,
+                                protocolInput,
+                                endpointModeInput,
+                                customKeyInput.trim(),
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = sanitizedBaseUrlInput.isNotBlank() && !modelListProbeState.inProgress,
+                    ) {
+                        if (modelListProbeState.inProgress) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (modelListProbeState.inProgress) "获取中..." else "获取模型列表")
+                    }
+                    if (showModelListProbeState) {
+                        Spacer(Modifier.height(8.dp))
+                        ModelListProbeBox(
+                            state = modelListProbeState,
+                            onModelSelected = { selectedModel ->
+                                modelInput = selectedModel
+                                Toast.makeText(context, "已填入模型名", Toast.LENGTH_SHORT).show()
+                            },
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     Text("协议",
                         style = MaterialTheme.typography.labelMedium,
@@ -1264,6 +1378,100 @@ private fun ModelTestResultBox(state: ModelTestUiState) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModelListProbeBox(
+    state: ModelListProbeUiState,
+    onModelSelected: (String) -> Unit,
+) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    val color = when (state.success) {
+        true -> MaterialTheme.colorScheme.primary
+        false -> MaterialTheme.colorScheme.error
+        null -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = color.copy(alpha = 0.08f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.24f)),
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (state.inProgress) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = color,
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (state.success == true) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    state.message,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = color,
+                )
+                IconButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(state.detail))
+                        Toast.makeText(context, "已复制模型列表摘要", Toast.LENGTH_SHORT).show()
+                    },
+                    enabled = state.detail.isNotBlank(),
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.ContentCopy,
+                        contentDescription = "复制模型列表摘要",
+                        tint = color,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+            if (state.detail.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    state.detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (state.modelIds.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "点选模型名填入输入框",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                state.modelIds.take(12).forEach { modelId ->
+                    TextButton(
+                        onClick = { onModelSelected(modelId) },
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            modelId,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Start,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
             }
         }
     }

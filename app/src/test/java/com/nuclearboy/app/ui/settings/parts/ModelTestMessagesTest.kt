@@ -138,6 +138,41 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider model list summary includes count endpoint samples and remaining count`() {
+        val summary = providerModelListSummary(
+            endpoint = " http://154.12.90.249:20128/v1/models ",
+            modelIds = listOf("nvidia/minimaxai/minimax-m2.7", "gpt-4o", "claude-3-5-sonnet"),
+            latencyMs = 123,
+            sampleLimit = 2,
+        )
+
+        assertEquals(
+            "模型列表：3 个 · 123 ms\n" +
+                "GET http://154.12.90.249:20128/v1/models\n" +
+                "- nvidia/minimaxai/minimax-m2.7\n" +
+                "- gpt-4o\n" +
+                "还有 1 个未显示",
+            summary,
+        )
+    }
+
+    @Test
+    fun `provider model list summary ignores blank and duplicate models`() {
+        val summary = providerModelListSummary(
+            endpoint = "http://154.12.90.249:20128/v1/models",
+            modelIds = listOf("gpt-4o", " ", "gpt-4o"),
+            latencyMs = -1,
+        )
+
+        assertEquals(
+            "模型列表：1 个 · 0 ms\n" +
+                "GET http://154.12.90.249:20128/v1/models\n" +
+                "- gpt-4o",
+            summary,
+        )
+    }
+
+    @Test
     fun `provider exact endpoint warning flags openai root endpoint`() {
         val warning = providerExactEndpointWarning(
             protocolLabel = "OpenAI",

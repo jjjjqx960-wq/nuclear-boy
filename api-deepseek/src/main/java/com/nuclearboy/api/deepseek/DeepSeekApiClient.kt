@@ -454,6 +454,78 @@ class DeepSeekApiClient(
         }
     }
 
+    suspend fun listOpenAiProviderModels(
+        baseUrl: String,
+        apiKey: String?,
+        endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
+    ): AppResult<ProviderModelListResult> = withContext(Dispatchers.IO) {
+        val endpoint = buildOpenAiModelsEndpoint(baseUrl, endpointMode)
+        if (endpoint.isBlank()) {
+            return@withContext AppResult.failure(AppError.InvalidRequest, "服务地址不能为空")
+        }
+        val startedAt = System.currentTimeMillis()
+        try {
+            val requestBuilder = Request.Builder()
+                .url(endpoint)
+                .get()
+                .addHeader("Accept", "application/json")
+            val key = apiKey?.trim().orEmpty()
+            if (key.isNotBlank()) {
+                requestBuilder.addHeader("Authorization", "Bearer $key")
+            }
+            diagnosticClient.newCall(requestBuilder.build()).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                val elapsedMs = System.currentTimeMillis() - startedAt
+                if (!response.isSuccessful) {
+                    return@withContext AppResult.failure(
+                        providerHttpError(response.code),
+                        "模型列表探测：GET $endpoint 返回 HTTP ${response.code}" +
+                            providerModelListFailureSuffix(body),
+                    )
+                }
+                val modelIds = parseProviderModelIds(body)
+                if (modelIds.isEmpty()) {
+                    return@withContext AppResult.failure(
+                        AppError.InvalidRequest,
+                        "模型列表探测：GET $endpoint 成功，但没有解析到模型 id；请在网关后台确认模型列表格式。",
+                    )
+                }
+                AppResult.success(
+                    ProviderModelListResult(
+                        endpoint = endpoint,
+                        modelIds = modelIds,
+                        latencyMs = elapsedMs,
+                    )
+                )
+            }
+        } catch (e: IllegalArgumentException) {
+            AppResult.failure(
+                AppError.InvalidRequest,
+                "模型列表地址格式不正确：${e.message ?: "无法解析 URL"}。",
+            )
+        } catch (e: SSLException) {
+            AppResult.failure(
+                AppError.NetworkUnavailable,
+                "HTTPS/TLS 握手失败。若网关只支持 HTTP，请填 http:// 地址；若填的是 HTTPS，请检查证书链和域名。",
+            )
+        } catch (e: java.net.SocketTimeoutException) {
+            AppResult.failure(
+                AppError.NetworkTimeout,
+                "模型列表请求超时。请确认手机当前网络能访问该 IP/域名和端口，网关服务正在运行。",
+            )
+        } catch (e: IOException) {
+            AppResult.failure(
+                classifyError(e),
+                "模型列表请求失败：${e.message ?: e.javaClass.simpleName}",
+            )
+        } catch (e: Exception) {
+            AppResult.failure(
+                classifyError(e),
+                "模型列表探测异常：${e.message ?: e.javaClass.simpleName}",
+            )
+        }
+    }
+
     private fun streamAnthropicChat(
         messages: List<MessageDto>,
         model: String,
@@ -1157,6 +1229,12 @@ data class ProviderTestResult(
     val endpointMode: ProviderEndpointMode,
     val latencyMs: Long,
     val replyPreview: String,
+)
+
+data class ProviderModelListResult(
+    val endpoint: String,
+    val modelIds: List<String>,
+    val latencyMs: Long,
 )
 
 sealed class StreamEvent {

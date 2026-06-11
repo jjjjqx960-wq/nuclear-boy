@@ -69,6 +69,21 @@ internal fun providerEndpointPreviewSummary(
     return "实际请求：${protocolLabel.trim()} · ${endpointModeLabel.trim()}\nPOST $normalizedEndpoint"
 }
 
+internal fun providerModelListSummary(
+    endpoint: String,
+    modelIds: List<String>,
+    latencyMs: Long,
+    sampleLimit: Int = 12,
+): String {
+    val normalizedEndpoint = endpoint.trim()
+    val normalizedModels = modelIds.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+    if (normalizedEndpoint.isBlank() || normalizedModels.isEmpty()) return ""
+    val limit = sampleLimit.coerceAtLeast(1)
+    val sample = normalizedModels.take(limit).joinToString("\n") { "- $it" }
+    val tail = if (normalizedModels.size > limit) "\n还有 ${normalizedModels.size - limit} 个未显示" else ""
+    return "模型列表：${normalizedModels.size} 个 · ${latencyMs.coerceAtLeast(0)} ms\nGET $normalizedEndpoint\n$sample$tail"
+}
+
 internal fun providerExactEndpointWarning(
     protocolLabel: String,
     endpoint: String,
