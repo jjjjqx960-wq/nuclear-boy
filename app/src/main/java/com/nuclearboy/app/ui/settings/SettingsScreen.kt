@@ -48,9 +48,10 @@ import com.nuclearboy.app.diagnostics.DiagnosticStatus
 import com.nuclearboy.app.ui.settings.parts.DiagnosticsCopyItem
 import com.nuclearboy.app.ui.settings.parts.apiKeyFingerprintSummary
 import com.nuclearboy.app.ui.settings.parts.fullDiagnosticsCopySummary
-import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelNameCleanupSummary
+import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
+import com.nuclearboy.app.ui.settings.parts.modelTestRequestContextSummary
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointWarning
 import com.nuclearboy.app.ui.settings.parts.providerEndpointPreviewSummary
 import com.nuclearboy.app.update.UpdateDownloader
@@ -200,6 +201,20 @@ class SettingsViewModel @Inject constructor(
         }
         val keyFingerprint = apiKeyFingerprintSummary(key)
         val cleanupSummary = modelNameCleanupSummary(trimmedModel, normalizedModel)
+        val resolvedProtocol = ProviderProtocol.resolve(protocol, normalizedBaseUrl, normalizedModel)
+        val requestEndpoint = when (resolvedProtocol) {
+            ProviderProtocol.ANTHROPIC ->
+                DeepSeekApiClient.buildAnthropicMessagesEndpoint(normalizedBaseUrl, endpointMode)
+            else ->
+                DeepSeekApiClient.buildOpenAiChatCompletionsEndpoint(normalizedBaseUrl, endpointMode)
+        }
+        val requestContext = modelTestRequestContextSummary(
+            endpoint = requestEndpoint,
+            modelName = normalizedModel,
+            protocolLabel = resolvedProtocol.displayName,
+            endpointModeLabel = endpointMode.displayName,
+            keyFingerprintSummary = keyFingerprint,
+        )
         val testLabel = sanitizeProviderModelName(label).ifBlank { normalizedModel }
         _modelTestState.value = ModelTestUiState(
             targetId = targetId,
@@ -211,9 +226,9 @@ class SettingsViewModel @Inject constructor(
                     append('\n')
                     append(cleanupSummary)
                 }
-                if (keyFingerprint.isNotBlank()) {
+                if (requestContext.isNotBlank()) {
                     append('\n')
-                    append(keyFingerprint)
+                    append(requestContext)
                 }
             },
         )
@@ -230,19 +245,21 @@ class SettingsViewModel @Inject constructor(
                     success = true,
                     message = "模型连接成功",
                     detail = buildString {
-                        append("端点：${result.data.endpoint}\n")
-                        append("模型：${result.data.modelName}\n")
+                        append(
+                            modelTestRequestContextSummary(
+                                endpoint = result.data.endpoint,
+                                modelName = result.data.modelName,
+                                protocolLabel = result.data.protocol.displayName,
+                                endpointModeLabel = result.data.endpointMode.displayName,
+                                keyFingerprintSummary = keyFingerprint,
+                            ),
+                        )
+                        append('\n')
                         if (cleanupSummary.isNotBlank()) {
                             append(cleanupSummary)
                             append('\n')
                         }
-                        append("协议：${result.data.protocol.displayName}\n")
-                        append("地址模式：${result.data.endpointMode.displayName}\n")
                         append("耗时：${result.data.latencyMs} ms")
-                        if (keyFingerprint.isNotBlank()) {
-                            append('\n')
-                            append(keyFingerprint)
-                        }
                         if (result.data.replyPreview.isNotBlank()) {
                             append("\n响应：${result.data.replyPreview}")
                         }
@@ -253,6 +270,10 @@ class SettingsViewModel @Inject constructor(
                     success = false,
                     message = modelTestFailureMessage(result.error, result.technicalDetail),
                     detail = buildString {
+                        if (requestContext.isNotBlank()) {
+                            append(requestContext)
+                            append('\n')
+                        }
                         if (cleanupSummary.isNotBlank()) {
                             append(cleanupSummary)
                             append('\n')

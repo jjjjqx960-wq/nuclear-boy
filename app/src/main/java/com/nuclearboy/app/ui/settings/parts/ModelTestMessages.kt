@@ -78,6 +78,56 @@ internal fun providerExactEndpointWarning(
     return "完整地址模式会直接 POST 到此地址；当前不像完整 $normalizedProtocol 接口，建议填写 $expectedPath 结尾的完整 URL，或切回智能拼接。"
 }
 
+internal fun modelTestRequestContextSummary(
+    endpoint: String,
+    modelName: String,
+    protocolLabel: String,
+    endpointModeLabel: String,
+    keyFingerprintSummary: String,
+): String {
+    val normalizedEndpoint = endpoint.trim()
+    val normalizedModel = modelName.trim()
+    val normalizedProtocol = protocolLabel.trim()
+    val normalizedEndpointMode = endpointModeLabel.trim()
+    val normalizedFingerprint = keyFingerprintSummary.trim()
+    if (
+        normalizedEndpoint.isBlank() &&
+        normalizedModel.isBlank() &&
+        normalizedProtocol.isBlank() &&
+        normalizedEndpointMode.isBlank() &&
+        normalizedFingerprint.isBlank()
+    ) {
+        return ""
+    }
+    return buildString {
+        append("请求上下文：")
+        if (normalizedEndpoint.isNotBlank()) {
+            append('\n')
+            append("端点：")
+            append(normalizedEndpoint)
+        }
+        if (normalizedModel.isNotBlank()) {
+            append('\n')
+            append("模型：")
+            append(normalizedModel)
+        }
+        if (normalizedProtocol.isNotBlank()) {
+            append('\n')
+            append("协议：")
+            append(normalizedProtocol)
+        }
+        if (normalizedEndpointMode.isNotBlank()) {
+            append('\n')
+            append("地址模式：")
+            append(normalizedEndpointMode)
+        }
+        if (normalizedFingerprint.isNotBlank()) {
+            append('\n')
+            append(normalizedFingerprint)
+        }
+    }
+}
+
 internal fun modelTestCopySummary(
     inProgress: Boolean,
     success: Boolean?,

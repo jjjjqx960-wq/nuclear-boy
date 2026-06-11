@@ -148,6 +148,40 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `model test request context includes endpoint model protocol mode and fingerprint`() {
+        val summary = modelTestRequestContextSummary(
+            endpoint = " http://154.12.90.249:20128/v1/chat/completions ",
+            modelName = " nvidia/minimaxai/minimax-m2.7 ",
+            protocolLabel = " OpenAI ",
+            endpointModeLabel = " 智能拼接 ",
+            keyFingerprintSummary = " Key 指纹：sha256 ba7816bf8f01 · 3 位 ",
+        )
+
+        assertEquals(
+            "请求上下文：\n" +
+                "端点：http://154.12.90.249:20128/v1/chat/completions\n" +
+                "模型：nvidia/minimaxai/minimax-m2.7\n" +
+                "协议：OpenAI\n" +
+                "地址模式：智能拼接\n" +
+                "Key 指纹：sha256 ba7816bf8f01 · 3 位",
+            summary,
+        )
+    }
+
+    @Test
+    fun `model test request context is empty for blank values`() {
+        val summary = modelTestRequestContextSummary(
+            endpoint = " ",
+            modelName = "",
+            protocolLabel = " ",
+            endpointModeLabel = " ",
+            keyFingerprintSummary = " ",
+        )
+
+        assertEquals("", summary)
+    }
+
+    @Test
     fun `model test copy summary includes status title and detail`() {
         val summary = modelTestCopySummary(
             inProgress = false,
