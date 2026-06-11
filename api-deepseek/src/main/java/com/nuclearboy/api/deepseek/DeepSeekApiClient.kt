@@ -375,6 +375,16 @@ class DeepSeekApiClient(
             val elapsedMs = System.currentTimeMillis() - startedAt
             if (!response.isSuccessful) {
                 val retryDetail = if (attempts > 1) "\n已按网关上游凭证短暂不可用场景重试 1 次，仍失败。" else ""
+                val modelListDetail = if (response.code == 404) {
+                    "\n" + probeOpenAiModelList(
+                        baseUrl = normalizedBaseUrl,
+                        endpointMode = endpointMode,
+                        apiKey = key,
+                        requestedModel = normalizedModel,
+                    )
+                } else {
+                    ""
+                }
                 return@withContext AppResult.failure(
                     providerHttpError(response.code),
                     buildProviderHttpFailureDetail(
@@ -382,7 +392,7 @@ class DeepSeekApiClient(
                         endpoint = endpoint,
                         modelName = normalizedModel,
                         body = responseBody,
-                    ) + retryDetail,
+                    ) + retryDetail + modelListDetail,
                 )
             }
 
@@ -912,6 +922,68 @@ class DeepSeekApiClient(
         }
     }
 
+    private fun probeOpenAiModelList(
+        baseUrl: String,
+        endpointMode: ProviderEndpointMode,
+        apiKey: String,
+        requestedModel: String,
+    ): String {
+        val endpoint = buildOpenAiModelsEndpoint(baseUrl, endpointMode)
+        if (endpoint.isBlank()) return "模型列表探测：服务地址为空，未请求 /v1/models。"
+        return try {
+            val requestBuilder = Request.Builder()
+                .url(endpoint)
+                .get()
+                .addHeader("Accept", "application/json")
+            if (apiKey.isNotBlank()) {
+                requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+            }
+            diagnosticClient.newCall(requestBuilder.build()).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    return "模型列表探测：GET $endpoint 返回 HTTP ${response.code}" +
+                        providerModelListFailureSuffix(body)
+                }
+                val modelIds = parseProviderModelIds(body)
+                if (modelIds.isEmpty()) {
+                    "模型列表探测：GET $endpoint 成功，但没有解析到模型 id；请在网关后台确认模型列表格式。"
+                } else {
+                    val sampleLimit = 12
+                    val sample = modelIds.take(sampleLimit).joinToString(", ")
+                    val tail = if (modelIds.size > sampleLimit) " 等 ${modelIds.size} 个" else ""
+                    val requestedState = if (modelIds.contains(requestedModel)) {
+                        "当前模型在列表中"
+                    } else {
+                        "当前模型不在列表中，建议从示例里复制完整模型名"
+                    }
+                    "模型列表探测：GET $endpoint 成功，发现 ${modelIds.size} 个模型，$requestedState。可用示例：$sample$tail"
+                }
+            }
+        } catch (e: IllegalArgumentException) {
+            "模型列表探测：/v1/models 地址格式不正确：${e.message ?: "无法解析 URL"}。"
+        } catch (e: IOException) {
+            "模型列表探测：请求 /v1/models 失败：${e.message ?: e.javaClass.simpleName}。"
+        } catch (e: Exception) {
+            "模型列表探测：请求 /v1/models 异常：${e.message ?: e.javaClass.simpleName}。"
+        }
+    }
+
+    private fun providerModelListFailureSuffix(body: String): String {
+        val providerMessage = sanitizeProviderBody(parseProviderErrorMessage(body).orEmpty())
+        val preview = sanitizeProviderBody(body)
+        return buildString {
+            if (providerMessage.isNotBlank()) {
+                append("：")
+                append(providerMessage.take(180))
+            }
+            append("。请确认网关是否开放 /v1/models，或在网关后台查看可用模型名。")
+            if (preview.isNotBlank()) {
+                append("\n模型列表返回片段：")
+                append(preview)
+            }
+        }
+    }
+
     private fun parseProviderErrorMessage(body: String): String? {
         if (body.isBlank()) return null
         return runCatching {
@@ -1009,6 +1081,33 @@ class DeepSeekApiClient(
                 "$baseUrl/chat/completions"
             } else {
                 "$baseUrl/v1/chat/completions"
+            }
+        }
+
+        fun buildOpenAiModelsEndpoint(
+            raw: String,
+            endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
+        ): String {
+            val sanitizedRaw = sanitizeProviderBaseUrl(raw).trimEnd('/')
+            if (sanitizedRaw.isBlank()) return ""
+            if (endpointMode == ProviderEndpointMode.EXACT) {
+                val lower = sanitizedRaw.lowercase()
+                return when {
+                    lower.endsWith("/models") -> sanitizedRaw
+                    lower.endsWith("/chat/completions") ->
+                        sanitizedRaw.dropLast("/chat/completions".length).trimEnd('/') + "/models"
+                    lower.endsWith("/completions") ->
+                        sanitizedRaw.dropLast("/completions".length).trimEnd('/') + "/models"
+                    lower.endsWith("/v1") -> "$sanitizedRaw/models"
+                    else -> buildOpenAiModelsEndpoint(sanitizedRaw, ProviderEndpointMode.AUTO)
+                }
+            }
+            val baseUrl = normalizeOpenAiBaseUrl(sanitizedRaw).trimEnd('/')
+            if (baseUrl.isBlank()) return ""
+            return if (Regex(""".*/v\d+$""").matches(baseUrl.lowercase())) {
+                "$baseUrl/models"
+            } else {
+                "$baseUrl/v1/models"
             }
         }
 

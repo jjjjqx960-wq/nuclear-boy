@@ -249,6 +249,37 @@ class DeepSeekModelsTest {
     }
 
     @Test
+    fun `OpenAI model list endpoint follows configured address mode`() {
+        assertEquals(
+            "http://154.12.90.249:20128/v1/models",
+            DeepSeekApiClient.buildOpenAiModelsEndpoint("http://154.12.90.249:20128/v1")
+        )
+        assertEquals(
+            "http://154.12.90.249:20128/v1/models",
+            DeepSeekApiClient.buildOpenAiModelsEndpoint(
+                "http://154.12.90.249:20128/v1/chat/completions",
+                ProviderEndpointMode.EXACT,
+            )
+        )
+        assertEquals(
+            "https://ark.cn-beijing.volces.com/api/v3/models",
+            DeepSeekApiClient.buildOpenAiModelsEndpoint("https://ark.cn-beijing.volces.com/api/compatible")
+        )
+    }
+
+    @Test
+    fun `provider model list parser extracts ids and strips hidden characters`() {
+        val ids = parseProviderModelIds(
+            """{"data":[{"id":"\u200Bnvidia/minimaxai/minimax-m2.7"},{"id":"gpt-4o"},{"name":"claude-3-5-sonnet"}]}"""
+        )
+
+        assertEquals(
+            listOf("nvidia/minimaxai/minimax-m2.7", "gpt-4o", "claude-3-5-sonnet"),
+            ids,
+        )
+    }
+
+    @Test
     fun `provider model name hint handles zero width provider prefix`() {
         val hint = providerModelNameHint("\u200Bnvidia/example-org/example-model")
 
