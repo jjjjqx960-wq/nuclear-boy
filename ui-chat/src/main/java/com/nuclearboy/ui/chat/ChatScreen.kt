@@ -75,6 +75,7 @@ import com.nuclearboy.ui.chat.parts.removeReferencedFilePaths
 import com.nuclearboy.ui.chat.parts.selectedFileTotalSizeBytes
 import com.nuclearboy.ui.chat.parts.selectVisibleFilePaths
 import com.nuclearboy.ui.chat.parts.selectedFilePanelEntries
+import com.nuclearboy.ui.chat.parts.shouldClosePanelAfterMatchedReference
 import com.nuclearboy.ui.chat.parts.sortFilePanelEntries
 import com.nuclearboy.ui.chat.parts.shouldFollowChatScroll
 import com.nuclearboy.ui.chat.parts.shouldShowFileSelectionActionBar
@@ -616,7 +617,11 @@ private fun ProjectFilePanel(
                             selectedPaths = selectedFilePaths,
                             referencedFiles = matchedSelectedFiles,
                         )
-                        onReferenceFiles(matchedSelectedFiles, false, remainingSelectedPaths.size)
+                        onReferenceFiles(
+                            matchedSelectedFiles,
+                            shouldClosePanelAfterMatchedReference(remainingSelectedPaths.size),
+                            remainingSelectedPaths.size,
+                        )
                         selectedFilePaths = remainingSelectedPaths
                         filterQuery = filterQueryAfterMatchedReference(
                             remainingSelectedCount = remainingSelectedPaths.size,

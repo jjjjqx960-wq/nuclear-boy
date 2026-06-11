@@ -163,6 +163,24 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `matched reference closes panel when no selection remains`() {
+        val shouldClose = shouldClosePanelAfterMatchedReference(
+            remainingSelectedCount = 0,
+        )
+
+        assertEquals(true, shouldClose)
+    }
+
+    @Test
+    fun `matched reference keeps panel open while selection remains`() {
+        val shouldClose = shouldClosePanelAfterMatchedReference(
+            remainingSelectedCount = 4,
+        )
+
+        assertEquals(false, shouldClose)
+    }
+
+    @Test
     fun `selected file panel entries returns selected files only`() {
         val entries = selectedFilePanelEntries(
             files = listOf(

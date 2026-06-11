@@ -74,6 +74,12 @@ internal fun fileReferencesToastMessage(
     }
 }
 
+internal fun shouldClosePanelAfterMatchedReference(
+    remainingSelectedCount: Int,
+): Boolean {
+    return remainingSelectedCount <= 0
+}
+
 internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
     return files
         .filterNot { it.isDirectory }
