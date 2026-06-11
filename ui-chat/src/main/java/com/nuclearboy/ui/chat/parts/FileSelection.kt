@@ -95,6 +95,17 @@ internal fun fileSelectionReferenceSelectedActionLabel(
     return if (count > 0) "$action $count" else action
 }
 
+internal fun fileSelectionSelectVisibleActionLabel(
+    selectedVisibleCount: Int,
+    visibleFileCount: Int,
+): String {
+    val safeSelectedVisibleCount = selectedVisibleCount.coerceAtLeast(0)
+    val safeVisibleFileCount = visibleFileCount.coerceAtLeast(0)
+    val addableCount = (safeVisibleFileCount - safeSelectedVisibleCount).coerceAtLeast(0)
+    val action = if (safeSelectedVisibleCount > 0) "补选" else "全选"
+    return "$action $addableCount"
+}
+
 internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
     return files
         .filterNot { it.isDirectory }

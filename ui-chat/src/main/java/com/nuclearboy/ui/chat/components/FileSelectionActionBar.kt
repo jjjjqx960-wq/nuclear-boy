@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.nuclearboy.ui.chat.NuclearBoyTheme
 import com.nuclearboy.ui.chat.parts.fileSelectionReferenceMatchedActionLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionReferenceSelectedActionLabel
+import com.nuclearboy.ui.chat.parts.fileSelectionSelectVisibleActionLabel
 import com.nuclearboy.ui.chat.parts.shouldShowReferenceMatchedAction
 import com.nuclearboy.ui.chat.parts.shouldShowUnselectVisibleAction
 
@@ -154,7 +155,10 @@ internal fun FileSelectionActionBar(
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = nc.material.primary),
                         ) {
                             Text(
-                                text = "全选",
+                                text = fileSelectionSelectVisibleActionLabel(
+                                    selectedVisibleCount = selectedVisibleCount,
+                                    visibleFileCount = visibleFileCount,
+                                ),
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
                             )
@@ -204,7 +208,10 @@ internal fun FileSelectionActionBar(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = nc.material.primary),
                 ) {
                     Text(
-                        text = "全选可见",
+                        text = fileSelectionSelectVisibleActionLabel(
+                            selectedVisibleCount = selectedVisibleCount,
+                            visibleFileCount = visibleFileCount,
+                        ),
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                     )

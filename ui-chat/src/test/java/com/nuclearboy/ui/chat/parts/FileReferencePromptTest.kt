@@ -220,6 +220,36 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `select visible action label shows full selectable count without visible selection`() {
+        val label = fileSelectionSelectVisibleActionLabel(
+            selectedVisibleCount = 0,
+            visibleFileCount = 7,
+        )
+
+        assertEquals("全选 7", label)
+    }
+
+    @Test
+    fun `select visible action label shows addable count with partial visible selection`() {
+        val label = fileSelectionSelectVisibleActionLabel(
+            selectedVisibleCount = 3,
+            visibleFileCount = 7,
+        )
+
+        assertEquals("补选 4", label)
+    }
+
+    @Test
+    fun `select visible action label clamps impossible counts`() {
+        val label = fileSelectionSelectVisibleActionLabel(
+            selectedVisibleCount = 9,
+            visibleFileCount = 7,
+        )
+
+        assertEquals("补选 0", label)
+    }
+
+    @Test
     fun `selected file panel entries returns selected files only`() {
         val entries = selectedFilePanelEntries(
             files = listOf(
