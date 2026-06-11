@@ -63,6 +63,17 @@ internal fun filterQueryAfterMatchedReference(
     return if (remainingSelectedCount > 0 && currentQuery.isNotBlank()) "" else currentQuery
 }
 
+internal fun fileReferencesToastMessage(
+    referencedCount: Int,
+    remainingSelectedCount: Int,
+): String {
+    return if (remainingSelectedCount > 0) {
+        "已引用 $referencedCount 个文件，剩余 $remainingSelectedCount 个已选"
+    } else {
+        "已引用 $referencedCount 个文件"
+    }
+}
+
 internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
     return files
         .filterNot { it.isDirectory }

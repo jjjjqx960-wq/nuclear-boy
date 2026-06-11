@@ -66,6 +66,7 @@ import com.nuclearboy.ui.chat.parts.buildFilePanelOverview
 import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
 import com.nuclearboy.ui.chat.parts.buildFileReferencesPrompt
 import com.nuclearboy.ui.chat.parts.fileSelectionStatusLabel
+import com.nuclearboy.ui.chat.parts.fileReferencesToastMessage
 import com.nuclearboy.ui.chat.parts.filePanelFilterSummary
 import com.nuclearboy.ui.chat.parts.filterQueryAfterMatchedReference
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
@@ -374,7 +375,7 @@ fun ChatScreen(
                     inputFocusRequest++
                     Toast.makeText(context, "已引用: ${file.name}", Toast.LENGTH_SHORT).show()
                 },
-                onReferenceFiles = { files, closePanel ->
+                onReferenceFiles = { files, closePanel, remainingSelectedCount ->
                     val prompt = buildFileReferencesPrompt(
                         filePaths = files.map { it.path },
                         projectRoot = viewModel.getProjectRoot(),
@@ -384,7 +385,14 @@ fun ChatScreen(
                         showFiles = false
                         inputFocusRequest++
                     }
-                    Toast.makeText(context, "已引用 ${files.size} 个文件", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        fileReferencesToastMessage(
+                            referencedCount = files.size,
+                            remainingSelectedCount = remainingSelectedCount,
+                        ),
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 },
             )
         }
@@ -402,7 +410,7 @@ private fun ProjectFilePanel(
     context: Context,
     onClose: () -> Unit = {},
     onReferenceFile: (FileInfo) -> Unit = {},
-    onReferenceFiles: (List<FileInfo>, Boolean) -> Unit = { _, _ -> },
+    onReferenceFiles: (List<FileInfo>, Boolean, Int) -> Unit = { _, _, _ -> },
 ) {
     val nc = NuclearBoyTheme.colorScheme
     val fileListState = rememberLazyListState()
@@ -604,11 +612,11 @@ private fun ProjectFilePanel(
                     onReferenceVisible = {
                         val matchedSelectedFiles = visibleSelectableFiles
                             .filter { it.path in selectedPathSet }
-                        onReferenceFiles(matchedSelectedFiles, false)
                         val remainingSelectedPaths = removeReferencedFilePaths(
                             selectedPaths = selectedFilePaths,
                             referencedFiles = matchedSelectedFiles,
                         )
+                        onReferenceFiles(matchedSelectedFiles, false, remainingSelectedPaths.size)
                         selectedFilePaths = remainingSelectedPaths
                         filterQuery = filterQueryAfterMatchedReference(
                             remainingSelectedCount = remainingSelectedPaths.size,
@@ -616,7 +624,7 @@ private fun ProjectFilePanel(
                         )
                     },
                     onReferenceSelected = {
-                        onReferenceFiles(selectedFiles, true)
+                        onReferenceFiles(selectedFiles, true, 0)
                         selectedFilePaths = emptyList()
                     },
                     onClearSelection = { selectedFilePaths = emptyList() },

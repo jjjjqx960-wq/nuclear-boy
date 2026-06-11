@@ -143,6 +143,26 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `file references toast message shows remaining selection`() {
+        val message = fileReferencesToastMessage(
+            referencedCount = 2,
+            remainingSelectedCount = 5,
+        )
+
+        assertEquals("已引用 2 个文件，剩余 5 个已选", message)
+    }
+
+    @Test
+    fun `file references toast message stays compact without remaining selection`() {
+        val message = fileReferencesToastMessage(
+            referencedCount = 2,
+            remainingSelectedCount = 0,
+        )
+
+        assertEquals("已引用 2 个文件", message)
+    }
+
+    @Test
     fun `selected file panel entries returns selected files only`() {
         val entries = selectedFilePanelEntries(
             files = listOf(
