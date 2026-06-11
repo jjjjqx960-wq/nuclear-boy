@@ -55,6 +55,7 @@ import com.nuclearboy.app.ui.settings.parts.modelTestFailureActionHint
 import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
 import com.nuclearboy.app.ui.settings.parts.modelTestRequestContextSummary
+import com.nuclearboy.app.ui.settings.parts.providerDisplayNameSuggestion
 import com.nuclearboy.app.ui.settings.parts.providerBaseUrlCleanupSummary
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointCompletionActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointRecoveryActionLabel
@@ -644,6 +645,12 @@ fun SettingsScreen(
                     val modelInputCleanupSummary = remember(modelInput, sanitizedModelInput) {
                         modelNameCleanupSummary(modelInput, sanitizedModelInput)
                     }
+                    val displayNameSuggestion = remember(sanitizedBaseUrlInput, sanitizedModelInput) {
+                        providerDisplayNameSuggestion(
+                            baseUrl = sanitizedBaseUrlInput,
+                            modelName = sanitizedModelInput,
+                        )
+                    }
                     val currentModelListEndpoint = remember(sanitizedBaseUrlInput, endpointModeInput) {
                         if (sanitizedBaseUrlInput.isBlank()) {
                             ""
@@ -813,6 +820,33 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                     )
+                    if (displayNameInput.trim().isBlank() && displayNameSuggestion.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        OutlinedButton(
+                            onClick = {
+                                displayNameInput = displayNameSuggestion
+                                Toast.makeText(context, "已填入推荐名称", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("使用推荐名称")
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                displayNameSuggestion,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                textAlign = TextAlign.End,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = baseUrlInput,

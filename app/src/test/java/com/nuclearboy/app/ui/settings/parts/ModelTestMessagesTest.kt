@@ -143,6 +143,46 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider display name suggestion combines ip host and model leaf`() {
+        val suggestion = providerDisplayNameSuggestion(
+            baseUrl = "http://154.12.90.249:20128/v1",
+            modelName = "nvidia/minimaxai/minimax-m2.7",
+        )
+
+        assertEquals("154.12.90.249 minimax-m2.7", suggestion)
+    }
+
+    @Test
+    fun `provider display name suggestion shortens domain host`() {
+        val suggestion = providerDisplayNameSuggestion(
+            baseUrl = "https://my-9router.com/v1",
+            modelName = "claude-3-5-sonnet",
+        )
+
+        assertEquals("my-9router claude-3-5-sonnet", suggestion)
+    }
+
+    @Test
+    fun `provider display name suggestion falls back to model leaf without host`() {
+        val suggestion = providerDisplayNameSuggestion(
+            baseUrl = "",
+            modelName = "openai/gpt-4o",
+        )
+
+        assertEquals("gpt-4o", suggestion)
+    }
+
+    @Test
+    fun `provider display name suggestion is empty without model`() {
+        val suggestion = providerDisplayNameSuggestion(
+            baseUrl = "https://my-9router.com/v1",
+            modelName = " ",
+        )
+
+        assertEquals("", suggestion)
+    }
+
+    @Test
     fun `provider model route hint explains prefixed model before probing list`() {
         val hint = providerModelRouteHint(
             modelName = "nvidia/minimaxai/minimax-m2.7",

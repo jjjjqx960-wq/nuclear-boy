@@ -1,6 +1,7 @@
 package com.nuclearboy.app.ui.settings.parts
 
 import com.nuclearboy.common.AppError
+import java.net.URI
 import java.security.MessageDigest
 
 private val inactiveProviderPattern = Regex(
@@ -80,6 +81,18 @@ internal fun modelNameCleanupSummary(
     val sanitized = sanitizedModelName.trim()
     if (sanitized.isBlank() || raw == sanitized) return ""
     return "已自动清理模型名中的隐藏字符；实际请求使用：$sanitized"
+}
+
+internal fun providerDisplayNameSuggestion(
+    baseUrl: String,
+    modelName: String,
+): String {
+    val modelLabel = providerModelDisplayLabel(modelName)
+    if (modelLabel.isBlank()) return ""
+    val hostLabel = providerHostDisplayLabel(baseUrl)
+    return listOf(hostLabel, modelLabel)
+        .filter { it.isNotBlank() }
+        .joinToString(" ")
 }
 
 internal fun providerModelRouteHint(
@@ -431,6 +444,21 @@ private fun redactSettingsCopySecrets(raw: String): String =
         .replace(Regex("sk-[A-Za-z0-9_-]{6,}"), "sk-<REDACTED_TOKEN>")
 
 private fun String.shellSingleQuoted(): String = "'${replace("'", "'\\''")}'"
+
+private fun providerModelDisplayLabel(modelName: String): String =
+    modelName.trim().substringAfterLast('/').trim()
+
+private fun providerHostDisplayLabel(baseUrl: String): String {
+    val normalized = baseUrl.trim().trimEnd('/')
+    if (normalized.isBlank()) return ""
+    val uriText = if (normalized.contains("://")) normalized else "https://$normalized"
+    val host = runCatching { URI(uriText).host.orEmpty() }.getOrDefault("")
+        .removePrefix("www.")
+        .trim()
+    if (host.isBlank()) return ""
+    val isIpv4 = host.matches(Regex("""\d{1,3}(\.\d{1,3}){3}"""))
+    return if (isIpv4) host else host.substringBefore('.')
+}
 
 private fun String.jsonEscaped(): String = buildString {
     this@jsonEscaped.forEach { char ->
