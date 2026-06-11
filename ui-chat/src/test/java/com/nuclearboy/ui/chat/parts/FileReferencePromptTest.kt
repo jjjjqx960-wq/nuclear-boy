@@ -195,6 +195,17 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `file reference toast message prefers path label`() {
+        val message = fileReferenceToastMessage(
+            fileName = "README.md",
+            fileSizeLabel = "3 KB",
+            filePathLabel = "app/src/README.md",
+        )
+
+        assertEquals("已引用: app/src/README.md · 3 KB", message)
+    }
+
+    @Test
     fun `file reference toast message keeps old compact form without size`() {
         val message = fileReferenceToastMessage(
             fileName = "README.md",

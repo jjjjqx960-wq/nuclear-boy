@@ -80,8 +80,9 @@ internal fun fileReferencesToastMessage(
 internal fun fileReferenceToastMessage(
     fileName: String,
     fileSizeLabel: String = "",
+    filePathLabel: String = "",
 ): String {
-    val safeFileName = fileName.ifBlank { "文件" }
+    val safeFileName = filePathLabel.ifBlank { fileName }.ifBlank { "文件" }
     val sizeSuffix = if (fileSizeLabel.isNotBlank()) " · $fileSizeLabel" else ""
     return "已引用: $safeFileName$sizeSuffix"
 }

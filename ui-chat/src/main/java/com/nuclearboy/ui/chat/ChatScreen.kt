@@ -74,6 +74,7 @@ import com.nuclearboy.ui.chat.parts.filterQueryAfterMatchedReference
 import com.nuclearboy.ui.chat.parts.filterFilePanelEntries
 import com.nuclearboy.ui.chat.parts.FilePanelSortMode
 import com.nuclearboy.ui.chat.parts.removeReferencedFilePaths
+import com.nuclearboy.ui.chat.parts.projectRelativeFilePath
 import com.nuclearboy.ui.chat.parts.selectVisibleFilePaths
 import com.nuclearboy.ui.chat.parts.selectedFilePanelEntries
 import com.nuclearboy.ui.chat.parts.shouldClosePanelAfterMatchedReference
@@ -380,6 +381,10 @@ fun ChatScreen(
                         fileReferenceToastMessage(
                             fileName = file.name,
                             fileSizeLabel = fileSelectionTotalSizeBytes(listOf(file)).toFileSizeString(),
+                            filePathLabel = projectRelativeFilePath(
+                                filePath = file.path,
+                                projectRoot = viewModel.getProjectRoot(),
+                            ),
                         ),
                         Toast.LENGTH_SHORT,
                     ).show()
