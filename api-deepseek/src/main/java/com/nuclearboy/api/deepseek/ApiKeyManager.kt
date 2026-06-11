@@ -185,8 +185,9 @@ class ApiKeyManager(context: Context) {
         selectAfterSave: Boolean = true,
     ): String {
         val normalizedModelName = sanitizeProviderModelName(modelName)
-        val resolvedProtocol = ProviderProtocol.resolve(protocol, baseUrl, normalizedModelName)
-        val normalizedBaseUrl = normalizeCustomBaseUrl(baseUrl, resolvedProtocol, endpointMode)
+        val sanitizedBaseUrl = sanitizeProviderBaseUrl(baseUrl)
+        val resolvedProtocol = ProviderProtocol.resolve(protocol, sanitizedBaseUrl, normalizedModelName)
+        val normalizedBaseUrl = normalizeCustomBaseUrl(sanitizedBaseUrl, resolvedProtocol, endpointMode)
         val id = existingId?.takeIf { it.isNotBlank() } ?: "custom_${UUID.randomUUID()}"
         val currentModels = loadCustomModels()
         val previous = currentModels.firstOrNull { it.id == id }
@@ -397,21 +398,22 @@ class ApiKeyManager(context: Context) {
         protocol: ProviderProtocol,
         endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
     ): String {
-        if (endpointMode == ProviderEndpointMode.EXACT) return raw.trim()
+        val sanitizedRaw = sanitizeProviderBaseUrl(raw)
+        if (endpointMode == ProviderEndpointMode.EXACT) return sanitizedRaw
         return when (protocol) {
-            ProviderProtocol.ANTHROPIC -> DeepSeekApiClient.normalizeAnthropicBaseUrl(raw)
-            ProviderProtocol.OPENAI -> DeepSeekApiClient.normalizeOpenAiBaseUrl(raw)
+            ProviderProtocol.ANTHROPIC -> DeepSeekApiClient.normalizeAnthropicBaseUrl(sanitizedRaw)
+            ProviderProtocol.OPENAI -> DeepSeekApiClient.normalizeOpenAiBaseUrl(sanitizedRaw)
             ProviderProtocol.AUTO -> {
-                when (ProviderProtocol.resolve(ProviderProtocol.AUTO, raw)) {
-                    ProviderProtocol.ANTHROPIC -> DeepSeekApiClient.normalizeAnthropicBaseUrl(raw)
-                    else -> DeepSeekApiClient.normalizeOpenAiBaseUrl(raw)
+                when (ProviderProtocol.resolve(ProviderProtocol.AUTO, sanitizedRaw)) {
+                    ProviderProtocol.ANTHROPIC -> DeepSeekApiClient.normalizeAnthropicBaseUrl(sanitizedRaw)
+                    else -> DeepSeekApiClient.normalizeOpenAiBaseUrl(sanitizedRaw)
                 }
             }
         }
     }
 
     private fun getResolvedProtocol(record: CustomModelRecord): ProviderProtocol {
-        return ProviderProtocol.resolve(record.protocol, record.baseUrl, record.modelName)
+        return ProviderProtocol.resolve(record.protocol, sanitizeProviderBaseUrl(record.baseUrl), record.modelName)
     }
 
     fun getActiveModelId(): String =
@@ -460,8 +462,15 @@ class ApiKeyManager(context: Context) {
         val modelName = sanitizeProviderModelName(record.modelName)
         val displayName = sanitizeProviderModelName(record.displayName)
             .ifBlank { modelName.ifBlank { "自定义模型" } }
+        val sanitizedBaseUrl = sanitizeProviderBaseUrl(record.baseUrl)
+        val baseUrl = normalizeCustomBaseUrl(
+            raw = sanitizedBaseUrl,
+            protocol = ProviderProtocol.resolve(record.protocol, sanitizedBaseUrl, modelName),
+            endpointMode = record.endpointMode,
+        )
         return record.copy(
             displayName = displayName,
+            baseUrl = baseUrl,
             modelName = modelName,
             apiKey = record.apiKey.trim(),
         )

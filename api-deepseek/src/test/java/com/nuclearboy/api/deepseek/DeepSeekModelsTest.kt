@@ -234,6 +234,21 @@ class DeepSeekModelsTest {
     }
 
     @Test
+    fun `provider base url sanitizer strips invisible routing characters`() {
+        assertEquals(
+            "http://154.12.90.249:20128/v1",
+            sanitizeProviderBaseUrl("\u200Bhttp://154.12.90.249:20128/v1\uFEFF")
+        )
+        assertEquals(
+            "http://154.12.90.249:20128/v1/chat/completions",
+            DeepSeekApiClient.buildOpenAiChatCompletionsEndpoint(
+                "\u200Bhttp://154.12.90.249:20128/v1/chat/completions\uFEFF",
+                ProviderEndpointMode.EXACT,
+            )
+        )
+    }
+
+    @Test
     fun `provider model name hint handles zero width provider prefix`() {
         val hint = providerModelNameHint("\u200Bnvidia/example-org/example-model")
 

@@ -90,6 +90,29 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider base url cleanup summary reports hidden character normalization`() {
+        val summary = providerBaseUrlCleanupSummary(
+            rawBaseUrl = "\u200Bhttp://154.12.90.249:20128/v1",
+            sanitizedBaseUrl = "http://154.12.90.249:20128/v1",
+        )
+
+        assertEquals(
+            "已自动清理服务地址中的隐藏字符；实际请求使用：http://154.12.90.249:20128/v1",
+            summary,
+        )
+    }
+
+    @Test
+    fun `provider base url cleanup summary ignores normal surrounding whitespace`() {
+        val summary = providerBaseUrlCleanupSummary(
+            rawBaseUrl = " http://154.12.90.249:20128/v1 ",
+            sanitizedBaseUrl = "http://154.12.90.249:20128/v1",
+        )
+
+        assertEquals("", summary)
+    }
+
+    @Test
     fun `provider endpoint preview summary includes protocol mode and post endpoint`() {
         val summary = providerEndpointPreviewSummary(
             protocolLabel = "OpenAI",

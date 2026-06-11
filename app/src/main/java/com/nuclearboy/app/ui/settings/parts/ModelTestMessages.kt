@@ -49,6 +49,16 @@ internal fun modelNameCleanupSummary(
     return "已自动清理模型名中的隐藏字符；实际请求使用：$sanitized"
 }
 
+internal fun providerBaseUrlCleanupSummary(
+    rawBaseUrl: String,
+    sanitizedBaseUrl: String,
+): String {
+    val raw = rawBaseUrl.trim()
+    val sanitized = sanitizedBaseUrl.trim()
+    if (sanitized.isBlank() || raw == sanitized) return ""
+    return "已自动清理服务地址中的隐藏字符；实际请求使用：$sanitized"
+}
+
 internal fun providerEndpointPreviewSummary(
     protocolLabel: String,
     endpointModeLabel: String,

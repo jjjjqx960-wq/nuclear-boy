@@ -40,6 +40,7 @@ import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.api.deepseek.DeepSeekApiClient
 import com.nuclearboy.api.deepseek.ProviderEndpointMode
 import com.nuclearboy.api.deepseek.ProviderProtocol
+import com.nuclearboy.api.deepseek.sanitizeProviderBaseUrl
 import com.nuclearboy.api.deepseek.sanitizeProviderModelName
 import com.nuclearboy.app.R
 import com.nuclearboy.app.diagnostics.AppDiagnostics
@@ -52,6 +53,7 @@ import com.nuclearboy.app.ui.settings.parts.modelNameCleanupSummary
 import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
 import com.nuclearboy.app.ui.settings.parts.modelTestRequestContextSummary
+import com.nuclearboy.app.ui.settings.parts.providerBaseUrlCleanupSummary
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointCompletionActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointRecoveryActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointWarning
@@ -189,7 +191,8 @@ class SettingsViewModel @Inject constructor(
         key: String?,
         label: String,
     ) {
-        val normalizedBaseUrl = baseUrl.trim()
+        val rawBaseUrl = baseUrl.trim()
+        val normalizedBaseUrl = sanitizeProviderBaseUrl(baseUrl)
         val trimmedModel = model.trim()
         val normalizedModel = sanitizeProviderModelName(model)
         if (normalizedBaseUrl.isBlank() || normalizedModel.isBlank()) {
@@ -202,6 +205,7 @@ class SettingsViewModel @Inject constructor(
             return
         }
         val keyFingerprint = apiKeyFingerprintSummary(key)
+        val baseUrlCleanupSummary = providerBaseUrlCleanupSummary(rawBaseUrl, normalizedBaseUrl)
         val cleanupSummary = modelNameCleanupSummary(trimmedModel, normalizedModel)
         val resolvedProtocol = ProviderProtocol.resolve(protocol, normalizedBaseUrl, normalizedModel)
         val requestEndpoint = when (resolvedProtocol) {
@@ -224,6 +228,10 @@ class SettingsViewModel @Inject constructor(
             message = "正在测试 $testLabel",
             detail = buildString {
                 append("会发送一条 max_tokens=8 的 ping 请求，不会保存或输出明文 Key。")
+                if (baseUrlCleanupSummary.isNotBlank()) {
+                    append('\n')
+                    append(baseUrlCleanupSummary)
+                }
                 if (cleanupSummary.isNotBlank()) {
                     append('\n')
                     append(cleanupSummary)
@@ -257,6 +265,10 @@ class SettingsViewModel @Inject constructor(
                             ),
                         )
                         append('\n')
+                        if (baseUrlCleanupSummary.isNotBlank()) {
+                            append(baseUrlCleanupSummary)
+                            append('\n')
+                        }
                         if (cleanupSummary.isNotBlank()) {
                             append(cleanupSummary)
                             append('\n')
@@ -274,6 +286,10 @@ class SettingsViewModel @Inject constructor(
                     detail = buildString {
                         if (requestContext.isNotBlank()) {
                             append(requestContext)
+                            append('\n')
+                        }
+                        if (baseUrlCleanupSummary.isNotBlank()) {
+                            append(baseUrlCleanupSummary)
                             append('\n')
                         }
                         if (cleanupSummary.isNotBlank()) {
@@ -527,6 +543,12 @@ fun SettingsScreen(
                     var protocolInput by remember { mutableStateOf(ProviderProtocol.AUTO) }
                     var endpointModeInput by remember { mutableStateOf(ProviderEndpointMode.AUTO) }
                     var customKeyInput by remember { mutableStateOf("") }
+                    val sanitizedBaseUrlInput = remember(baseUrlInput) {
+                        sanitizeProviderBaseUrl(baseUrlInput)
+                    }
+                    val baseUrlInputCleanupSummary = remember(baseUrlInput, sanitizedBaseUrlInput) {
+                        providerBaseUrlCleanupSummary(baseUrlInput, sanitizedBaseUrlInput)
+                    }
                     val sanitizedModelInput = remember(modelInput) {
                         sanitizeProviderModelName(modelInput)
                     }
@@ -534,12 +556,12 @@ fun SettingsScreen(
                         modelNameCleanupSummary(modelInput, sanitizedModelInput)
                     }
                     val providerEndpointPreview = remember(
-                        baseUrlInput,
+                        sanitizedBaseUrlInput,
                         protocolInput,
                         endpointModeInput,
                         sanitizedModelInput,
                     ) {
-                        val baseUrl = baseUrlInput.trim()
+                        val baseUrl = sanitizedBaseUrlInput
                         if (baseUrl.isBlank()) {
                             ""
                         } else {
@@ -562,12 +584,12 @@ fun SettingsScreen(
                         }
                     }
                     val providerEndpointWarning = remember(
-                        baseUrlInput,
+                        sanitizedBaseUrlInput,
                         protocolInput,
                         endpointModeInput,
                         sanitizedModelInput,
                     ) {
-                        val baseUrl = baseUrlInput.trim()
+                        val baseUrl = sanitizedBaseUrlInput
                         if (baseUrl.isBlank() || endpointModeInput != ProviderEndpointMode.EXACT) {
                             ""
                         } else {
@@ -589,13 +611,13 @@ fun SettingsScreen(
                         }
                     }
                     val providerExactCompletionEndpoint = remember(
-                        baseUrlInput,
+                        sanitizedBaseUrlInput,
                         protocolInput,
                         endpointModeInput,
                         sanitizedModelInput,
                         providerEndpointWarning,
                     ) {
-                        val baseUrl = baseUrlInput.trim()
+                        val baseUrl = sanitizedBaseUrlInput
                         if (baseUrl.isBlank() || providerEndpointWarning.isBlank()) {
                             ""
                         } else {
@@ -614,12 +636,12 @@ fun SettingsScreen(
                     }
                     val providerEndpointCompletionAction = remember(
                         providerEndpointWarning,
-                        baseUrlInput,
+                        sanitizedBaseUrlInput,
                         providerExactCompletionEndpoint,
                     ) {
                         providerExactEndpointCompletionActionLabel(
                             warning = providerEndpointWarning,
-                            currentEndpoint = baseUrlInput,
+                            currentEndpoint = sanitizedBaseUrlInput,
                             suggestedEndpoint = providerExactCompletionEndpoint,
                         )
                     }
@@ -646,6 +668,11 @@ fun SettingsScreen(
                         placeholder = { Text("https://...") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
+                        supportingText = {
+                            if (baseUrlInputCleanupSummary.isNotBlank()) {
+                                Text(baseUrlInputCleanupSummary)
+                            }
+                        },
                     )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
@@ -786,7 +813,7 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 viewModel.testCustomModelInput(
-                                    baseUrlInput.trim(),
+                                    sanitizedBaseUrlInput,
                                     sanitizedModelInput,
                                     protocolInput,
                                     endpointModeInput,
@@ -794,7 +821,7 @@ fun SettingsScreen(
                                 )
                             },
                             modifier = Modifier.weight(1f),
-                            enabled = baseUrlInput.isNotBlank() &&
+                            enabled = sanitizedBaseUrlInput.isNotBlank() &&
                                 sanitizedModelInput.isNotBlank() &&
                                 !(modelTestState.inProgress &&
                                     modelTestState.targetId == SettingsViewModel.NEW_MODEL_TEST_ID),
@@ -813,7 +840,7 @@ fun SettingsScreen(
                             onClick = {
                                 viewModel.saveCustomModel(
                                     displayNameInput.trim().ifBlank { sanitizedModelInput },
-                                    baseUrlInput.trim(),
+                                    sanitizedBaseUrlInput,
                                     sanitizedModelInput,
                                     protocolInput,
                                     endpointModeInput,
@@ -827,7 +854,7 @@ fun SettingsScreen(
                                 customKeyInput = ""
                             },
                             modifier = Modifier.weight(1f),
-                            enabled = baseUrlInput.isNotBlank() && sanitizedModelInput.isNotBlank(),
+                            enabled = sanitizedBaseUrlInput.isNotBlank() && sanitizedModelInput.isNotBlank(),
                         ) {
                             Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))

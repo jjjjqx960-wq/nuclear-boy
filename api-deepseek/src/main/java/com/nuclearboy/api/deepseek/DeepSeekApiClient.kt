@@ -318,15 +318,16 @@ class DeepSeekApiClient(
         protocol: ProviderProtocol = ProviderProtocol.AUTO,
         endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
     ): AppResult<ProviderTestResult> = withContext(Dispatchers.IO) {
+        val normalizedBaseUrl = sanitizeProviderBaseUrl(baseUrl)
         val normalizedModel = sanitizeProviderModelName(modelName)
-        val resolvedProtocol = ProviderProtocol.resolve(protocol, baseUrl, normalizedModel)
+        val resolvedProtocol = ProviderProtocol.resolve(protocol, normalizedBaseUrl, normalizedModel)
         if (normalizedModel.isBlank()) {
             return@withContext AppResult.failure(AppError.InvalidRequest, "模型名不能为空")
         }
 
         val endpoint = when (resolvedProtocol) {
-            ProviderProtocol.ANTHROPIC -> buildAnthropicMessagesEndpoint(baseUrl, endpointMode)
-            else -> buildOpenAiChatCompletionsEndpoint(baseUrl, endpointMode)
+            ProviderProtocol.ANTHROPIC -> buildAnthropicMessagesEndpoint(normalizedBaseUrl, endpointMode)
+            else -> buildOpenAiChatCompletionsEndpoint(normalizedBaseUrl, endpointMode)
         }
         if (endpoint.isBlank()) {
             return@withContext AppResult.failure(AppError.InvalidRequest, "服务地址不能为空")
@@ -969,8 +970,9 @@ class DeepSeekApiClient(
             raw: String,
             endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
         ): String {
-            if (endpointMode == ProviderEndpointMode.EXACT) return raw.trim()
-            var url = raw.trim().trimEnd('/')
+            val sanitizedRaw = sanitizeProviderBaseUrl(raw)
+            if (endpointMode == ProviderEndpointMode.EXACT) return sanitizedRaw
+            var url = sanitizedRaw.trimEnd('/')
             if (url.isBlank()) return ""
             val lower = url.lowercase()
             if (lower.startsWith("https://api.minimaxi.com/anthropic")) {
@@ -998,7 +1000,7 @@ class DeepSeekApiClient(
             raw: String,
             endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
         ): String {
-            if (endpointMode == ProviderEndpointMode.EXACT) return raw.trim()
+            if (endpointMode == ProviderEndpointMode.EXACT) return sanitizeProviderBaseUrl(raw)
             val baseUrl = normalizeOpenAiBaseUrl(raw).trimEnd('/')
             if (baseUrl.isBlank()) return ""
             val lower = baseUrl.lowercase()
@@ -1014,8 +1016,9 @@ class DeepSeekApiClient(
             raw: String,
             endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
         ): String {
-            if (endpointMode == ProviderEndpointMode.EXACT) return raw.trim()
-            var url = raw.trim().trimEnd('/')
+            val sanitizedRaw = sanitizeProviderBaseUrl(raw)
+            if (endpointMode == ProviderEndpointMode.EXACT) return sanitizedRaw
+            var url = sanitizedRaw.trimEnd('/')
             if (url.isBlank()) return ""
             val suffixes = listOf(
                 "/v1/messages",
@@ -1034,7 +1037,7 @@ class DeepSeekApiClient(
             raw: String,
             endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
         ): String {
-            if (endpointMode == ProviderEndpointMode.EXACT) return raw.trim()
+            if (endpointMode == ProviderEndpointMode.EXACT) return sanitizeProviderBaseUrl(raw)
             val baseUrl = normalizeAnthropicBaseUrl(raw).trimEnd('/')
             if (baseUrl.isBlank()) return ""
             return if (baseUrl.lowercase().endsWith("/v1")) {
