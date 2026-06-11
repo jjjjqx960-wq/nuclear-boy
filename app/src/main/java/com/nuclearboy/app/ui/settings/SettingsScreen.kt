@@ -52,6 +52,7 @@ import com.nuclearboy.app.ui.settings.parts.modelNameCleanupSummary
 import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
 import com.nuclearboy.app.ui.settings.parts.modelTestRequestContextSummary
+import com.nuclearboy.app.ui.settings.parts.providerExactEndpointCompletionActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointRecoveryActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointWarning
 import com.nuclearboy.app.ui.settings.parts.providerEndpointPreviewSummary
@@ -587,6 +588,41 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    val providerExactCompletionEndpoint = remember(
+                        baseUrlInput,
+                        protocolInput,
+                        endpointModeInput,
+                        sanitizedModelInput,
+                        providerEndpointWarning,
+                    ) {
+                        val baseUrl = baseUrlInput.trim()
+                        if (baseUrl.isBlank() || providerEndpointWarning.isBlank()) {
+                            ""
+                        } else {
+                            val resolvedProtocol = ProviderProtocol.resolve(
+                                protocolInput,
+                                baseUrl,
+                                sanitizedModelInput,
+                            )
+                            when (resolvedProtocol) {
+                                ProviderProtocol.ANTHROPIC ->
+                                    DeepSeekApiClient.buildAnthropicMessagesEndpoint(baseUrl, ProviderEndpointMode.AUTO)
+                                else ->
+                                    DeepSeekApiClient.buildOpenAiChatCompletionsEndpoint(baseUrl, ProviderEndpointMode.AUTO)
+                            }
+                        }
+                    }
+                    val providerEndpointCompletionAction = remember(
+                        providerEndpointWarning,
+                        baseUrlInput,
+                        providerExactCompletionEndpoint,
+                    ) {
+                        providerExactEndpointCompletionActionLabel(
+                            warning = providerEndpointWarning,
+                            currentEndpoint = baseUrlInput,
+                            suggestedEndpoint = providerExactCompletionEndpoint,
+                        )
+                    }
                     val providerEndpointRecoveryAction = remember(providerEndpointWarning) {
                         providerExactEndpointRecoveryActionLabel(providerEndpointWarning)
                     }
@@ -681,22 +717,49 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
-                    if (providerEndpointRecoveryAction.isNotBlank()) {
+                    if (
+                        providerEndpointCompletionAction.isNotBlank() ||
+                        providerEndpointRecoveryAction.isNotBlank()
+                    ) {
                         Spacer(Modifier.height(4.dp))
-                        OutlinedButton(
-                            onClick = {
-                                endpointModeInput = ProviderEndpointMode.AUTO
-                                Toast.makeText(context, "已切回智能拼接", Toast.LENGTH_SHORT).show()
-                            },
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Icon(
-                                Icons.Filled.Refresh,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(providerEndpointRecoveryAction)
+                            if (providerEndpointCompletionAction.isNotBlank()) {
+                                OutlinedButton(
+                                    onClick = {
+                                        baseUrlInput = providerExactCompletionEndpoint
+                                        Toast.makeText(context, "已补成完整地址", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Build,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(providerEndpointCompletionAction)
+                                }
+                            }
+                            if (providerEndpointRecoveryAction.isNotBlank()) {
+                                OutlinedButton(
+                                    onClick = {
+                                        endpointModeInput = ProviderEndpointMode.AUTO
+                                        Toast.makeText(context, "已切回智能拼接", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(providerEndpointRecoveryAction)
+                                }
+                            }
                         }
                     }
                     Spacer(Modifier.height(8.dp))

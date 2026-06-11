@@ -81,6 +81,17 @@ internal fun providerExactEndpointWarning(
 internal fun providerExactEndpointRecoveryActionLabel(warning: String): String =
     if (warning.trim().isBlank()) "" else "切回智能拼接"
 
+internal fun providerExactEndpointCompletionActionLabel(
+    warning: String,
+    currentEndpoint: String,
+    suggestedEndpoint: String,
+): String {
+    val normalizedSuggested = suggestedEndpoint.trim()
+    if (warning.trim().isBlank() || normalizedSuggested.isBlank()) return ""
+    if (currentEndpoint.trim() == normalizedSuggested) return ""
+    return "补成完整地址"
+}
+
 internal fun modelTestRequestContextSummary(
     endpoint: String,
     modelName: String,

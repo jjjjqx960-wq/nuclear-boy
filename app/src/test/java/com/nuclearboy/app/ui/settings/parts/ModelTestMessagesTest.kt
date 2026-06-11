@@ -157,6 +157,34 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider exact endpoint completion action appears only for different suggestion`() {
+        assertEquals(
+            "补成完整地址",
+            providerExactEndpointCompletionActionLabel(
+                warning = "完整地址模式会直接 POST 到此地址",
+                currentEndpoint = "http://154.12.90.249:20128/v1",
+                suggestedEndpoint = "http://154.12.90.249:20128/v1/chat/completions",
+            ),
+        )
+        assertEquals(
+            "",
+            providerExactEndpointCompletionActionLabel(
+                warning = "完整地址模式会直接 POST 到此地址",
+                currentEndpoint = "http://154.12.90.249:20128/v1/chat/completions",
+                suggestedEndpoint = " http://154.12.90.249:20128/v1/chat/completions ",
+            ),
+        )
+        assertEquals(
+            "",
+            providerExactEndpointCompletionActionLabel(
+                warning = " ",
+                currentEndpoint = "http://154.12.90.249:20128/v1",
+                suggestedEndpoint = "http://154.12.90.249:20128/v1/chat/completions",
+            ),
+        )
+    }
+
+    @Test
     fun `model test request context includes endpoint model protocol mode and fingerprint`() {
         val summary = modelTestRequestContextSummary(
             endpoint = " http://154.12.90.249:20128/v1/chat/completions ",
