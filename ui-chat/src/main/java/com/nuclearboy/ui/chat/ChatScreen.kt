@@ -440,6 +440,9 @@ private fun ProjectFilePanel(
             sortMode,
         )
     }
+    val allVisibleSelectableFileCount = remember(sortedFilteredFiles) {
+        sortedFilteredFiles.count { !it.isDirectory }
+    }
     val visibleFiles = remember(sortedFilteredFiles, selectedFiles, showSelectedOnly, filterQuery) {
         visibleFilePanelEntries(
             filteredFiles = sortedFilteredFiles,
@@ -589,6 +592,7 @@ private fun ProjectFilePanel(
                     selectedVisibleCount = selectedVisibleCount,
                     statusLabel = selectionStatusLabel,
                     visibleFileCount = visibleSelectableFiles.size,
+                    allVisibleFileCount = allVisibleSelectableFileCount,
                     showSelectedOnly = showSelectedOnly,
                     hasFilterQuery = filterQuery.isNotBlank(),
                     onSelectVisible = {

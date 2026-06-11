@@ -38,6 +38,7 @@ import com.nuclearboy.ui.chat.NuclearBoyTheme
 import com.nuclearboy.ui.chat.parts.fileSelectionClearActionDescription
 import com.nuclearboy.ui.chat.parts.fileSelectionReferenceMatchedActionLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionReferenceSelectedActionLabel
+import com.nuclearboy.ui.chat.parts.fileSelectionSelectedOnlyToggleLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionSelectVisibleActionLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionUnselectHiddenActionDescription
 import com.nuclearboy.ui.chat.parts.fileSelectionUnselectVisibleActionDescription
@@ -50,6 +51,7 @@ internal fun FileSelectionActionBar(
     selectedVisibleCount: Int,
     statusLabel: String,
     visibleFileCount: Int,
+    allVisibleFileCount: Int,
     showSelectedOnly: Boolean,
     hasFilterQuery: Boolean,
     onSelectVisible: () -> Unit,
@@ -106,7 +108,13 @@ internal fun FileSelectionActionBar(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = nc.material.secondary),
                     ) {
                         Text(
-                            text = if (showSelectedOnly) "全部" else "只看",
+                            text = fileSelectionSelectedOnlyToggleLabel(
+                                showSelectedOnly = showSelectedOnly,
+                                selectedCount = selectedCount,
+                                selectedVisibleCount = selectedVisibleCount,
+                                allVisibleFileCount = allVisibleFileCount,
+                                hasFilterQuery = hasFilterQuery,
+                            ),
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                         )

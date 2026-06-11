@@ -106,6 +106,21 @@ internal fun fileSelectionSelectVisibleActionLabel(
     return "$action $addableCount"
 }
 
+internal fun fileSelectionSelectedOnlyToggleLabel(
+    showSelectedOnly: Boolean,
+    selectedCount: Int,
+    selectedVisibleCount: Int,
+    allVisibleFileCount: Int,
+    hasFilterQuery: Boolean,
+): String {
+    return if (showSelectedOnly) {
+        "全部 ${allVisibleFileCount.coerceAtLeast(0)}"
+    } else {
+        val targetCount = if (hasFilterQuery) selectedVisibleCount else selectedCount
+        "只看 ${targetCount.coerceAtLeast(0)}"
+    }
+}
+
 internal fun fileSelectionClearActionDescription(
     selectedCount: Int,
 ): String {

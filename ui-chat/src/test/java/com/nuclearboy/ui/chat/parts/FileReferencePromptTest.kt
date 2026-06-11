@@ -250,6 +250,45 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `selected only toggle label shows selected count without filter`() {
+        val label = fileSelectionSelectedOnlyToggleLabel(
+            showSelectedOnly = false,
+            selectedCount = 7,
+            selectedVisibleCount = 3,
+            allVisibleFileCount = 11,
+            hasFilterQuery = false,
+        )
+
+        assertEquals("只看 7", label)
+    }
+
+    @Test
+    fun `selected only toggle label shows matched selected count with filter`() {
+        val label = fileSelectionSelectedOnlyToggleLabel(
+            showSelectedOnly = false,
+            selectedCount = 7,
+            selectedVisibleCount = 3,
+            allVisibleFileCount = 11,
+            hasFilterQuery = true,
+        )
+
+        assertEquals("只看 3", label)
+    }
+
+    @Test
+    fun `selected only toggle label shows all filtered selectable count when active`() {
+        val label = fileSelectionSelectedOnlyToggleLabel(
+            showSelectedOnly = true,
+            selectedCount = 7,
+            selectedVisibleCount = 3,
+            allVisibleFileCount = 11,
+            hasFilterQuery = true,
+        )
+
+        assertEquals("全部 11", label)
+    }
+
+    @Test
     fun `clear selection action description shows selected count`() {
         val description = fileSelectionClearActionDescription(
             selectedCount = 7,
