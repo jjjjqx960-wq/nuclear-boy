@@ -101,6 +101,41 @@ internal fun providerEndpointPreviewSummary(
     return "实际请求：${protocolLabel.trim()} · ${endpointModeLabel.trim()}\nPOST $normalizedEndpoint"
 }
 
+internal fun providerRequestCurlTemplate(
+    protocolLabel: String,
+    endpoint: String,
+    modelName: String,
+    hasApiKey: Boolean,
+): String {
+    val normalizedEndpoint = endpoint.trim()
+    val normalizedModel = modelName.trim()
+    if (normalizedEndpoint.isBlank() || normalizedModel.isBlank()) return ""
+
+    val isAnthropic = protocolLabel.trim().equals("Anthropic", ignoreCase = true)
+    val body = if (isAnthropic) {
+        """{"model":"${normalizedModel.jsonEscaped()}","max_tokens":8,"messages":[{"role":"user","content":"ping"}]}"""
+    } else {
+        """{"model":"${normalizedModel.jsonEscaped()}","messages":[{"role":"user","content":"ping"}],"temperature":0.0,"top_p":1.0,"max_tokens":8,"stream":false}"""
+    }
+    val headers = buildList {
+        add("  -H ${"Accept: application/json".shellSingleQuoted()}")
+        add("  -H ${"Content-Type: application/json; charset=utf-8".shellSingleQuoted()}")
+        if (hasApiKey) {
+            add("  -H ${"Authorization: Bearer <REDACTED_TOKEN>".shellSingleQuoted()}")
+        }
+    }
+
+    return buildString {
+        append("curl -X POST ")
+        append(normalizedEndpoint.shellSingleQuoted())
+        append(" \\\n")
+        append(headers.joinToString(" \\\n"))
+        append(" \\\n")
+        append("  --data ")
+        append(body.shellSingleQuoted())
+    }
+}
+
 internal fun providerModelListSummary(
     endpoint: String,
     modelIds: List<String>,
@@ -326,3 +361,27 @@ private fun redactModelTestSecrets(raw: String): String = redactSettingsCopySecr
 private fun redactSettingsCopySecrets(raw: String): String =
     raw.replace(Regex("Bearer\\s+[A-Za-z0-9._~+/=-]+", RegexOption.IGNORE_CASE), "Bearer <REDACTED_TOKEN>")
         .replace(Regex("sk-[A-Za-z0-9_-]{6,}"), "sk-<REDACTED_TOKEN>")
+
+private fun String.shellSingleQuoted(): String = "'${replace("'", "'\\''")}'"
+
+private fun String.jsonEscaped(): String = buildString {
+    this@jsonEscaped.forEach { char ->
+        when (char) {
+            '\\' -> append("\\\\")
+            '"' -> append("\\\"")
+            '\b' -> append("\\b")
+            '\u000C' -> append("\\f")
+            '\n' -> append("\\n")
+            '\r' -> append("\\r")
+            '\t' -> append("\\t")
+            else -> {
+                if (char.code < 0x20) {
+                    append("\\u")
+                    append(char.code.toString(16).padStart(4, '0'))
+                } else {
+                    append(char)
+                }
+            }
+        }
+    }
+}

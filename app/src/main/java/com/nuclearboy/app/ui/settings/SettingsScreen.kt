@@ -63,6 +63,7 @@ import com.nuclearboy.app.ui.settings.parts.providerModelListClearFilterActionLa
 import com.nuclearboy.app.ui.settings.parts.providerModelListPickerHint
 import com.nuclearboy.app.ui.settings.parts.providerModelListSummary
 import com.nuclearboy.app.ui.settings.parts.providerModelListVisibleModels
+import com.nuclearboy.app.ui.settings.parts.providerRequestCurlTemplate
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
 import com.nuclearboy.common.AppResult
@@ -676,6 +677,37 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    val providerRequestTemplate = remember(
+                        sanitizedBaseUrlInput,
+                        sanitizedModelInput,
+                        protocolInput,
+                        endpointModeInput,
+                        customKeyInput,
+                    ) {
+                        val baseUrl = sanitizedBaseUrlInput
+                        val modelName = sanitizedModelInput
+                        if (baseUrl.isBlank() || modelName.isBlank()) {
+                            ""
+                        } else {
+                            val resolvedProtocol = ProviderProtocol.resolve(
+                                protocolInput,
+                                baseUrl,
+                                modelName,
+                            )
+                            val endpoint = when (resolvedProtocol) {
+                                ProviderProtocol.ANTHROPIC ->
+                                    DeepSeekApiClient.buildAnthropicMessagesEndpoint(baseUrl, endpointModeInput)
+                                else ->
+                                    DeepSeekApiClient.buildOpenAiChatCompletionsEndpoint(baseUrl, endpointModeInput)
+                            }
+                            providerRequestCurlTemplate(
+                                protocolLabel = resolvedProtocol.displayName,
+                                endpoint = endpoint,
+                                modelName = modelName,
+                                hasApiKey = customKeyInput.trim().isNotBlank(),
+                            )
+                        }
+                    }
                     val providerEndpointWarning = remember(
                         sanitizedBaseUrlInput,
                         protocolInput,
@@ -865,6 +897,24 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.primary,
                             fontFamily = FontFamily.Monospace,
                         )
+                        if (providerRequestTemplate.isNotBlank()) {
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    clipboardManager.setText(AnnotatedString(providerRequestTemplate))
+                                    Toast.makeText(context, "已复制请求模板", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Icon(
+                                    Icons.Filled.ContentCopy,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("复制请求模板")
+                            }
+                        }
                     }
                     if (providerEndpointWarning.isNotBlank()) {
                         Spacer(Modifier.height(4.dp))

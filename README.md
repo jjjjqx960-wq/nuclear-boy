@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.61
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.62
 
 ---
 
@@ -32,6 +32,12 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.62 重点
+
+- 第三方模型表单会在实际请求预览下方提供“复制请求模板”。
+- 模板按当前协议、地址模式、服务地址和模型名生成最小 ping curl，方便和抓包、ccswitch 或网关日志对齐。
+- Authorization 只输出 `<REDACTED_TOKEN>` 占位符，不复制明文 Key。
 
 ## 1.0.61 重点
 

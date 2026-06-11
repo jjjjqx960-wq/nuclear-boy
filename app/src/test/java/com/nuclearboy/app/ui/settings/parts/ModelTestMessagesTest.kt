@@ -191,6 +191,83 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider request curl template builds openai request with redacted key`() {
+        val template = providerRequestCurlTemplate(
+            protocolLabel = "OpenAI",
+            endpoint = " http://154.12.90.249:20128/v1/chat/completions ",
+            modelName = " nvidia/minimaxai/minimax-m2.7 ",
+            hasApiKey = true,
+        )
+
+        assertEquals(
+            "curl -X POST 'http://154.12.90.249:20128/v1/chat/completions' \\\n" +
+                "  -H 'Accept: application/json' \\\n" +
+                "  -H 'Content-Type: application/json; charset=utf-8' \\\n" +
+                "  -H 'Authorization: Bearer <REDACTED_TOKEN>' \\\n" +
+                "  --data '{\"model\":\"nvidia/minimaxai/minimax-m2.7\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"temperature\":0.0,\"top_p\":1.0,\"max_tokens\":8,\"stream\":false}'",
+            template,
+        )
+    }
+
+    @Test
+    fun `provider request curl template builds anthropic request without auth header`() {
+        val template = providerRequestCurlTemplate(
+            protocolLabel = "Anthropic",
+            endpoint = "https://gateway.example.com/v1/messages",
+            modelName = "claude-3-5-sonnet",
+            hasApiKey = false,
+        )
+
+        assertEquals(
+            "curl -X POST 'https://gateway.example.com/v1/messages' \\\n" +
+                "  -H 'Accept: application/json' \\\n" +
+                "  -H 'Content-Type: application/json; charset=utf-8' \\\n" +
+                "  --data '{\"model\":\"claude-3-5-sonnet\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}'",
+            template,
+        )
+    }
+
+    @Test
+    fun `provider request curl template escapes shell and json values`() {
+        val template = providerRequestCurlTemplate(
+            protocolLabel = "OpenAI",
+            endpoint = "https://gateway.example.com/v1/chat/completions?tag=it's",
+            modelName = "model\"x",
+            hasApiKey = false,
+        )
+
+        assertEquals(
+            "curl -X POST 'https://gateway.example.com/v1/chat/completions?tag=it'\\''s' \\\n" +
+                "  -H 'Accept: application/json' \\\n" +
+                "  -H 'Content-Type: application/json; charset=utf-8' \\\n" +
+                "  --data '{\"model\":\"model\\\"x\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"temperature\":0.0,\"top_p\":1.0,\"max_tokens\":8,\"stream\":false}'",
+            template,
+        )
+    }
+
+    @Test
+    fun `provider request curl template is empty without endpoint or model`() {
+        assertEquals(
+            "",
+            providerRequestCurlTemplate(
+                protocolLabel = "OpenAI",
+                endpoint = "",
+                modelName = "gpt-4o",
+                hasApiKey = true,
+            ),
+        )
+        assertEquals(
+            "",
+            providerRequestCurlTemplate(
+                protocolLabel = "OpenAI",
+                endpoint = "https://gateway.example.com/v1/chat/completions",
+                modelName = " ",
+                hasApiKey = true,
+            ),
+        )
+    }
+
+    @Test
     fun `provider model list summary includes count endpoint samples and remaining count`() {
         val summary = providerModelListSummary(
             endpoint = " http://154.12.90.249:20128/v1/models ",
