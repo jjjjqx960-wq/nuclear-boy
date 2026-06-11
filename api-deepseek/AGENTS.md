@@ -1,6 +1,6 @@
 ## 目录职责
 
-`api-deepseek` 是组件层模块，负责模型 API DTO、API Key 管理、DeepSeek/OpenAI 兼容请求、第三方网关诊断、流式 SSE 解析、Token 统计和上下文预算。
+`api-deepseek` 是组件层模块，负责模型 API DTO、API Key 管理、DeepSeek/OpenAI 兼容请求、第三方网关诊断、模型名清理、流式 SSE 解析、Token 统计和上下文预算。
 
 ## 边界
 
@@ -21,4 +21,4 @@
 
 ## 验证方式
 
-检查 DTO 序列化、SSE 事件解析、Token 统计、第三方 OpenAI 兼容网关请求体、404 模型路由诊断提示、模型名隐藏字符清理和上游凭证短重试。
+检查 DTO 序列化、SSE 事件解析、Token 统计、第三方 OpenAI 兼容网关请求体、404 模型路由诊断提示、公开模型名隐藏字符清理函数和上游凭证短重试。

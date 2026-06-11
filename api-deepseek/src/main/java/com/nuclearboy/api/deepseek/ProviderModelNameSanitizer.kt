@@ -1,6 +1,6 @@
 package com.nuclearboy.api.deepseek
 
-internal fun sanitizeProviderModelName(raw: String): String =
+fun sanitizeProviderModelName(raw: String): String =
     raw.filterNot { it.isInvisibleModelNameChar() }.trim()
 
 private fun Char.isInvisibleModelNameChar(): Boolean {

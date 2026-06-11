@@ -38,11 +38,13 @@ import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.api.deepseek.DeepSeekApiClient
 import com.nuclearboy.api.deepseek.ProviderEndpointMode
 import com.nuclearboy.api.deepseek.ProviderProtocol
+import com.nuclearboy.api.deepseek.sanitizeProviderModelName
 import com.nuclearboy.app.R
 import com.nuclearboy.app.diagnostics.AppDiagnostics
 import com.nuclearboy.app.diagnostics.DiagnosticResult
 import com.nuclearboy.app.diagnostics.DiagnosticStatus
 import com.nuclearboy.app.ui.settings.parts.apiKeyFingerprintSummary
+import com.nuclearboy.app.ui.settings.parts.modelNameCleanupSummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
@@ -177,7 +179,8 @@ class SettingsViewModel @Inject constructor(
         label: String,
     ) {
         val normalizedBaseUrl = baseUrl.trim()
-        val normalizedModel = model.trim()
+        val trimmedModel = model.trim()
+        val normalizedModel = sanitizeProviderModelName(model)
         if (normalizedBaseUrl.isBlank() || normalizedModel.isBlank()) {
             _modelTestState.value = ModelTestUiState(
                 targetId = targetId,
@@ -188,12 +191,18 @@ class SettingsViewModel @Inject constructor(
             return
         }
         val keyFingerprint = apiKeyFingerprintSummary(key)
+        val cleanupSummary = modelNameCleanupSummary(trimmedModel, normalizedModel)
+        val testLabel = sanitizeProviderModelName(label).ifBlank { normalizedModel }
         _modelTestState.value = ModelTestUiState(
             targetId = targetId,
             inProgress = true,
-            message = "正在测试 $label",
+            message = "正在测试 $testLabel",
             detail = buildString {
                 append("会发送一条 max_tokens=8 的 ping 请求，不会保存或输出明文 Key。")
+                if (cleanupSummary.isNotBlank()) {
+                    append('\n')
+                    append(cleanupSummary)
+                }
                 if (keyFingerprint.isNotBlank()) {
                     append('\n')
                     append(keyFingerprint)
@@ -215,6 +224,10 @@ class SettingsViewModel @Inject constructor(
                     detail = buildString {
                         append("端点：${result.data.endpoint}\n")
                         append("模型：${result.data.modelName}\n")
+                        if (cleanupSummary.isNotBlank()) {
+                            append(cleanupSummary)
+                            append('\n')
+                        }
                         append("协议：${result.data.protocol.displayName}\n")
                         append("地址模式：${result.data.endpointMode.displayName}\n")
                         append("耗时：${result.data.latencyMs} ms")
@@ -231,7 +244,13 @@ class SettingsViewModel @Inject constructor(
                     targetId = targetId,
                     success = false,
                     message = modelTestFailureMessage(result.error, result.technicalDetail),
-                    detail = result.technicalDetail ?: "没有更多错误细节。",
+                    detail = buildString {
+                        if (cleanupSummary.isNotBlank()) {
+                            append(cleanupSummary)
+                            append('\n')
+                        }
+                        append(result.technicalDetail ?: "没有更多错误细节。")
+                    },
                 )
             }
         }

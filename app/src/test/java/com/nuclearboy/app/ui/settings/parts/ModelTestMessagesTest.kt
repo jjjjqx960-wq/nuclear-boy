@@ -55,4 +55,27 @@ class ModelTestMessagesTest {
 
         assertEquals("", summary)
     }
+
+    @Test
+    fun `model name cleanup summary reports hidden character normalization`() {
+        val summary = modelNameCleanupSummary(
+            rawModelName = "\u200Bnvidia/minimaxai/minimax-m2.7",
+            sanitizedModelName = "nvidia/minimaxai/minimax-m2.7",
+        )
+
+        assertEquals(
+            "已自动清理模型名中的隐藏字符；实际请求使用：nvidia/minimaxai/minimax-m2.7",
+            summary,
+        )
+    }
+
+    @Test
+    fun `model name cleanup summary is empty when unchanged`() {
+        val summary = modelNameCleanupSummary(
+            rawModelName = "nvidia/minimaxai/minimax-m2.7",
+            sanitizedModelName = "nvidia/minimaxai/minimax-m2.7",
+        )
+
+        assertEquals("", summary)
+    }
 }

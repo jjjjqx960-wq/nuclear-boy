@@ -38,3 +38,13 @@ internal fun apiKeyFingerprintSummary(apiKey: String?): String {
         .take(12)
     return "Key 指纹：sha256 $digest · ${normalized.length} 位"
 }
+
+internal fun modelNameCleanupSummary(
+    rawModelName: String,
+    sanitizedModelName: String,
+): String {
+    val raw = rawModelName.trim()
+    val sanitized = sanitizedModelName.trim()
+    if (sanitized.isBlank() || raw == sanitized) return ""
+    return "已自动清理模型名中的隐藏字符；实际请求使用：$sanitized"
+}
