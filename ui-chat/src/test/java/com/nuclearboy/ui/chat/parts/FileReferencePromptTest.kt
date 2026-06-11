@@ -163,6 +163,28 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `file references toast message shows referenced size`() {
+        val message = fileReferencesToastMessage(
+            referencedCount = 2,
+            remainingSelectedCount = 0,
+            referencedSizeLabel = "3 KB",
+        )
+
+        assertEquals("已引用 2 个文件 · 3 KB", message)
+    }
+
+    @Test
+    fun `file references toast message shows size before remaining selection`() {
+        val message = fileReferencesToastMessage(
+            referencedCount = 2,
+            remainingSelectedCount = 5,
+            referencedSizeLabel = "3 KB",
+        )
+
+        assertEquals("已引用 2 个文件 · 3 KB，剩余 5 个已选", message)
+    }
+
+    @Test
     fun `matched reference closes panel when no selection remains`() {
         val shouldClose = shouldClosePanelAfterMatchedReference(
             remainingSelectedCount = 0,

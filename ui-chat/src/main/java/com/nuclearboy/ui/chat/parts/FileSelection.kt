@@ -66,11 +66,14 @@ internal fun filterQueryAfterMatchedReference(
 internal fun fileReferencesToastMessage(
     referencedCount: Int,
     remainingSelectedCount: Int,
+    referencedSizeLabel: String = "",
 ): String {
+    val sizeSuffix = if (referencedSizeLabel.isNotBlank()) " · $referencedSizeLabel" else ""
+    val referencedLabel = "已引用 $referencedCount 个文件$sizeSuffix"
     return if (remainingSelectedCount > 0) {
-        "已引用 $referencedCount 个文件，剩余 $remainingSelectedCount 个已选"
+        "$referencedLabel，剩余 $remainingSelectedCount 个已选"
     } else {
-        "已引用 $referencedCount 个文件"
+        referencedLabel
     }
 }
 

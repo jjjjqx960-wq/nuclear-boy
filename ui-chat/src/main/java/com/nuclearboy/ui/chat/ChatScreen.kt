@@ -391,6 +391,7 @@ fun ChatScreen(
                         fileReferencesToastMessage(
                             referencedCount = files.size,
                             remainingSelectedCount = remainingSelectedCount,
+                            referencedSizeLabel = fileSelectionTotalSizeBytes(files).toFileSizeString(),
                         ),
                         Toast.LENGTH_SHORT,
                     ).show()
