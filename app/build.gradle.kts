@@ -16,8 +16,8 @@ android {
         applicationId = "com.nuclearboy.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 74
-        versionName = "1.0.64"
+        versionCode = 75
+        versionName = "1.0.65"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.64
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.65
 
 ---
 
@@ -32,6 +32,12 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.65 重点
+
+- 获取模型列表后，如果当前 `nvidia/...` 模型名不在列表里，设置页会自动推荐最可能的列表候选。
+- 候选匹配优先使用去掉 provider 前缀后的完整后缀，再回退到最后一段模型名，例如从 `nvidia/minimaxai/minimax-m2.7` 推荐 `minimaxai/minimax-m2.7` 或 `minimax-m2.7`。
+- 用户可以一键“改用列表候选”，不需要在长模型列表里手动找相似名称。
 
 ## 1.0.64 重点
 

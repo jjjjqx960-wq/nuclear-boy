@@ -7,6 +7,7 @@ private val inactiveProviderPattern = Regex(
     pattern = """no active credentials for provider:\s*([A-Za-z0-9_.-]+)""",
     option = RegexOption.IGNORE_CASE,
 )
+private val providerPrefixPattern = Regex("[A-Za-z0-9_.-]+")
 
 internal fun modelTestFailureMessage(
     error: AppError,
@@ -90,7 +91,7 @@ internal fun providerModelRouteHint(
     val slashIndex = normalizedModel.indexOf('/')
     if (slashIndex <= 0 || slashIndex == normalizedModel.lastIndex) return ""
     val providerPrefix = normalizedModel.substring(0, slashIndex).trim()
-    if (!providerPrefix.matches(Regex("[A-Za-z0-9_.-]+"))) return ""
+    if (!providerPrefix.matches(providerPrefixPattern)) return ""
 
     val normalizedModels = modelIds.map { it.trim() }.filter { it.isNotBlank() }.distinct()
     val hasExactModel = normalizedModels.any { it == normalizedModel }
@@ -102,6 +103,28 @@ internal fun providerModelRouteHint(
         else ->
             "此模型名带 $providerPrefix 前缀；若测试返回 provider 凭证缺失，先获取模型列表并点选实际可用模型名。"
     }
+}
+
+internal fun providerModelRouteSuggestedModel(
+    modelName: String,
+    modelIds: List<String>,
+): String {
+    val normalizedModel = modelName.trim()
+    val slashIndex = normalizedModel.indexOf('/')
+    if (slashIndex <= 0 || slashIndex == normalizedModel.lastIndex) return ""
+    val providerPrefix = normalizedModel.substring(0, slashIndex).trim()
+    if (!providerPrefix.matches(providerPrefixPattern)) return ""
+
+    val normalizedModels = modelIds.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+    if (normalizedModels.any { it == normalizedModel }) return ""
+
+    val suffix = normalizedModel.substring(slashIndex + 1).trim()
+    val lastSegment = suffix.substringAfterLast('/').trim()
+    return normalizedModels.firstOrNull { it.equals(suffix, ignoreCase = true) }
+        ?: normalizedModels.firstOrNull { it.endsWith("/$suffix", ignoreCase = true) }
+        ?: normalizedModels.firstOrNull { it.equals(lastSegment, ignoreCase = true) }
+        ?: normalizedModels.firstOrNull { it.endsWith("/$lastSegment", ignoreCase = true) }
+        ?: ""
 }
 
 internal fun providerBaseUrlCleanupSummary(

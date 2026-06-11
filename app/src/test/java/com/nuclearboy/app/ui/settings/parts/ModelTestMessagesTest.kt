@@ -189,6 +189,43 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider model route suggested model prefers suffix match`() {
+        val suggestion = providerModelRouteSuggestedModel(
+            modelName = "nvidia/minimaxai/minimax-m2.7",
+            modelIds = listOf("minimax-m2.7", "minimaxai/minimax-m2.7", "gpt-4o"),
+        )
+
+        assertEquals("minimaxai/minimax-m2.7", suggestion)
+    }
+
+    @Test
+    fun `provider model route suggested model falls back to last segment match`() {
+        val suggestion = providerModelRouteSuggestedModel(
+            modelName = "nvidia/minimaxai/minimax-m2.7",
+            modelIds = listOf("gpt-4o", "minimax-m2.7"),
+        )
+
+        assertEquals("minimax-m2.7", suggestion)
+    }
+
+    @Test
+    fun `provider model route suggested model is empty for exact match`() {
+        val suggestion = providerModelRouteSuggestedModel(
+            modelName = "nvidia/minimaxai/minimax-m2.7",
+            modelIds = listOf("nvidia/minimaxai/minimax-m2.7", "minimax-m2.7"),
+        )
+
+        assertEquals("", suggestion)
+    }
+
+    @Test
+    fun `provider model route suggested model ignores plain incomplete or unmatched names`() {
+        assertEquals("", providerModelRouteSuggestedModel(modelName = "gpt-4o", modelIds = listOf("gpt-4o")))
+        assertEquals("", providerModelRouteSuggestedModel(modelName = "nvidia/", modelIds = listOf("minimax-m2.7")))
+        assertEquals("", providerModelRouteSuggestedModel(modelName = "nvidia/minimax", modelIds = listOf("gpt-4o")))
+    }
+
+    @Test
     fun `provider base url cleanup summary reports hidden character normalization`() {
         val summary = providerBaseUrlCleanupSummary(
             rawBaseUrl = "\u200Bhttp://154.12.90.249:20128/v1",

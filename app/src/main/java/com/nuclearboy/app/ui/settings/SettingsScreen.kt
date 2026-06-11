@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -65,6 +66,7 @@ import com.nuclearboy.app.ui.settings.parts.providerModelListPickerHint
 import com.nuclearboy.app.ui.settings.parts.providerModelListSummary
 import com.nuclearboy.app.ui.settings.parts.providerModelListVisibleModels
 import com.nuclearboy.app.ui.settings.parts.providerModelRouteHint
+import com.nuclearboy.app.ui.settings.parts.providerModelRouteSuggestedModel
 import com.nuclearboy.app.ui.settings.parts.providerRequestCurlTemplate
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
@@ -661,6 +663,20 @@ fun SettingsScreen(
                             modelIds = if (showModelListProbeState) modelListProbeState.modelIds else emptyList(),
                         )
                     }
+                    val modelRouteSuggestion = remember(
+                        sanitizedModelInput,
+                        modelListProbeState.modelIds,
+                        showModelListProbeState,
+                    ) {
+                        if (showModelListProbeState) {
+                            providerModelRouteSuggestedModel(
+                                modelName = sanitizedModelInput,
+                                modelIds = modelListProbeState.modelIds,
+                            )
+                        } else {
+                            ""
+                        }
+                    }
                     val providerEndpointPreview = remember(
                         sanitizedBaseUrlInput,
                         protocolInput,
@@ -831,6 +847,34 @@ fun SettingsScreen(
                             }
                         },
                     )
+                    if (modelRouteSuggestion.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        OutlinedButton(
+                            onClick = {
+                                modelInput = modelRouteSuggestion
+                                Toast.makeText(context, "已改用列表候选", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("改用列表候选")
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                modelRouteSuggestion,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                textAlign = TextAlign.End,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(
                         onClick = {
