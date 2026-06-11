@@ -147,6 +147,19 @@ internal fun providerModelListPickerHint(
     }
 }
 
+internal fun providerModelListClearFilterActionLabel(
+    totalCount: Int,
+    visibleCount: Int,
+    query: String,
+): String {
+    val normalizedQuery = query.trim()
+    return if (totalCount > 0 && visibleCount == 0 && normalizedQuery.isNotBlank()) {
+        "查看全部模型"
+    } else {
+        ""
+    }
+}
+
 internal fun providerExactEndpointWarning(
     protocolLabel: String,
     endpoint: String,

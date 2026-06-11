@@ -59,6 +59,7 @@ import com.nuclearboy.app.ui.settings.parts.providerExactEndpointCompletionActio
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointRecoveryActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointWarning
 import com.nuclearboy.app.ui.settings.parts.providerEndpointPreviewSummary
+import com.nuclearboy.app.ui.settings.parts.providerModelListClearFilterActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerModelListPickerHint
 import com.nuclearboy.app.ui.settings.parts.providerModelListSummary
 import com.nuclearboy.app.ui.settings.parts.providerModelListVisibleModels
@@ -806,6 +807,10 @@ fun SettingsScreen(
                         ModelListProbeBox(
                             state = modelListProbeState,
                             filterQuery = sanitizedModelInput,
+                            onClearFilter = {
+                                modelInput = ""
+                                Toast.makeText(context, "已显示全部模型", Toast.LENGTH_SHORT).show()
+                            },
                             onModelSelected = { selectedModel ->
                                 modelInput = selectedModel
                                 Toast.makeText(context, "已填入模型名", Toast.LENGTH_SHORT).show()
@@ -1398,6 +1403,7 @@ private fun ModelTestResultBox(state: ModelTestUiState) {
 private fun ModelListProbeBox(
     state: ModelListProbeUiState,
     filterQuery: String,
+    onClearFilter: () -> Unit,
     onModelSelected: (String) -> Unit,
 ) {
     val clipboardManager = LocalClipboardManager.current
@@ -1411,6 +1417,13 @@ private fun ModelListProbeBox(
     }
     val pickerHint = remember(state.modelIds, visibleModelIds, filterQuery) {
         providerModelListPickerHint(
+            totalCount = state.modelIds.map { it.trim() }.filter { it.isNotBlank() }.distinct().size,
+            visibleCount = visibleModelIds.size,
+            query = filterQuery,
+        )
+    }
+    val clearFilterActionLabel = remember(state.modelIds, visibleModelIds, filterQuery) {
+        providerModelListClearFilterActionLabel(
             totalCount = state.modelIds.map { it.trim() }.filter { it.isNotBlank() }.distinct().size,
             visibleCount = visibleModelIds.size,
             query = filterQuery,
@@ -1483,6 +1496,21 @@ private fun ModelListProbeBox(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                if (clearFilterActionLabel.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = onClearFilter,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(
+                            Icons.Filled.Clear,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(clearFilterActionLabel)
+                    }
                 }
                 Spacer(Modifier.height(4.dp))
                 visibleModelIds.forEach { modelId ->

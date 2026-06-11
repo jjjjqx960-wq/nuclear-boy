@@ -269,6 +269,26 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider model list clear filter action appears only when query hides all models`() {
+        assertEquals(
+            "查看全部模型",
+            providerModelListClearFilterActionLabel(totalCount = 38, visibleCount = 0, query = " nvidia "),
+        )
+        assertEquals(
+            "",
+            providerModelListClearFilterActionLabel(totalCount = 38, visibleCount = 3, query = "mini"),
+        )
+        assertEquals(
+            "",
+            providerModelListClearFilterActionLabel(totalCount = 38, visibleCount = 12, query = ""),
+        )
+        assertEquals(
+            "",
+            providerModelListClearFilterActionLabel(totalCount = 0, visibleCount = 0, query = "mini"),
+        )
+    }
+
+    @Test
     fun `provider exact endpoint warning flags openai root endpoint`() {
         val warning = providerExactEndpointWarning(
             protocolLabel = "OpenAI",
