@@ -80,6 +80,16 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `model name cleanup summary ignores normal surrounding whitespace`() {
+        val summary = modelNameCleanupSummary(
+            rawModelName = " nvidia/minimaxai/minimax-m2.7 ",
+            sanitizedModelName = "nvidia/minimaxai/minimax-m2.7",
+        )
+
+        assertEquals("", summary)
+    }
+
+    @Test
     fun `model test copy summary includes status title and detail`() {
         val summary = modelTestCopySummary(
             inProgress = false,

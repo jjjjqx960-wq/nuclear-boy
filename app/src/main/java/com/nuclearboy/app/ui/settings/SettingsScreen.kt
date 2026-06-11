@@ -502,6 +502,12 @@ fun SettingsScreen(
                     var protocolInput by remember { mutableStateOf(ProviderProtocol.AUTO) }
                     var endpointModeInput by remember { mutableStateOf(ProviderEndpointMode.AUTO) }
                     var customKeyInput by remember { mutableStateOf("") }
+                    val sanitizedModelInput = remember(modelInput) {
+                        sanitizeProviderModelName(modelInput)
+                    }
+                    val modelInputCleanupSummary = remember(modelInput, sanitizedModelInput) {
+                        modelNameCleanupSummary(modelInput, sanitizedModelInput)
+                    }
 
                     Text("添加模型",
                         style = MaterialTheme.typography.labelMedium,
@@ -530,6 +536,11 @@ fun SettingsScreen(
                         label = { Text("模型名（如 gpt-4o / claude-3-5-sonnet）") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
+                        supportingText = {
+                            if (modelInputCleanupSummary.isNotBlank()) {
+                                Text(modelInputCleanupSummary)
+                            }
+                        },
                     )
                     Spacer(Modifier.height(8.dp))
                     Text("协议",
@@ -596,7 +607,7 @@ fun SettingsScreen(
                             onClick = {
                                 viewModel.testCustomModelInput(
                                     baseUrlInput.trim(),
-                                    modelInput.trim(),
+                                    sanitizedModelInput,
                                     protocolInput,
                                     endpointModeInput,
                                     customKeyInput.trim(),
@@ -604,7 +615,7 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.weight(1f),
                             enabled = baseUrlInput.isNotBlank() &&
-                                modelInput.isNotBlank() &&
+                                sanitizedModelInput.isNotBlank() &&
                                 !(modelTestState.inProgress &&
                                     modelTestState.targetId == SettingsViewModel.NEW_MODEL_TEST_ID),
                         ) {
@@ -621,9 +632,9 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 viewModel.saveCustomModel(
-                                    displayNameInput.trim().ifBlank { modelInput.trim() },
+                                    displayNameInput.trim().ifBlank { sanitizedModelInput },
                                     baseUrlInput.trim(),
-                                    modelInput.trim(),
+                                    sanitizedModelInput,
                                     protocolInput,
                                     endpointModeInput,
                                     customKeyInput.trim(),
@@ -636,7 +647,7 @@ fun SettingsScreen(
                                 customKeyInput = ""
                             },
                             modifier = Modifier.weight(1f),
-                            enabled = baseUrlInput.isNotBlank() && modelInput.isNotBlank(),
+                            enabled = baseUrlInput.isNotBlank() && sanitizedModelInput.isNotBlank(),
                         ) {
                             Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
