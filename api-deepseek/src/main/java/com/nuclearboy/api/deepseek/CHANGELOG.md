@@ -1,3 +1,4 @@
+2026-06-11 1.0.69 validateApiKey 改用 use 关闭响应修复连接泄漏；streamChat、streamAnthropicChat 和 checkBalance 不再把 CancellationException 当普通错误吞掉。
 2026-06-11 1.0.68 自定义网关正式聊天请求增加 400/404/422 工具格式兼容重试，并清理历史消息中的 DeepSeek reasoning 扩展字段。
 2026-06-11 1.0.58 将 OpenAI 兼容模型列表探测封装为公开 API，返回 endpoint、模型 id 列表和耗时。
 2026-06-11 1.0.57 新增 OpenAI 兼容模型列表解析零件和 404 后 /v1/models 探测详情。

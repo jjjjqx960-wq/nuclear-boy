@@ -1269,7 +1269,10 @@ private fun ChatInputBar(
 
             OutlinedTextField(
                 value = text, onValueChange = onTextChange,
-                modifier = Modifier.weight(1f).focusRequester(focusRequester),
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester)
+                    .semantics { contentDescription = "聊天输入框" },
                 placeholder = { Text(placeholder, style = MaterialTheme.typography.bodyMedium.copy(
                     fontFamily = FontFamily.Monospace, fontSize = 13.sp,
                     color = nc.material.onSurfaceVariant.copy(alpha = 0.4f))) },
@@ -1296,7 +1299,12 @@ private fun ChatInputBar(
                             onSend(text); onTextChange(""); focusManager.clearFocus()
                         }
                     },
-                    modifier = Modifier.size(36.dp).clip(CircleShape)
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .semantics {
+                            contentDescription = if (canSend) "发送消息" else "发送消息不可用"
+                        }
                         .background(if (canSend) nc.material.primary else Color.Transparent)
                         .border(2.dp, if (canSend) nc.material.primary
                             else nc.material.outline.copy(alpha = 0.3f), CircleShape),

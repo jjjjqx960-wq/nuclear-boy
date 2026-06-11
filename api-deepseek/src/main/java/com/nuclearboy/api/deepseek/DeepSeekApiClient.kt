@@ -217,6 +217,8 @@ class DeepSeekApiClient(
                 emit(StreamEvent.Complete(usage))
                 return@flow
 
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 lastException = e
                 val appError = classifyError(e)
@@ -267,18 +269,18 @@ class DeepSeekApiClient(
             )
 
             val httpRequest = buildHttpRequest(request)
-            val response = client.newCall(httpRequest).execute()
-
-            val result = when (response.code) {
-                200 -> AppResult.success(true)
-                401 -> AppResult.failure(AppError.ApiKeyInvalid)
-                402 -> AppResult.failure(AppError.InsufficientBalance)
-                429 -> AppResult.failure(AppError.RateLimited)
-                in 500..599 -> AppResult.failure(AppError.ServerError)
-                else -> AppResult.failure(AppError.Unknown, "HTTP ${response.code}")
+            client.newCall(httpRequest).execute().use { response ->
+                val result = when (response.code) {
+                    200 -> AppResult.success(true)
+                    401 -> AppResult.failure(AppError.ApiKeyInvalid)
+                    402 -> AppResult.failure(AppError.InsufficientBalance)
+                    429 -> AppResult.failure(AppError.RateLimited)
+                    in 500..599 -> AppResult.failure(AppError.ServerError)
+                    else -> AppResult.failure(AppError.Unknown, "HTTP ${response.code}")
+                }
+                android.util.Log.e("NuclearBoy", "[ApiClient] validateApiKey() response httpCode=${response.code} result=${result}")
+                result
             }
-            android.util.Log.e("NuclearBoy", "[ApiClient] validateApiKey() response httpCode=${response.code} result=${result}")
-            result
         } catch (e: SSLException) {
             android.util.Log.e("NuclearBoy", "[ApiClient] validateApiKey() SSLException: ${e.message}")
             AppResult.failure(
@@ -324,6 +326,8 @@ class DeepSeekApiClient(
                         detail = errorBody?.error?.message ?: body
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 AppResult.failure(
                     error = classifyError(e),
@@ -681,6 +685,8 @@ class DeepSeekApiClient(
                 tokenTracker.onRequestComplete(usage)
                 emit(StreamEvent.Complete(usage))
                 return@flow
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 lastException = e
                 val appError = classifyError(e)
