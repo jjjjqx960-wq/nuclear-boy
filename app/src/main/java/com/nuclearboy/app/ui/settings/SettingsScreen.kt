@@ -51,6 +51,7 @@ import com.nuclearboy.app.ui.settings.parts.fullDiagnosticsCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelNameCleanupSummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
+import com.nuclearboy.app.ui.settings.parts.providerEndpointPreviewSummary
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
 import com.nuclearboy.common.AppResult
@@ -508,6 +509,34 @@ fun SettingsScreen(
                     val modelInputCleanupSummary = remember(modelInput, sanitizedModelInput) {
                         modelNameCleanupSummary(modelInput, sanitizedModelInput)
                     }
+                    val providerEndpointPreview = remember(
+                        baseUrlInput,
+                        protocolInput,
+                        endpointModeInput,
+                        sanitizedModelInput,
+                    ) {
+                        val baseUrl = baseUrlInput.trim()
+                        if (baseUrl.isBlank()) {
+                            ""
+                        } else {
+                            val resolvedProtocol = ProviderProtocol.resolve(
+                                protocolInput,
+                                baseUrl,
+                                sanitizedModelInput,
+                            )
+                            val endpoint = when (resolvedProtocol) {
+                                ProviderProtocol.ANTHROPIC ->
+                                    DeepSeekApiClient.buildAnthropicMessagesEndpoint(baseUrl, endpointModeInput)
+                                else ->
+                                    DeepSeekApiClient.buildOpenAiChatCompletionsEndpoint(baseUrl, endpointModeInput)
+                            }
+                            providerEndpointPreviewSummary(
+                                protocolLabel = resolvedProtocol.displayName,
+                                endpointModeLabel = endpointModeInput.displayName,
+                                endpoint = endpoint,
+                            )
+                        }
+                    }
 
                     Text("添加模型",
                         style = MaterialTheme.typography.labelMedium,
@@ -582,6 +611,15 @@ fun SettingsScreen(
                     Text(endpointModeInput.description,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (providerEndpointPreview.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            providerEndpointPreview,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = customKeyInput,

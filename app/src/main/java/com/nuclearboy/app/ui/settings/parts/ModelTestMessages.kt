@@ -49,6 +49,16 @@ internal fun modelNameCleanupSummary(
     return "已自动清理模型名中的隐藏字符；实际请求使用：$sanitized"
 }
 
+internal fun providerEndpointPreviewSummary(
+    protocolLabel: String,
+    endpointModeLabel: String,
+    endpoint: String,
+): String {
+    val normalizedEndpoint = endpoint.trim()
+    if (normalizedEndpoint.isBlank()) return ""
+    return "实际请求：${protocolLabel.trim()} · ${endpointModeLabel.trim()}\nPOST $normalizedEndpoint"
+}
+
 internal fun modelTestCopySummary(
     inProgress: Boolean,
     success: Boolean?,

@@ -90,6 +90,31 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider endpoint preview summary includes protocol mode and post endpoint`() {
+        val summary = providerEndpointPreviewSummary(
+            protocolLabel = "OpenAI",
+            endpointModeLabel = "智能拼接",
+            endpoint = " http://154.12.90.249:20128/v1/chat/completions ",
+        )
+
+        assertEquals(
+            "实际请求：OpenAI · 智能拼接\nPOST http://154.12.90.249:20128/v1/chat/completions",
+            summary,
+        )
+    }
+
+    @Test
+    fun `provider endpoint preview summary is empty for blank endpoint`() {
+        val summary = providerEndpointPreviewSummary(
+            protocolLabel = "OpenAI",
+            endpointModeLabel = "智能拼接",
+            endpoint = " ",
+        )
+
+        assertEquals("", summary)
+    }
+
+    @Test
     fun `model test copy summary includes status title and detail`() {
         val summary = modelTestCopySummary(
             inProgress = false,
