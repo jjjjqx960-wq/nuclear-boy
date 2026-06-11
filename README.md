@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.42
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.43
 
 ---
 
@@ -32,6 +32,12 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.43 重点
+
+- 第三方模型测试失败标题会识别 `No active credentials for provider`，直接显示“网关缺少 nvidia 上游凭证”。
+- `model_not_found` 等模型路由错误会显示“模型路由失败，请核对模型名”，不再误报为请求格式错误。
+- 对 provider 凭证短暂不可用会自动短重试一次，贴近 ccswitch 代理层的实际行为；详情区仍保留 HTTP 状态、端点排查和返回片段。
 
 ## 1.0.42 重点
 

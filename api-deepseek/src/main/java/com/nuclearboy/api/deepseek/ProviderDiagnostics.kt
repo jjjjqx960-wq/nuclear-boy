@@ -32,6 +32,9 @@ internal fun buildProviderNotFoundHint(
     }
 }
 
+internal fun isInactiveProviderCredentialError(body: String): Boolean =
+    "no active credentials for provider" in body.lowercase()
+
 internal fun providerModelNameHint(modelName: String): String {
     val normalized = modelName.trim()
     val lower = normalized.lowercase()

@@ -42,6 +42,7 @@ import com.nuclearboy.app.R
 import com.nuclearboy.app.diagnostics.AppDiagnostics
 import com.nuclearboy.app.diagnostics.DiagnosticResult
 import com.nuclearboy.app.diagnostics.DiagnosticStatus
+import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
 import com.nuclearboy.common.AppResult
@@ -217,7 +218,7 @@ class SettingsViewModel @Inject constructor(
                 is AppResult.Failure -> ModelTestUiState(
                     targetId = targetId,
                     success = false,
-                    message = result.error.humanMessage,
+                    message = modelTestFailureMessage(result.error, result.technicalDetail),
                     detail = result.technicalDetail ?: "没有更多错误细节。",
                 )
             }

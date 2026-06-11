@@ -362,10 +362,18 @@ class DeepSeekApiClient(
                 requestBuilder.addHeader("Authorization", "Bearer $key")
             }
 
-            val response = diagnosticClient.newCall(requestBuilder.build()).execute()
-            val responseBody = response.body?.string().orEmpty()
+            var attempts = 1
+            var response = diagnosticClient.newCall(requestBuilder.build()).execute()
+            var responseBody = response.body?.string().orEmpty()
+            if (response.code == 404 && isInactiveProviderCredentialError(responseBody)) {
+                delay(800)
+                attempts += 1
+                response = diagnosticClient.newCall(requestBuilder.build()).execute()
+                responseBody = response.body?.string().orEmpty()
+            }
             val elapsedMs = System.currentTimeMillis() - startedAt
             if (!response.isSuccessful) {
+                val retryDetail = if (attempts > 1) "\n已按网关上游凭证短暂不可用场景重试 1 次，仍失败。" else ""
                 return@withContext AppResult.failure(
                     providerHttpError(response.code),
                     buildProviderHttpFailureDetail(
@@ -373,7 +381,7 @@ class DeepSeekApiClient(
                         endpoint = endpoint,
                         modelName = normalizedModel,
                         body = responseBody,
-                    ),
+                    ) + retryDetail,
                 )
             }
 

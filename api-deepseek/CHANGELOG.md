@@ -1,3 +1,4 @@
+2026-06-11 1.0.43 第三方模型测试遇到网关上游 provider 凭证短暂不可用时自动短重试一次，贴近 ccswitch 代理行为。
 2026-06-10 1.0.42 第三方 OpenAI 兼容 404 诊断补充标准 chat/completions 路由、上游 provider 凭证和 NVIDIA MiniMax 模型名前缀提示。
 2026-06-10 1.0.2 404 诊断区分“路径不存在”和“网关模型路由失败”（model_not_found / no active credentials 等），后者提示检查模型名与上游 provider 凭证，不再误导用户切换地址模式。
 2026-06-10 1.0.2 鉴权拦截器跳过已带 Authorization/x-api-key 的请求，避免 checkBalance 等显式带 Key 的调用出现双鉴权头。

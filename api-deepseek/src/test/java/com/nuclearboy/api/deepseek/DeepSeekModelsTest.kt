@@ -220,4 +220,14 @@ class DeepSeekModelsTest {
         assertTrue(hint.contains("不需要 nvidia/ 前缀"))
         assertTrue(hint.contains("GET /v1/models"))
     }
+
+    @Test
+    fun `inactive provider credential detector recognizes gateway credential failures`() {
+        assertTrue(
+            isInactiveProviderCredentialError(
+                """{"error":{"message":"No active credentials for provider: nvidia"}}"""
+            )
+        )
+        assertFalse(isInactiveProviderCredentialError("""{"error":{"message":"model not found"}}"""))
+    }
 }

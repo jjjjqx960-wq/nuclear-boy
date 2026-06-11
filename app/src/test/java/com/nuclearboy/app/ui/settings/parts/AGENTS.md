@@ -1,0 +1,23 @@
+## 目录职责
+
+这里承载设置页零件层的本地 JVM 单元测试。
+
+## 边界
+
+只测试纯函数和展示规则，不测试 Compose 渲染、网络请求或 Android 系统能力。
+
+## 允许依赖
+
+可以依赖 `settings/parts` 零件和 `common` 基础类型。
+
+## 禁止事项
+
+不要在测试中写入真实 API Key、Token、个人数据或依赖外部服务。
+
+## 常用命令
+
+- `./gradlew :app:testDebugUnitTest`
+
+## 验证方式
+
+覆盖网关 provider 凭证缺失、模型名路由失败和通用错误兜底。
