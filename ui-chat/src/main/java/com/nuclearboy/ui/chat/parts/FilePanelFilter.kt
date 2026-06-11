@@ -41,3 +41,14 @@ internal fun filePanelFilterSummary(
         "$filteredCount / $totalCount"
     }
 }
+
+internal fun filePanelClearFilterDescription(
+    resultSummary: String,
+): String {
+    val normalizedSummary = resultSummary.trim()
+    return if (normalizedSummary.isEmpty()) {
+        "清除过滤"
+    } else {
+        "清除过滤，当前 $normalizedSummary"
+    }
+}

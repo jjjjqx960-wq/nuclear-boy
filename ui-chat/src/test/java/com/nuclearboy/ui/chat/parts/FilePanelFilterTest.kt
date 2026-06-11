@@ -65,4 +65,18 @@ class FilePanelFilterTest {
 
         assertEquals("3 项", summary)
     }
+
+    @Test
+    fun `file panel clear filter description includes result summary`() {
+        val description = filePanelClearFilterDescription("1 / 3")
+
+        assertEquals("清除过滤，当前 1 / 3", description)
+    }
+
+    @Test
+    fun `file panel clear filter description stays compact without summary`() {
+        val description = filePanelClearFilterDescription(" ")
+
+        assertEquals("清除过滤", description)
+    }
 }
