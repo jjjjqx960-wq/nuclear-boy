@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.41
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.42
 
 ---
 
@@ -32,6 +32,12 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.42 重点
+
+- 第三方模型测试遇到 OpenAI 兼容 `404` 时，会提示先带 Key 请求 `/v1/models` 核对真实可用模型名。
+- 对标准 `/v1/chat/completions` 的 404，不再只引导改地址，而是提示检查网关上游 provider 凭证和模型路由。
+- 对 NVIDIA MiniMax 这类模型补充前缀提示：网关列表没有 `nvidia/` 时，可尝试 `minimaxai/minimax-m2.7`。
 
 ## 1.0.41 重点
 

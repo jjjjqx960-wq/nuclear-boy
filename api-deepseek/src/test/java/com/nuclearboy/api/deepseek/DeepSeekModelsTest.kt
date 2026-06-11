@@ -199,4 +199,25 @@ class DeepSeekModelsTest {
             ProviderProtocol.resolve(ProviderProtocol.AUTO, "https://api.anthropic.com/v1/messages", "claude-3-5-sonnet")
         )
     }
+
+    @Test
+    fun `provider not found hint treats standard OpenAI 404 as possible model routing failure`() {
+        val hint = buildProviderNotFoundHint(
+            endpoint = "http://192.0.2.10:20128/v1/chat/completions",
+            body = "404 page not found",
+            modelName = "nvidia/minimaxai/minimax-m2.7",
+        )
+
+        assertTrue(hint.contains("网关在路由模型时报错"))
+        assertTrue(hint.contains("GET <服务地址>/v1/models"))
+        assertTrue(hint.contains("minimaxai/minimax-m2.7"))
+    }
+
+    @Test
+    fun `provider model name hint suggests stripping NVIDIA provider prefix`() {
+        val hint = providerModelNameHint("nvidia/example-org/example-model")
+
+        assertTrue(hint.contains("不需要 nvidia/ 前缀"))
+        assertTrue(hint.contains("GET /v1/models"))
+    }
 }

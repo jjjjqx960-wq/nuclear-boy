@@ -845,7 +845,7 @@ class DeepSeekApiClient(
         val hint = when (httpCode) {
             400, 422 -> "请求格式或模型名可能不被网关接受。请核对模型名：$modelName。"
             401, 403 -> "鉴权失败。请检查 API Key、网关是否要求 Bearer Token，以及账号是否有该模型权限。"
-            404 -> buildNotFoundHint(endpoint, body)
+            404 -> buildProviderNotFoundHint(endpoint, body, modelName)
             405 -> buildMethodNotAllowedHint(endpoint)
             402 -> "账号余额或额度不足。"
             429 -> "请求过快或额度被限流，稍后再试。"
@@ -866,23 +866,6 @@ class DeepSeekApiClient(
                 append("\n返回片段：")
                 append(preview)
             }
-        }
-    }
-
-    private fun buildNotFoundHint(endpoint: String, body: String): String {
-        // 网关（如 9router/LiteLLM/one-api）常用 404 表达“模型路由失败”，
-        // 此时路径本身是对的，不能引导用户去改地址模式。
-        val lower = body.lowercase()
-        val isModelRoutingError = "model_not_found" in lower ||
-            "no active credentials" in lower ||
-            "model not found" in lower ||
-            "unknown model" in lower ||
-            "does not exist" in lower
-        return if (isModelRoutingError) {
-            "接口路径正常，是网关在路由模型时报错：模型名不存在，或网关没有为该模型的上游 provider 配置可用凭证。\n" +
-                "请求 GET <服务地址>/v1/models（带你的 Key）确认可用模型名，并在网关侧检查对应 provider 的 API Key 是否已配置且有额度。"
-        } else {
-            "接口路径不存在。当前会请求 $endpoint；若你的网关提供完整接口地址，请在地址模式里选择“完整地址”。"
         }
     }
 
