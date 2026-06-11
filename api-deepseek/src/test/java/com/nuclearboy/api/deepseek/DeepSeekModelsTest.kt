@@ -66,6 +66,73 @@ class DeepSeekModelsTest {
     }
 
     @Test
+    fun `custom provider message sanitizer strips reasoning but keeps tool protocol by default`() {
+        val messages = listOf(
+            MessageDto(role = "user", content = "Hi"),
+            MessageDto(role = "assistant", content = "Hello", reasoningContent = "hidden reasoning"),
+            MessageDto(
+                role = "assistant",
+                content = null,
+                toolCalls = listOf(
+                    ToolCallDto(
+                        id = "call_1",
+                        function = FunctionCallDto(name = "read_file", arguments = "{}"),
+                    ),
+                ),
+            ),
+            MessageDto(role = "tool", content = "file content", toolCallId = "call_1", name = "read_file"),
+            MessageDto(role = "assistant", content = null, reasoningContent = "reasoning only"),
+        )
+
+        val sanitized = sanitizeChatMessagesForProvider(
+            messages = messages,
+            isCustomProvider = true,
+            omitToolProtocol = false,
+        )
+
+        assertEquals(4, sanitized.size)
+        assertNull(sanitized[1].reasoningContent)
+        assertNotNull(sanitized[2].toolCalls)
+        assertEquals("tool", sanitized[3].role)
+    }
+
+    @Test
+    fun `custom provider compatibility mode removes tool protocol messages`() {
+        val messages = listOf(
+            MessageDto(role = "user", content = "Hi"),
+            MessageDto(role = "assistant", content = "Visible", reasoningContent = "hidden reasoning"),
+            MessageDto(
+                role = "assistant",
+                content = null,
+                toolCalls = listOf(
+                    ToolCallDto(
+                        id = "call_1",
+                        function = FunctionCallDto(name = "read_file", arguments = "{}"),
+                    ),
+                ),
+            ),
+            MessageDto(role = "tool", content = "file content", toolCallId = "call_1", name = "read_file"),
+        )
+
+        val sanitized = sanitizeChatMessagesForProvider(
+            messages = messages,
+            isCustomProvider = true,
+            omitToolProtocol = true,
+        )
+
+        assertEquals(2, sanitized.size)
+        assertEquals(listOf("user", "assistant"), sanitized.map { it.role })
+        assertEquals("Visible", sanitized[1].content)
+        assertNull(sanitized[1].reasoningContent)
+        assertNull(sanitized[1].toolCalls)
+    }
+
+    @Test
+    fun `custom provider compatibility retry includes gateway route not found`() {
+        assertTrue(CUSTOM_PROVIDER_COMPATIBILITY_HTTP_CODES.containsAll(listOf(400, 404, 422)))
+    }
+
+    @Test
     fun `StreamChunk parsing handles content delta`() {
         val chunkJson = """{"choices":[{"index":0,"delta":{"content":"Hello world"}}]}"""
         val chunk = json.decodeFromString<StreamChunk>(chunkJson)

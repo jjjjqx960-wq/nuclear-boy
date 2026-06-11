@@ -834,12 +834,30 @@ class ChatViewModel @Inject constructor(
 
             is AgentEvent.Error -> {
                 android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() Error message=${event.error.humanMessage}")
-                val errorMsg = ChatMessage(
-                    role = MessageRole.SYSTEM,
-                    content = "处理时遇到了问题：${event.error.humanMessage}",
-                    status = MessageStatus.ERROR,
-                )
-                _messages.update { it + errorMsg }
+                val content = "处理时遇到了问题：${event.error.humanMessage}"
+                val activeAssistantId = currentAssistantMsgId
+                if (activeAssistantId != null) {
+                    updateAssistantMessage(activeAssistantId) { msg ->
+                        msg.copy(
+                            content = msg.content.ifBlank { content },
+                            status = MessageStatus.ERROR,
+                        )
+                    }
+                    _streamingState.update { state ->
+                        if (state?.messageId == activeAssistantId && state.responseText.isEmpty()) {
+                            state.copy(responseText = StringBuilder(content))
+                        } else {
+                            state
+                        }
+                    }
+                } else {
+                    val errorMsg = ChatMessage(
+                        role = MessageRole.SYSTEM,
+                        content = content,
+                        status = MessageStatus.ERROR,
+                    )
+                    _messages.update { it + errorMsg }
+                }
                 _scrollToBottom.value++
             }
 

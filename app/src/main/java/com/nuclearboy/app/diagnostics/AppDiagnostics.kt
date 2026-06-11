@@ -4,11 +4,18 @@ import android.util.Log
 import com.nuclearboy.agent.ToolRegistry
 import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.api.deepseek.DeepSeekApiClient
+import com.nuclearboy.api.deepseek.FunctionDefinitionDto
+import com.nuclearboy.api.deepseek.MessageDto
+import com.nuclearboy.api.deepseek.StreamEvent
+import com.nuclearboy.api.deepseek.ToolDefinitionDto
 import com.nuclearboy.common.AppResult
 import com.nuclearboy.python.PythonSandbox
 import com.nuclearboy.tools.docgen.FileOperations
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -40,6 +47,7 @@ class AppDiagnostics @Inject constructor(
             { checkModelState() },
             { checkModelCrud() },
             { checkCustomProviders() },
+            { checkActiveCustomProviderChat() },
             { checkPythonExecutor() },
             { checkPythonWriteAccess() },
             { checkFileOperations() },
@@ -212,6 +220,86 @@ class AppDiagnostics @Inject constructor(
             )
         }
     }
+
+    private suspend fun checkActiveCustomProviderChat(): DiagnosticResult =
+        timedSuspend("第三方正式聊天兼容性") {
+            val state = apiKeyManager.state.value
+            if (state.activeModelId == ApiKeyManager.OFFICIAL_MODEL_ID) {
+                return@timedSuspend DiagnosticResult(
+                    name = "第三方正式聊天兼容性",
+                    status = DiagnosticStatus.WARN,
+                    message = "当前未选中第三方模型",
+                    detail = "切换到第三方模型后可验证正式聊天链路。",
+                )
+            }
+            val activeModel = state.customModels.firstOrNull { it.id == state.activeModelId }
+                ?: return@timedSuspend DiagnosticResult(
+                    name = "第三方正式聊天兼容性",
+                    status = DiagnosticStatus.FAIL,
+                    message = "当前第三方模型配置缺失",
+                    detail = "activeModelId=${state.activeModelId}",
+                )
+
+            var sawContent = false
+            var sawComplete = false
+            var sawCompatibilityRetry = false
+            var errorEvent: StreamEvent.Error? = null
+
+            try {
+                withTimeout(30_000) {
+                    apiClient.streamChat(
+                        messages = listOf(MessageDto(role = "user", content = "ping")),
+                        tools = listOf(
+                            ToolDefinitionDto(
+                                function = FunctionDefinitionDto(
+                                    name = "diagnostic_noop",
+                                    description = "Diagnostic no-op tool.",
+                                ),
+                            ),
+                        ),
+                    ).collect { event ->
+                        when (event) {
+                            is StreamEvent.Content -> sawContent = true
+                            is StreamEvent.Complete -> sawComplete = true
+                            is StreamEvent.Thinking -> {
+                                if (event.message.contains("兼容聊天模式")) sawCompatibilityRetry = true
+                            }
+                            is StreamEvent.Error -> errorEvent = event
+                            else -> Unit
+                        }
+                    }
+                }
+            } catch (_: TimeoutCancellationException) {
+                return@timedSuspend DiagnosticResult(
+                    name = "第三方正式聊天兼容性",
+                    status = DiagnosticStatus.FAIL,
+                    message = "正式聊天请求超时",
+                    detail = "${activeModel.displayName}; timeoutMs=30000; content=$sawContent; compatibilityRetry=$sawCompatibilityRetry",
+                )
+            }
+
+            val error = errorEvent
+            when {
+                error != null -> DiagnosticResult(
+                    name = "第三方正式聊天兼容性",
+                    status = DiagnosticStatus.FAIL,
+                    message = "正式聊天请求失败",
+                    detail = "${activeModel.displayName}: ${error.appError.code} ${error.technicalDetail.orEmpty().take(200)}",
+                )
+                sawComplete -> DiagnosticResult(
+                    name = "第三方正式聊天兼容性",
+                    status = DiagnosticStatus.PASS,
+                    message = "正式聊天链路可用",
+                    detail = "${activeModel.displayName}; content=$sawContent; compatibilityRetry=$sawCompatibilityRetry",
+                )
+                else -> DiagnosticResult(
+                    name = "第三方正式聊天兼容性",
+                    status = DiagnosticStatus.WARN,
+                    message = "正式聊天未返回完成事件",
+                    detail = "${activeModel.displayName}; content=$sawContent; compatibilityRetry=$sawCompatibilityRetry",
+                )
+            }
+        }
 
     private suspend fun checkPythonExecutor(): DiagnosticResult = timedSuspend("Python 执行器") {
         val result = pythonSandbox.execute(

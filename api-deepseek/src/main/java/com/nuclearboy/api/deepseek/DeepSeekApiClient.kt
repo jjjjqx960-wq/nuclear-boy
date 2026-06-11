@@ -111,8 +111,9 @@ class DeepSeekApiClient(
             emitAll(streamAnthropicChat(messages, model, modelTier, tools))
             return@flow
         }
-        val request = buildRequest(messages, model, thinkingMode, tools, stream = true)
-        android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() ENTRY model=$model msgs=${messages.size} tools=${tools?.size ?: 0} thinking=$thinkingMode stream=true")
+        val isCustomProvider = modelOverrideProvider() != null
+        var providerCompatibilityMode = false
+        android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() ENTRY model=$model msgs=${messages.size} tools=${tools?.size ?: 0} thinking=$thinkingMode stream=true custom=$isCustomProvider")
         val clientStartMs = System.currentTimeMillis()
 
         val promptTokens = estimatePromptTokens(messages)
@@ -125,6 +126,14 @@ class DeepSeekApiClient(
 
         while (retryCount <= AppConstants.MAX_RETRIES) {
             try {
+                val request = buildRequest(
+                    messages = messages,
+                    model = model,
+                    thinkingMode = thinkingMode,
+                    tools = tools,
+                    stream = true,
+                    compatibilityMode = providerCompatibilityMode,
+                )
                 val httpRequest = buildHttpRequest(request)
                 android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() HTTP request sent url=${httpRequest.url} bodySize=${httpRequest.body?.contentLength() ?: -1}")
                 val response = client.newCall(httpRequest).execute()
@@ -212,6 +221,18 @@ class DeepSeekApiClient(
                 lastException = e
                 val appError = classifyError(e)
                 android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() error retryCount=$retryCount maxRetries=${AppConstants.MAX_RETRIES} appError=$appError isRetryable=${appError.isRetryable}")
+                if (
+                    isCustomProvider &&
+                    !providerCompatibilityMode &&
+                    !tools.isNullOrEmpty() &&
+                    e is DeepSeekHttpException &&
+                    e.code in CUSTOM_PROVIDER_COMPATIBILITY_HTTP_CODES
+                ) {
+                    providerCompatibilityMode = true
+                    android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() custom provider rejected tool format; retrying without tools")
+                    emit(StreamEvent.Thinking("当前网关不接受工具调用格式，已切换兼容聊天模式重试…"))
+                    continue
+                }
                 if (!appError.isRetryable || retryCount >= AppConstants.MAX_RETRIES) {
                     android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() non-retryable or max retries reached, emitting error")
                     emit(StreamEvent.Error(appError, e.message))
@@ -869,20 +890,27 @@ class DeepSeekApiClient(
         tools: List<ToolDefinitionDto>?,
         stream: Boolean,
         maxTokens: Int = 8192,
+        compatibilityMode: Boolean = false,
     ): ChatCompletionRequest {
         // Custom OpenAI-compatible providers (e.g. self-hosted routers) don't understand
         // DeepSeek's thinking/reasoning_effort extensions — omit them entirely.
         val isCustomProvider = modelOverrideProvider() != null
+        val omitToolProtocol = isCustomProvider && compatibilityMode
+        val effectiveTools = if (omitToolProtocol) null else tools
         val normalizedModel = sanitizeProviderModelName(model)
-        android.util.Log.e("NuclearBoy", "[ApiClient] buildRequest() model=$normalizedModel stream=$stream thinking=$thinkingMode tools=${tools?.size ?: 0} messages=${messages.size} maxTokens=$maxTokens custom=$isCustomProvider")
+        android.util.Log.e("NuclearBoy", "[ApiClient] buildRequest() model=$normalizedModel stream=$stream thinking=$thinkingMode tools=${effectiveTools?.size ?: 0} messages=${messages.size} maxTokens=$maxTokens custom=$isCustomProvider compat=$compatibilityMode")
         return ChatCompletionRequest(
             model = normalizedModel,
-            messages = sanitizeMessages(messages),
+            messages = sanitizeMessages(
+                messages = messages,
+                isCustomProvider = isCustomProvider,
+                omitToolProtocol = omitToolProtocol,
+            ),
             temperature = 1.0,
             topP = 1.0,
             maxTokens = maxTokens,
             stream = stream,
-            tools = tools,
+            tools = effectiveTools,
             thinking = when {
                 isCustomProvider -> null
                 thinkingMode != ThinkingMode.DISABLED -> ThinkingConfigDto(type = "enabled")
@@ -901,9 +929,16 @@ class DeepSeekApiClient(
      * in thinking mode (policy changed ~2026).
      * We keep it intact.
      */
-    private fun sanitizeMessages(messages: List<MessageDto>): List<MessageDto> {
-        // No-op: reasoning_content must be preserved for thinking mode
-        return messages
+    private fun sanitizeMessages(
+        messages: List<MessageDto>,
+        isCustomProvider: Boolean,
+        omitToolProtocol: Boolean,
+    ): List<MessageDto> {
+        return sanitizeChatMessagesForProvider(
+            messages = messages,
+            isCustomProvider = isCustomProvider,
+            omitToolProtocol = omitToolProtocol,
+        )
     }
 
     private fun buildHttpRequest(request: ChatCompletionRequest): okhttp3.Request {
@@ -1221,6 +1256,35 @@ class DeepSeekApiClient(
 }
 
 // ── Supporting Types ──────────────────────────────────
+
+internal val CUSTOM_PROVIDER_COMPATIBILITY_HTTP_CODES = setOf(400, 404, 422)
+
+internal fun sanitizeChatMessagesForProvider(
+    messages: List<MessageDto>,
+    isCustomProvider: Boolean,
+    omitToolProtocol: Boolean,
+): List<MessageDto> {
+    if (!isCustomProvider && !omitToolProtocol) return messages
+
+    return messages.mapNotNull { message ->
+        if (omitToolProtocol && message.role == "tool") {
+            return@mapNotNull null
+        }
+
+        val sanitized = message.copy(
+            reasoningContent = if (isCustomProvider) null else message.reasoningContent,
+            toolCalls = if (omitToolProtocol) null else message.toolCalls,
+            toolCallId = if (omitToolProtocol) null else message.toolCallId,
+            name = if (omitToolProtocol) null else message.name,
+        )
+
+        val becameEmptyAssistant = isCustomProvider &&
+            sanitized.role == "assistant" &&
+            sanitized.content.isNullOrBlank() &&
+            sanitized.toolCalls.isNullOrEmpty()
+        if (becameEmptyAssistant) null else sanitized
+    }
+}
 
 data class ProviderTestResult(
     val endpoint: String,
