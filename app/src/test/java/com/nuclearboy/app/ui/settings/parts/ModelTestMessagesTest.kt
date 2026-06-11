@@ -677,6 +677,48 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `model test troubleshooting bundle includes request and model list sections`() {
+        val bundle = modelTestTroubleshootingBundle(
+            testSummary = "第三方模型测试：失败\n标题：模型路由失败",
+            requestTemplate = "curl -X POST 'http://154.12.90.249:20128/v1/chat/completions'",
+            modelListSummary = "模型列表：2 个 · 88 ms\nGET http://154.12.90.249:20128/v1/models\n- minimax-m2.7",
+            modelListRequestTemplate = "curl -X GET 'http://154.12.90.249:20128/v1/models'",
+        )
+
+        assertEquals(
+            "第三方模型测试：失败\n" +
+                "标题：模型路由失败\n\n" +
+                "POST 请求模板：\n" +
+                "curl -X POST 'http://154.12.90.249:20128/v1/chat/completions'\n\n" +
+                "模型列表摘要：\n" +
+                "模型列表：2 个 · 88 ms\n" +
+                "GET http://154.12.90.249:20128/v1/models\n" +
+                "- minimax-m2.7\n\n" +
+                "模型列表请求模板：\n" +
+                "curl -X GET 'http://154.12.90.249:20128/v1/models'",
+            bundle,
+        )
+    }
+
+    @Test
+    fun `model test troubleshooting bundle redacts secrets and skips duplicates`() {
+        val bundle = modelTestTroubleshootingBundle(
+            testSummary = "第三方模型测试：失败\n详情：Authorization: Bearer sk-test123456",
+            requestTemplate = "Authorization: Bearer sk-test123456",
+            modelListSummary = "Authorization: Bearer sk-test123456",
+            modelListRequestTemplate = " ",
+        )
+
+        assertEquals(
+            "第三方模型测试：失败\n" +
+                "详情：Authorization: Bearer <REDACTED_TOKEN>\n\n" +
+                "POST 请求模板：\n" +
+                "Authorization: Bearer <REDACTED_TOKEN>",
+            bundle,
+        )
+    }
+
+    @Test
     fun `full diagnostics copy summary includes counts rows and details`() {
         val summary = fullDiagnosticsCopySummary(
             listOf(

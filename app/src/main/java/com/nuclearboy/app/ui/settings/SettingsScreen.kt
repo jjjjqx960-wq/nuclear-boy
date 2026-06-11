@@ -55,6 +55,7 @@ import com.nuclearboy.app.ui.settings.parts.modelTestFailureActionHint
 import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
 import com.nuclearboy.app.ui.settings.parts.modelTestRequestContextSummary
+import com.nuclearboy.app.ui.settings.parts.modelTestTroubleshootingBundle
 import com.nuclearboy.app.ui.settings.parts.providerDisplayNameSuggestion
 import com.nuclearboy.app.ui.settings.parts.providerBaseUrlCleanupSummary
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointCompletionActionLabel
@@ -87,6 +88,7 @@ data class ModelTestUiState(
     val success: Boolean? = null,
     val message: String = "",
     val detail: String = "",
+    val requestTemplate: String = "",
 )
 
 data class ModelListProbeUiState(
@@ -303,11 +305,18 @@ class SettingsViewModel @Inject constructor(
             endpointModeLabel = endpointMode.displayName,
             keyFingerprintSummary = keyFingerprint,
         )
+        val requestTemplate = providerRequestCurlTemplate(
+            protocolLabel = resolvedProtocol.displayName,
+            endpoint = requestEndpoint,
+            modelName = normalizedModel,
+            hasApiKey = key.orEmpty().trim().isNotBlank(),
+        )
         val testLabel = sanitizeProviderModelName(label).ifBlank { normalizedModel }
         _modelTestState.value = ModelTestUiState(
             targetId = targetId,
             inProgress = true,
             message = "正在测试 $testLabel",
+            requestTemplate = requestTemplate,
             detail = buildString {
                 append("会发送一条 max_tokens=8 的 ping 请求，不会保存或输出明文 Key。")
                 if (baseUrlCleanupSummary.isNotBlank()) {
@@ -336,6 +345,12 @@ class SettingsViewModel @Inject constructor(
                     targetId = targetId,
                     success = true,
                     message = "模型连接成功",
+                    requestTemplate = providerRequestCurlTemplate(
+                        protocolLabel = result.data.protocol.displayName,
+                        endpoint = result.data.endpoint,
+                        modelName = result.data.modelName,
+                        hasApiKey = key.orEmpty().trim().isNotBlank(),
+                    ),
                     detail = buildString {
                         append(
                             modelTestRequestContextSummary(
@@ -367,6 +382,7 @@ class SettingsViewModel @Inject constructor(
                         targetId = targetId,
                         success = false,
                         message = modelTestFailureMessage(result.error, result.technicalDetail),
+                        requestTemplate = requestTemplate,
                         detail = buildString {
                             if (requestContext.isNotBlank()) {
                                 append(requestContext)
@@ -1143,7 +1159,24 @@ fun SettingsScreen(
                         modelTestState.targetId == SettingsViewModel.NEW_MODEL_TEST_ID
                     ) {
                         Spacer(Modifier.height(10.dp))
-                        ModelTestResultBox(modelTestState)
+                        val modelListSummaryForTestCopy = if (showModelListProbeState) {
+                            modelListProbeState.detail
+                        } else {
+                            ""
+                        }
+                        val modelListRequestForTestCopy = if (showModelListProbeState) {
+                            providerModelListCurlTemplate(
+                                endpoint = modelListProbeState.endpoint,
+                                hasApiKey = customKeyInput.trim().isNotBlank(),
+                            )
+                        } else {
+                            ""
+                        }
+                        ModelTestResultBox(
+                            state = modelTestState,
+                            modelListSummary = modelListSummaryForTestCopy,
+                            modelListRequestTemplate = modelListRequestForTestCopy,
+                        )
                     }
                     Spacer(Modifier.height(4.dp))
                     Text("智能拼接会按协议补全标准路径；完整地址会原样请求你填写的 URL，适合非标准第三方网关。第三方模型会自动关闭 DeepSeek 专属思考参数。",
@@ -1474,15 +1507,32 @@ private fun SponsorTierButton(
 }
 
 @Composable
-private fun ModelTestResultBox(state: ModelTestUiState) {
+private fun ModelTestResultBox(
+    state: ModelTestUiState,
+    modelListSummary: String = "",
+    modelListRequestTemplate: String = "",
+) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-    val copySummary = remember(state.inProgress, state.success, state.message, state.detail) {
-        modelTestCopySummary(
-            inProgress = state.inProgress,
-            success = state.success,
-            message = state.message,
-            detail = state.detail,
+    val copySummary = remember(
+        state.inProgress,
+        state.success,
+        state.message,
+        state.detail,
+        state.requestTemplate,
+        modelListSummary,
+        modelListRequestTemplate,
+    ) {
+        modelTestTroubleshootingBundle(
+            testSummary = modelTestCopySummary(
+                inProgress = state.inProgress,
+                success = state.success,
+                message = state.message,
+                detail = state.detail,
+            ),
+            requestTemplate = state.requestTemplate,
+            modelListSummary = modelListSummary,
+            modelListRequestTemplate = modelListRequestTemplate,
         )
     }
     val color = when (state.success) {
@@ -1523,13 +1573,13 @@ private fun ModelTestResultBox(state: ModelTestUiState) {
                 IconButton(
                     onClick = {
                         clipboardManager.setText(AnnotatedString(copySummary))
-                        Toast.makeText(context, "已复制测试摘要", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "已复制测试排障包", Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
                         Icons.Filled.ContentCopy,
-                        contentDescription = "复制测试摘要",
+                        contentDescription = "复制测试排障包",
                         tint = color,
                         modifier = Modifier.size(18.dp),
                     )

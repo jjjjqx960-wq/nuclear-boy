@@ -389,6 +389,42 @@ internal fun modelTestCopySummary(
     }
 }
 
+internal fun modelTestTroubleshootingBundle(
+    testSummary: String,
+    requestTemplate: String = "",
+    modelListSummary: String = "",
+    modelListRequestTemplate: String = "",
+): String {
+    val sections = mutableListOf<Pair<String, String>>()
+    val seenBodies = mutableSetOf<String>()
+
+    fun addSection(title: String, rawBody: String) {
+        val body = redactSettingsCopySecrets(rawBody).trim()
+        if (body.isBlank() || !seenBodies.add(body)) return
+        sections += title to body
+    }
+
+    val normalizedTestSummary = redactSettingsCopySecrets(testSummary).trim()
+    if (normalizedTestSummary.isNotBlank()) {
+        seenBodies += normalizedTestSummary
+    }
+    addSection("POST 请求模板：", requestTemplate)
+    addSection("模型列表摘要：", modelListSummary)
+    addSection("模型列表请求模板：", modelListRequestTemplate)
+
+    return buildString {
+        if (normalizedTestSummary.isNotBlank()) {
+            append(normalizedTestSummary)
+        }
+        sections.forEach { (title, body) ->
+            if (isNotEmpty()) append("\n\n")
+            append(title)
+            append('\n')
+            append(body)
+        }
+    }
+}
+
 internal data class DiagnosticsCopyItem(
     val name: String,
     val status: String,
