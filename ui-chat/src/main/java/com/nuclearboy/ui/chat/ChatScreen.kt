@@ -509,11 +509,21 @@ private fun ProjectFilePanel(
             visibleSizeLabel = visibleSelectableSizeLabel,
         )
     }
-    val filterSummary = remember(files.size, filteredFiles.size, filterQuery) {
+    val filterSummary = remember(
+        files.size,
+        filteredFiles.size,
+        selectedFiles.size,
+        visibleFiles.size,
+        showSelectedOnly,
+        filterQuery,
+    ) {
+        val summaryTotalCount = if (showSelectedOnly) selectedFiles.size else files.size
+        val summaryFilteredCount = if (showSelectedOnly) visibleFiles.size else filteredFiles.size
         filePanelFilterSummary(
-            totalCount = files.size,
-            filteredCount = filteredFiles.size,
+            totalCount = summaryTotalCount,
+            filteredCount = summaryFilteredCount,
             query = filterQuery,
+            scopeLabel = if (showSelectedOnly) "已选" else "",
         )
     }
     val emptyStateMessage = remember(filterQuery) {

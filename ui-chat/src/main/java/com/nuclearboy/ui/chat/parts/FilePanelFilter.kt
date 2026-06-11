@@ -33,12 +33,19 @@ internal fun filePanelFilterSummary(
     totalCount: Int,
     filteredCount: Int,
     query: String,
+    scopeLabel: String = "",
 ): String {
     val normalizedQuery = query.trim()
-    return if (normalizedQuery.isEmpty()) {
-        "$totalCount 项"
+    val normalizedScopeLabel = scopeLabel.trim()
+    val prefix = if (normalizedScopeLabel.isEmpty()) {
+        ""
     } else {
-        "$filteredCount / $totalCount"
+        "$normalizedScopeLabel "
+    }
+    return if (normalizedQuery.isEmpty()) {
+        "$prefix$totalCount 项"
+    } else {
+        "$prefix$filteredCount / $totalCount"
     }
 }
 

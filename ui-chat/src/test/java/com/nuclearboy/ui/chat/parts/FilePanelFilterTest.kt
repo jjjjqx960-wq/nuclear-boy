@@ -67,6 +67,30 @@ class FilePanelFilterTest {
     }
 
     @Test
+    fun `file panel filter summary can show selected scope count`() {
+        val summary = filePanelFilterSummary(
+            totalCount = 2,
+            filteredCount = 1,
+            query = "read",
+            scopeLabel = "已选",
+        )
+
+        assertEquals("已选 1 / 2", summary)
+    }
+
+    @Test
+    fun `file panel filter summary keeps selected scope without query`() {
+        val summary = filePanelFilterSummary(
+            totalCount = 2,
+            filteredCount = 1,
+            query = " ",
+            scopeLabel = " 已选 ",
+        )
+
+        assertEquals("已选 2 项", summary)
+    }
+
+    @Test
     fun `file panel empty state message includes trimmed query`() {
         val message = filePanelEmptyStateMessage("  service  ")
 
