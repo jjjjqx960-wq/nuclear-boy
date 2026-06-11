@@ -143,6 +143,52 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider model route hint explains prefixed model before probing list`() {
+        val hint = providerModelRouteHint(
+            modelName = "nvidia/minimaxai/minimax-m2.7",
+            modelIds = emptyList(),
+        )
+
+        assertEquals(
+            "此模型名带 nvidia 前缀；若测试返回 provider 凭证缺失，先获取模型列表并点选实际可用模型名。",
+            hint,
+        )
+    }
+
+    @Test
+    fun `provider model route hint confirms exact model list match`() {
+        val hint = providerModelRouteHint(
+            modelName = "nvidia/minimaxai/minimax-m2.7",
+            modelIds = listOf("gpt-4o", "nvidia/minimaxai/minimax-m2.7"),
+        )
+
+        assertEquals(
+            "模型列表已包含此完整模型名；如果仍 404，多半是网关上游 nvidia 凭证或额度问题。",
+            hint,
+        )
+    }
+
+    @Test
+    fun `provider model route hint warns when fetched list lacks exact model`() {
+        val hint = providerModelRouteHint(
+            modelName = "nvidia/minimaxai/minimax-m2.7",
+            modelIds = listOf("minimax-m2.7", "gpt-4o"),
+        )
+
+        assertEquals(
+            "当前模型列表未包含此完整模型名；建议点选列表返回的模型，避免网关把 nvidia 当作上游 provider 后报凭证缺失。",
+            hint,
+        )
+    }
+
+    @Test
+    fun `provider model route hint stays quiet for plain or incomplete names`() {
+        assertEquals("", providerModelRouteHint(modelName = "gpt-4o", modelIds = emptyList()))
+        assertEquals("", providerModelRouteHint(modelName = "nvidia/", modelIds = emptyList()))
+        assertEquals("", providerModelRouteHint(modelName = " ", modelIds = emptyList()))
+    }
+
+    @Test
     fun `provider base url cleanup summary reports hidden character normalization`() {
         val summary = providerBaseUrlCleanupSummary(
             rawBaseUrl = "\u200Bhttp://154.12.90.249:20128/v1",

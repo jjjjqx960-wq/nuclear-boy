@@ -81,6 +81,29 @@ internal fun modelNameCleanupSummary(
     return "已自动清理模型名中的隐藏字符；实际请求使用：$sanitized"
 }
 
+internal fun providerModelRouteHint(
+    modelName: String,
+    modelIds: List<String>,
+): String {
+    val normalizedModel = modelName.trim()
+    if (normalizedModel.isBlank()) return ""
+    val slashIndex = normalizedModel.indexOf('/')
+    if (slashIndex <= 0 || slashIndex == normalizedModel.lastIndex) return ""
+    val providerPrefix = normalizedModel.substring(0, slashIndex).trim()
+    if (!providerPrefix.matches(Regex("[A-Za-z0-9_.-]+"))) return ""
+
+    val normalizedModels = modelIds.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+    val hasExactModel = normalizedModels.any { it == normalizedModel }
+    return when {
+        hasExactModel ->
+            "模型列表已包含此完整模型名；如果仍 404，多半是网关上游 $providerPrefix 凭证或额度问题。"
+        normalizedModels.isNotEmpty() ->
+            "当前模型列表未包含此完整模型名；建议点选列表返回的模型，避免网关把 $providerPrefix 当作上游 provider 后报凭证缺失。"
+        else ->
+            "此模型名带 $providerPrefix 前缀；若测试返回 provider 凭证缺失，先获取模型列表并点选实际可用模型名。"
+    }
+}
+
 internal fun providerBaseUrlCleanupSummary(
     rawBaseUrl: String,
     sanitizedBaseUrl: String,

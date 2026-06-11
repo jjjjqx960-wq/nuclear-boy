@@ -64,6 +64,7 @@ import com.nuclearboy.app.ui.settings.parts.providerModelListCurlTemplate
 import com.nuclearboy.app.ui.settings.parts.providerModelListPickerHint
 import com.nuclearboy.app.ui.settings.parts.providerModelListSummary
 import com.nuclearboy.app.ui.settings.parts.providerModelListVisibleModels
+import com.nuclearboy.app.ui.settings.parts.providerModelRouteHint
 import com.nuclearboy.app.ui.settings.parts.providerRequestCurlTemplate
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
@@ -650,6 +651,16 @@ fun SettingsScreen(
                     }
                     val showModelListProbeState = modelListProbeState.message.isNotBlank() &&
                         (modelListProbeState.endpoint.isBlank() || modelListProbeState.endpoint == currentModelListEndpoint)
+                    val modelRouteHint = remember(
+                        sanitizedModelInput,
+                        modelListProbeState.modelIds,
+                        showModelListProbeState,
+                    ) {
+                        providerModelRouteHint(
+                            modelName = sanitizedModelInput,
+                            modelIds = if (showModelListProbeState) modelListProbeState.modelIds else emptyList(),
+                        )
+                    }
                     val providerEndpointPreview = remember(
                         sanitizedBaseUrlInput,
                         protocolInput,
@@ -808,8 +819,15 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         supportingText = {
-                            if (modelInputCleanupSummary.isNotBlank()) {
-                                Text(modelInputCleanupSummary)
+                            if (modelInputCleanupSummary.isNotBlank() || modelRouteHint.isNotBlank()) {
+                                Column {
+                                    if (modelInputCleanupSummary.isNotBlank()) {
+                                        Text(modelInputCleanupSummary)
+                                    }
+                                    if (modelRouteHint.isNotBlank()) {
+                                        Text(modelRouteHint)
+                                    }
+                                }
                             }
                         },
                     )
