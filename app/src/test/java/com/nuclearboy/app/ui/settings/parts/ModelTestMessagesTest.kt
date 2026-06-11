@@ -108,4 +108,65 @@ class ModelTestMessagesTest {
             summary,
         )
     }
+
+    @Test
+    fun `full diagnostics copy summary includes counts rows and details`() {
+        val summary = fullDiagnosticsCopySummary(
+            listOf(
+                DiagnosticsCopyItem(
+                    name = "模型配置状态",
+                    status = "PASS",
+                    message = "当前模型配置可解析",
+                    durationMs = 1,
+                    detail = "ok",
+                ),
+                DiagnosticsCopyItem(
+                    name = "第三方模型连通性",
+                    status = "FAIL",
+                    message = "部分第三方模型不可用",
+                    durationMs = 20095,
+                    detail = "HTTP 401",
+                ),
+            ),
+        )
+
+        assertEquals(
+            "全量自检：2 项，失败 1，警告 0\n" +
+                "- PASS 模型配置状态：当前模型配置可解析（1 ms）\n" +
+                "  ok\n" +
+                "- FAIL 第三方模型连通性：部分第三方模型不可用（20095 ms）\n" +
+                "  HTTP 401",
+            summary,
+        )
+    }
+
+    @Test
+    fun `full diagnostics copy summary redacts secrets in details`() {
+        val summary = fullDiagnosticsCopySummary(
+            listOf(
+                DiagnosticsCopyItem(
+                    name = "第三方模型连通性",
+                    status = "WARN",
+                    message = "上游响应较慢",
+                    durationMs = 1010,
+                    detail = "Authorization: Bearer sk-test123456\napi_key=sk-another_secret_123",
+                ),
+            ),
+        )
+
+        assertEquals(
+            "全量自检：1 项，失败 0，警告 1\n" +
+                "- WARN 第三方模型连通性：上游响应较慢（1010 ms）\n" +
+                "  Authorization: Bearer <REDACTED_TOKEN>\n" +
+                "  api_key=sk-<REDACTED_TOKEN>",
+            summary,
+        )
+    }
+
+    @Test
+    fun `full diagnostics copy summary is stable for empty results`() {
+        val summary = fullDiagnosticsCopySummary(emptyList())
+
+        assertEquals("全量自检：暂无结果", summary)
+    }
 }

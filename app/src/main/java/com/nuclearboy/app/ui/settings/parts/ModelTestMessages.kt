@@ -79,6 +79,56 @@ internal fun modelTestCopySummary(
     }
 }
 
-private fun redactModelTestSecrets(raw: String): String =
+internal data class DiagnosticsCopyItem(
+    val name: String,
+    val status: String,
+    val message: String,
+    val durationMs: Long,
+    val detail: String,
+)
+
+internal fun fullDiagnosticsCopySummary(items: List<DiagnosticsCopyItem>): String {
+    if (items.isEmpty()) return "全量自检：暂无结果"
+    val failed = items.count { it.status.equals("FAIL", ignoreCase = true) }
+    val warned = items.count { it.status.equals("WARN", ignoreCase = true) }
+    return buildString {
+        append("全量自检：")
+        append(items.size)
+        append(" 项，失败 ")
+        append(failed)
+        append("，警告 ")
+        append(warned)
+        items.forEach { item ->
+            append('\n')
+            append("- ")
+            append(item.statusLabel())
+            append(' ')
+            append(item.name.trim())
+            append("：")
+            append(item.message.trim())
+            append("（")
+            append(item.durationMs)
+            append(" ms）")
+            val detail = redactSettingsCopySecrets(item.detail).trim()
+            if (detail.isNotBlank()) {
+                append('\n')
+                append("  ")
+                append(detail.replace("\n", "\n  "))
+            }
+        }
+    }
+}
+
+private fun DiagnosticsCopyItem.statusLabel(): String =
+    when {
+        status.equals("PASS", ignoreCase = true) -> "PASS"
+        status.equals("WARN", ignoreCase = true) -> "WARN"
+        status.equals("FAIL", ignoreCase = true) -> "FAIL"
+        else -> status.trim().ifBlank { "UNKNOWN" }
+    }
+
+private fun redactModelTestSecrets(raw: String): String = redactSettingsCopySecrets(raw)
+
+private fun redactSettingsCopySecrets(raw: String): String =
     raw.replace(Regex("Bearer\\s+[A-Za-z0-9._~+/=-]+", RegexOption.IGNORE_CASE), "Bearer <REDACTED_TOKEN>")
         .replace(Regex("sk-[A-Za-z0-9_-]{6,}"), "sk-<REDACTED_TOKEN>")

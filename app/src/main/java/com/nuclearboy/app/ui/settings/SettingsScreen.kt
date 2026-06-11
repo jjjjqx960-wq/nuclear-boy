@@ -45,7 +45,9 @@ import com.nuclearboy.app.R
 import com.nuclearboy.app.diagnostics.AppDiagnostics
 import com.nuclearboy.app.diagnostics.DiagnosticResult
 import com.nuclearboy.app.diagnostics.DiagnosticStatus
+import com.nuclearboy.app.ui.settings.parts.DiagnosticsCopyItem
 import com.nuclearboy.app.ui.settings.parts.apiKeyFingerprintSummary
+import com.nuclearboy.app.ui.settings.parts.fullDiagnosticsCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelNameCleanupSummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
@@ -294,6 +296,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val apiKeyState by viewModel.apiKeyState.collectAsState()
     val modelTestState by viewModel.modelTestState.collectAsState()
     val fullDiagnosticsState by viewModel.fullDiagnosticsState.collectAsState()
@@ -684,11 +687,40 @@ fun SettingsScreen(
                         Spacer(Modifier.height(12.dp))
                         val failed = fullDiagnosticsState.results.count { it.status == DiagnosticStatus.FAIL }
                         val warned = fullDiagnosticsState.results.count { it.status == DiagnosticStatus.WARN }
-                        Text(
-                            "结果：${fullDiagnosticsState.results.size} 项，失败 $failed，警告 $warned",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                        )
+                        val diagnosticsCopySummary = remember(fullDiagnosticsState.results) {
+                            fullDiagnosticsCopySummary(
+                                fullDiagnosticsState.results.map { result ->
+                                    DiagnosticsCopyItem(
+                                        name = result.name,
+                                        status = result.status.name,
+                                        message = result.message,
+                                        durationMs = result.durationMs,
+                                        detail = result.detail,
+                                    )
+                                }
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "结果：${fullDiagnosticsState.results.size} 项，失败 $failed，警告 $warned",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            IconButton(
+                                onClick = {
+                                    clipboardManager.setText(AnnotatedString(diagnosticsCopySummary))
+                                    Toast.makeText(context, "已复制自检摘要", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(
+                                    Icons.Filled.ContentCopy,
+                                    contentDescription = "复制自检摘要",
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
                         Spacer(Modifier.height(8.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             fullDiagnosticsState.results.forEach { result ->
