@@ -35,6 +35,9 @@ class DiagnosticsReceiver : BroadcastReceiver() {
                         "NuclearBoy",
                         "[DiagReceiver] ${result.status} ${result.name}: ${result.message}; durationMs=${result.durationMs}; detailLen=${result.detail.length}",
                     )
+                    if (result.status != DiagnosticStatus.PASS && result.detail.isNotBlank()) {
+                        Log.e("NuclearBoy", "[DiagReceiver] detail ${result.name}: ${redactSecretDetail(result.detail).take(500)}")
+                    }
                 }
                 Log.e("NuclearBoy", "[DiagReceiver] diagnostics complete total=${results.size} failed=$failed warn=$warn")
             } catch (e: Exception) {
@@ -47,5 +50,8 @@ class DiagnosticsReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_RUN_DIAGNOSTICS = "com.nuclearboy.app.RUN_DIAGNOSTICS"
+
+        private fun redactSecretDetail(detail: String): String =
+            detail.replace(Regex("sk-[A-Za-z0-9_-]{6,}"), "sk-<REDACTED>")
     }
 }
