@@ -50,6 +50,7 @@ import com.nuclearboy.app.ui.settings.parts.DiagnosticsCopyItem
 import com.nuclearboy.app.ui.settings.parts.apiKeyFingerprintSummary
 import com.nuclearboy.app.ui.settings.parts.fullDiagnosticsCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelNameCleanupSummary
+import com.nuclearboy.app.ui.settings.parts.modelTestFailureActionHint
 import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
 import com.nuclearboy.app.ui.settings.parts.modelTestRequestContextSummary
@@ -353,26 +354,33 @@ class SettingsViewModel @Inject constructor(
                         }
                     },
                 )
-                is AppResult.Failure -> ModelTestUiState(
-                    targetId = targetId,
-                    success = false,
-                    message = modelTestFailureMessage(result.error, result.technicalDetail),
-                    detail = buildString {
-                        if (requestContext.isNotBlank()) {
-                            append(requestContext)
-                            append('\n')
-                        }
-                        if (baseUrlCleanupSummary.isNotBlank()) {
-                            append(baseUrlCleanupSummary)
-                            append('\n')
-                        }
-                        if (cleanupSummary.isNotBlank()) {
-                            append(cleanupSummary)
-                            append('\n')
-                        }
-                        append(result.technicalDetail ?: "没有更多错误细节。")
-                    },
-                )
+                is AppResult.Failure -> {
+                    val actionHint = modelTestFailureActionHint(result.technicalDetail)
+                    ModelTestUiState(
+                        targetId = targetId,
+                        success = false,
+                        message = modelTestFailureMessage(result.error, result.technicalDetail),
+                        detail = buildString {
+                            if (requestContext.isNotBlank()) {
+                                append(requestContext)
+                                append('\n')
+                            }
+                            if (baseUrlCleanupSummary.isNotBlank()) {
+                                append(baseUrlCleanupSummary)
+                                append('\n')
+                            }
+                            if (cleanupSummary.isNotBlank()) {
+                                append(cleanupSummary)
+                                append('\n')
+                            }
+                            if (actionHint.isNotBlank()) {
+                                append(actionHint)
+                                append('\n')
+                            }
+                            append(result.technicalDetail ?: "没有更多错误细节。")
+                        },
+                    )
+                }
             }
         }
     }

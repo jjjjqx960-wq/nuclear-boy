@@ -29,6 +29,38 @@ internal fun modelTestFailureMessage(
     }
 }
 
+internal fun modelTestFailureActionHint(technicalDetail: String?): String {
+    val detail = technicalDetail.orEmpty()
+    val inactiveProvider = inactiveProviderPattern
+        .find(detail)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.takeIf { it.isNotBlank() }
+
+    return when {
+        inactiveProvider != null ->
+            "操作建议：网关把模型名前缀 $inactiveProvider 当作上游 provider，但当前没有可用凭证。先点“获取模型列表”选择网关实际返回的模型名；若必须使用 $inactiveProvider，请在网关后台补齐对应上游 Key 或额度。"
+        detail.contains("model_not_found", ignoreCase = true) ||
+            detail.contains("model not found", ignoreCase = true) ||
+            detail.contains("unknown model", ignoreCase = true) ||
+            detail.contains("模型名不存在") ->
+            "操作建议：先点“获取模型列表”确认网关可用模型，并点选列表里的完整模型名；如果列表为空，请检查网关后台的模型映射和上游凭证。"
+        detail.contains("HTTP 401", ignoreCase = true) ||
+            detail.contains("unauthorized", ignoreCase = true) ||
+            detail.contains("invalid api key", ignoreCase = true) ->
+            "操作建议：核对这个 Key 是否属于当前服务地址；如果这是免鉴权本地网关，也可以清空 API Key 后重试。"
+        detail.contains("HTTP 403", ignoreCase = true) ||
+            detail.contains("forbidden", ignoreCase = true) ||
+            detail.contains("permission", ignoreCase = true) ->
+            "操作建议：当前 Key 或上游账号没有访问该模型的权限，请换有权限的 Key，或改用模型列表中可用的模型名。"
+        detail.contains("timeout", ignoreCase = true) ||
+            detail.contains("timed out", ignoreCase = true) ||
+            detail.contains("failed to connect", ignoreCase = true) ->
+            "操作建议：检查手机网络、VPN、服务地址和端口是否可达；确认浏览器或抓包工具能访问后再重试测试。"
+        else -> ""
+    }
+}
+
 internal fun apiKeyFingerprintSummary(apiKey: String?): String {
     val normalized = apiKey.orEmpty().trim()
     if (normalized.isBlank()) return ""

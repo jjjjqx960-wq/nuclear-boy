@@ -36,6 +36,59 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `failure action hint explains inactive provider recovery`() {
+        val hint = modelTestFailureActionHint(
+            "HTTP 404: No active credentials for provider: nvidia",
+        )
+
+        assertEquals(
+            "操作建议：网关把模型名前缀 nvidia 当作上游 provider，但当前没有可用凭证。先点“获取模型列表”选择网关实际返回的模型名；若必须使用 nvidia，请在网关后台补齐对应上游 Key 或额度。",
+            hint,
+        )
+    }
+
+    @Test
+    fun `failure action hint suggests model list for routing errors`() {
+        val hint = modelTestFailureActionHint(
+            """{"error":{"code":"model_not_found"}}""",
+        )
+
+        assertEquals(
+            "操作建议：先点“获取模型列表”确认网关可用模型，并点选列表里的完整模型名；如果列表为空，请检查网关后台的模型映射和上游凭证。",
+            hint,
+        )
+    }
+
+    @Test
+    fun `failure action hint explains auth and permission errors`() {
+        assertEquals(
+            "操作建议：核对这个 Key 是否属于当前服务地址；如果这是免鉴权本地网关，也可以清空 API Key 后重试。",
+            modelTestFailureActionHint("HTTP 401: unauthorized"),
+        )
+        assertEquals(
+            "操作建议：当前 Key 或上游账号没有访问该模型的权限，请换有权限的 Key，或改用模型列表中可用的模型名。",
+            modelTestFailureActionHint("HTTP 403: forbidden"),
+        )
+    }
+
+    @Test
+    fun `failure action hint explains connectivity errors`() {
+        val hint = modelTestFailureActionHint("failed to connect after timeout")
+
+        assertEquals(
+            "操作建议：检查手机网络、VPN、服务地址和端口是否可达；确认浏览器或抓包工具能访问后再重试测试。",
+            hint,
+        )
+    }
+
+    @Test
+    fun `failure action hint is empty for generic errors`() {
+        val hint = modelTestFailureActionHint("unexpected gateway body")
+
+        assertEquals("", hint)
+    }
+
+    @Test
     fun `api key fingerprint summary uses sha256 prefix and length`() {
         val summary = apiKeyFingerprintSummary("abc")
 
