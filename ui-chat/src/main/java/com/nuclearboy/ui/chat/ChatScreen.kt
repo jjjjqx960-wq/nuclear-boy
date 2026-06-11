@@ -614,6 +614,9 @@ private fun ProjectFilePanel(
                         )
                     },
                     onShowSelectedOnlyChange = { showSelectedOnly = it },
+                    onReferenceVisibleFiles = {
+                        onReferenceFiles(visibleSelectableFiles, true, 0)
+                    },
                     onReferenceVisible = {
                         val matchedSelectedFiles = visibleSelectableFiles
                             .filter { it.path in selectedPathSet }

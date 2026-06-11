@@ -220,6 +220,33 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `reference visible action label shows visible count`() {
+        val label = fileSelectionReferenceVisibleActionLabel(
+            visibleFileCount = 5,
+        )
+
+        assertEquals("引用 5", label)
+    }
+
+    @Test
+    fun `reference visible action label stays compact without visible files`() {
+        val label = fileSelectionReferenceVisibleActionLabel(
+            visibleFileCount = 0,
+        )
+
+        assertEquals("引用", label)
+    }
+
+    @Test
+    fun `reference visible action description shows visible count`() {
+        val description = fileSelectionReferenceVisibleActionDescription(
+            visibleFileCount = 5,
+        )
+
+        assertEquals("引用当前可见 5 个文件到输入", description)
+    }
+
+    @Test
     fun `select visible action label shows full selectable count without visible selection`() {
         val label = fileSelectionSelectVisibleActionLabel(
             selectedVisibleCount = 0,

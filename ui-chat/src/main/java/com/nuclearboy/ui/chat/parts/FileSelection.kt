@@ -95,6 +95,19 @@ internal fun fileSelectionReferenceSelectedActionLabel(
     return if (count > 0) "$action $count" else action
 }
 
+internal fun fileSelectionReferenceVisibleActionLabel(
+    visibleFileCount: Int,
+): String {
+    val count = visibleFileCount.coerceAtLeast(0)
+    return if (count > 0) "引用 $count" else "引用"
+}
+
+internal fun fileSelectionReferenceVisibleActionDescription(
+    visibleFileCount: Int,
+): String {
+    return "引用当前可见 ${visibleFileCount.coerceAtLeast(0)} 个文件到输入"
+}
+
 internal fun fileSelectionSelectVisibleActionLabel(
     selectedVisibleCount: Int,
     visibleFileCount: Int,

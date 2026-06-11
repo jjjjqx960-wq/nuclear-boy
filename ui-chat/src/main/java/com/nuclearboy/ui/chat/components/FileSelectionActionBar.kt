@@ -38,6 +38,8 @@ import com.nuclearboy.ui.chat.NuclearBoyTheme
 import com.nuclearboy.ui.chat.parts.fileSelectionClearActionDescription
 import com.nuclearboy.ui.chat.parts.fileSelectionReferenceMatchedActionLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionReferenceSelectedActionLabel
+import com.nuclearboy.ui.chat.parts.fileSelectionReferenceVisibleActionDescription
+import com.nuclearboy.ui.chat.parts.fileSelectionReferenceVisibleActionLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionSelectedOnlyToggleLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionSelectVisibleActionLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionUnselectHiddenActionDescription
@@ -59,6 +61,7 @@ internal fun FileSelectionActionBar(
     onUnselectHidden: () -> Unit,
     onShowSelectedOnlyChange: (Boolean) -> Unit,
     onReferenceVisible: () -> Unit,
+    onReferenceVisibleFiles: () -> Unit,
     onReferenceSelected: () -> Unit,
     onClearSelection: () -> Unit,
     modifier: Modifier = Modifier,
@@ -233,10 +236,10 @@ internal fun FileSelectionActionBar(
                     )
                 }
                 FileSelectionReferenceButton(
-                    enabled = false,
-                    label = "引用",
-                    contentDescription = "批量引用到输入",
-                    onClick = onReferenceSelected,
+                    enabled = visibleFileCount > 0,
+                    label = fileSelectionReferenceVisibleActionLabel(visibleFileCount),
+                    contentDescription = fileSelectionReferenceVisibleActionDescription(visibleFileCount),
+                    onClick = onReferenceVisibleFiles,
                 )
             }
         }
