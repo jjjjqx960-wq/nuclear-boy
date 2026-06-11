@@ -161,9 +161,10 @@ class ApiKeyManager(context: Context) {
         apiKey: String?,
         endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
     ) {
+        val normalizedModelName = sanitizeProviderModelName(modelName)
         saveCustomModel(
             existingId = getActiveCustomModel()?.id,
-            displayName = modelName.trim().ifBlank { "自定义模型" },
+            displayName = normalizedModelName.ifBlank { "自定义模型" },
             baseUrl = baseUrl,
             modelName = modelName,
             protocol = ProviderProtocol.AUTO,
@@ -183,7 +184,7 @@ class ApiKeyManager(context: Context) {
         apiKey: String?,
         selectAfterSave: Boolean = true,
     ): String {
-        val normalizedModelName = modelName.trim()
+        val normalizedModelName = sanitizeProviderModelName(modelName)
         val resolvedProtocol = ProviderProtocol.resolve(protocol, baseUrl, normalizedModelName)
         val normalizedBaseUrl = normalizeCustomBaseUrl(baseUrl, resolvedProtocol, endpointMode)
         val id = existingId?.takeIf { it.isNotBlank() } ?: "custom_${UUID.randomUUID()}"
@@ -286,7 +287,7 @@ class ApiKeyManager(context: Context) {
      * DeepSeek-specific fields (thinking / reasoning_effort).
      */
     fun getModelOverride(): String? {
-        return getActiveCustomModel()?.modelName?.trim()?.takeIf { it.isNotBlank() }
+        return getActiveCustomModel()?.modelName?.let(::sanitizeProviderModelName)?.takeIf { it.isNotBlank() }
     }
 
     // ── Legacy Python isolation toggle ─────────────────
@@ -434,11 +435,13 @@ class ApiKeyManager(context: Context) {
             return runCatching {
                 json.decodeFromString<List<CustomModelRecord>>(stored)
             }.getOrDefault(emptyList())
+                .map(::sanitizeCustomModelRecord)
+                .filter { it.baseUrl.isNotBlank() && it.modelName.isNotBlank() }
         }
 
         val legacyBaseUrlRaw = prefs.getString(KEY_CUSTOM_BASE_URL, "").orEmpty()
         val legacyBaseUrl = normalizeCustomBaseUrl(legacyBaseUrlRaw, ProviderProtocol.AUTO)
-        val legacyModel = prefs.getString(KEY_CUSTOM_MODEL, "").orEmpty().trim()
+        val legacyModel = sanitizeProviderModelName(prefs.getString(KEY_CUSTOM_MODEL, "").orEmpty())
         if (legacyBaseUrl.isBlank() || legacyModel.isBlank()) return emptyList()
         return listOf(
             CustomModelRecord(
@@ -450,6 +453,17 @@ class ApiKeyManager(context: Context) {
                 endpointMode = ProviderEndpointMode.AUTO,
                 apiKey = prefs.getString(KEY_CUSTOM_KEY, "").orEmpty().trim(),
             )
+        )
+    }
+
+    private fun sanitizeCustomModelRecord(record: CustomModelRecord): CustomModelRecord {
+        val modelName = sanitizeProviderModelName(record.modelName)
+        val displayName = sanitizeProviderModelName(record.displayName)
+            .ifBlank { modelName.ifBlank { "自定义模型" } }
+        return record.copy(
+            displayName = displayName,
+            modelName = modelName,
+            apiKey = record.apiKey.trim(),
         )
     }
 

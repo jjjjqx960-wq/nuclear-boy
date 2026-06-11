@@ -105,7 +105,7 @@ class DeepSeekApiClient(
         thinkingMode: ThinkingMode = ThinkingMode.DISABLED,
         tools: List<ToolDefinitionDto>? = null,
     ): Flow<StreamEvent> = flow {
-        val model = modelOverrideProvider() ?: modelTier.modelId
+        val model = sanitizeProviderModelName(modelOverrideProvider() ?: modelTier.modelId)
         val activeProtocol = activeProviderProtocol(model)
         if (activeProtocol == ProviderProtocol.ANTHROPIC) {
             emitAll(streamAnthropicChat(messages, model, modelTier, tools))
@@ -238,7 +238,7 @@ class DeepSeekApiClient(
             )
             val request = buildRequest(
                 messages = testMessages,
-                model = modelOverrideProvider() ?: ModelTier.V4_FLASH.modelId,
+                model = sanitizeProviderModelName(modelOverrideProvider() ?: ModelTier.V4_FLASH.modelId),
                 thinkingMode = ThinkingMode.DISABLED,
                 tools = null,
                 stream = false,
@@ -318,7 +318,7 @@ class DeepSeekApiClient(
         protocol: ProviderProtocol = ProviderProtocol.AUTO,
         endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
     ): AppResult<ProviderTestResult> = withContext(Dispatchers.IO) {
-        val normalizedModel = modelName.trim()
+        val normalizedModel = sanitizeProviderModelName(modelName)
         val resolvedProtocol = ProviderProtocol.resolve(protocol, baseUrl, normalizedModel)
         if (normalizedModel.isBlank()) {
             return@withContext AppResult.failure(AppError.InvalidRequest, "模型名不能为空")
@@ -667,7 +667,7 @@ class DeepSeekApiClient(
         return if (modelOverrideProvider() == null) {
             ProviderProtocol.OPENAI
         } else {
-            ProviderProtocol.resolve(providerProtocolProvider(), baseUrlProvider(), modelName)
+            ProviderProtocol.resolve(providerProtocolProvider(), baseUrlProvider(), sanitizeProviderModelName(modelName))
         }
     }
 
@@ -681,6 +681,7 @@ class DeepSeekApiClient(
         stream: Boolean,
         maxTokens: Int,
     ): String {
+        val normalizedModel = sanitizeProviderModelName(model)
         val systemText = messages
             .filter { it.role == "system" }
             .mapNotNull { it.content }
@@ -742,7 +743,7 @@ class DeepSeekApiClient(
         }
 
         val body = buildJsonObject {
-            put("model", JsonPrimitive(model))
+            put("model", JsonPrimitive(normalizedModel))
             put("max_tokens", JsonPrimitive(maxTokens))
             put("stream", JsonPrimitive(stream))
             if (systemText.isNotBlank()) {
@@ -789,9 +790,10 @@ class DeepSeekApiClient(
         // Custom OpenAI-compatible providers (e.g. self-hosted routers) don't understand
         // DeepSeek's thinking/reasoning_effort extensions — omit them entirely.
         val isCustomProvider = modelOverrideProvider() != null
-        android.util.Log.e("NuclearBoy", "[ApiClient] buildRequest() model=$model stream=$stream thinking=$thinkingMode tools=${tools?.size ?: 0} messages=${messages.size} maxTokens=$maxTokens custom=$isCustomProvider")
+        val normalizedModel = sanitizeProviderModelName(model)
+        android.util.Log.e("NuclearBoy", "[ApiClient] buildRequest() model=$normalizedModel stream=$stream thinking=$thinkingMode tools=${tools?.size ?: 0} messages=${messages.size} maxTokens=$maxTokens custom=$isCustomProvider")
         return ChatCompletionRequest(
-            model = model,
+            model = normalizedModel,
             messages = sanitizeMessages(messages),
             temperature = 1.0,
             topP = 1.0,

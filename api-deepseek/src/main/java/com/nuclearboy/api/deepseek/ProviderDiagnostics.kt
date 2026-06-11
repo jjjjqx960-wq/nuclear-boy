@@ -36,7 +36,7 @@ internal fun isInactiveProviderCredentialError(body: String): Boolean =
     "no active credentials for provider" in body.lowercase()
 
 internal fun providerModelNameHint(modelName: String): String {
-    val normalized = modelName.trim()
+    val normalized = sanitizeProviderModelName(modelName)
     val lower = normalized.lowercase()
     return when {
         lower == "nvidia/minimaxai/minimax-m2.7" ->

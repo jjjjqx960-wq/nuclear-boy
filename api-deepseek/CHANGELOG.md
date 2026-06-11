@@ -1,3 +1,4 @@
+2026-06-11 1.0.46 第三方模型名保存、读取、测试和发包前清理零宽隐藏字符，避免 nvidia 前缀被解析成无凭证 provider。
 2026-06-11 1.0.43 第三方模型测试遇到网关上游 provider 凭证短暂不可用时自动短重试一次，贴近 ccswitch 代理行为。
 2026-06-10 1.0.42 第三方 OpenAI 兼容 404 诊断补充标准 chat/completions 路由、上游 provider 凭证和 NVIDIA MiniMax 模型名前缀提示。
 2026-06-10 1.0.2 404 诊断区分“路径不存在”和“网关模型路由失败”（model_not_found / no active credentials 等），后者提示检查模型名与上游 provider 凭证，不再误导用户切换地址模式。

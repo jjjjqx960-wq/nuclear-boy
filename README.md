@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.45
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.46
 
 ---
 
@@ -32,6 +32,12 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.46 重点
+
+- 第三方模型名保存、读取、测试和真实发包前都会清理零宽隐藏字符。
+- 解决复制粘贴导致 `nvidia/minimaxai/minimax-m2.7` 前缀被网关识别成隐藏字符+nvidia，从而返回 `No active credentials for provider` 的 404。
+- 已保存的旧异常模型名读取时会被兜底修正，不需要用户手动删除重建。
 
 ## 1.0.45 重点
 

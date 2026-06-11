@@ -222,6 +222,26 @@ class DeepSeekModelsTest {
     }
 
     @Test
+    fun `provider model name sanitizer strips invisible routing characters`() {
+        assertEquals(
+            "nvidia/minimaxai/minimax-m2.7",
+            sanitizeProviderModelName("\u200Bnvidia/minimaxai/minimax-m2.7\uFEFF")
+        )
+        assertEquals(
+            "nvidia/minimaxai/minimax-m2.7",
+            sanitizeProviderModelName("\u0000 nvidia/minimaxai/minimax-m2.7 \u0007")
+        )
+    }
+
+    @Test
+    fun `provider model name hint handles zero width provider prefix`() {
+        val hint = providerModelNameHint("\u200Bnvidia/example-org/example-model")
+
+        assertTrue(hint.contains("不需要 nvidia/ 前缀"))
+        assertTrue(hint.contains("GET /v1/models"))
+    }
+
+    @Test
     fun `inactive provider credential detector recognizes gateway credential failures`() {
         assertTrue(
             isInactiveProviderCredentialError(
