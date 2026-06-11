@@ -60,6 +60,7 @@ import com.nuclearboy.app.ui.settings.parts.providerExactEndpointRecoveryActionL
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointWarning
 import com.nuclearboy.app.ui.settings.parts.providerEndpointPreviewSummary
 import com.nuclearboy.app.ui.settings.parts.providerModelListClearFilterActionLabel
+import com.nuclearboy.app.ui.settings.parts.providerModelListCurlTemplate
 import com.nuclearboy.app.ui.settings.parts.providerModelListPickerHint
 import com.nuclearboy.app.ui.settings.parts.providerModelListSummary
 import com.nuclearboy.app.ui.settings.parts.providerModelListVisibleModels
@@ -839,6 +840,7 @@ fun SettingsScreen(
                         ModelListProbeBox(
                             state = modelListProbeState,
                             filterQuery = sanitizedModelInput,
+                            hasApiKey = customKeyInput.trim().isNotBlank(),
                             onClearFilter = {
                                 modelInput = ""
                                 Toast.makeText(context, "已显示全部模型", Toast.LENGTH_SHORT).show()
@@ -1453,6 +1455,7 @@ private fun ModelTestResultBox(state: ModelTestUiState) {
 private fun ModelListProbeBox(
     state: ModelListProbeUiState,
     filterQuery: String,
+    hasApiKey: Boolean,
     onClearFilter: () -> Unit,
     onModelSelected: (String) -> Unit,
 ) {
@@ -1477,6 +1480,12 @@ private fun ModelListProbeBox(
             totalCount = state.modelIds.map { it.trim() }.filter { it.isNotBlank() }.distinct().size,
             visibleCount = visibleModelIds.size,
             query = filterQuery,
+        )
+    }
+    val requestTemplate = remember(state.endpoint, hasApiKey) {
+        providerModelListCurlTemplate(
+            endpoint = state.endpoint,
+            hasApiKey = hasApiKey,
         )
     }
     val color = when (state.success) {
@@ -1514,6 +1523,21 @@ private fun ModelListProbeBox(
                     fontWeight = FontWeight.Medium,
                     color = color,
                 )
+                IconButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(requestTemplate))
+                        Toast.makeText(context, "已复制列表请求模板", Toast.LENGTH_SHORT).show()
+                    },
+                    enabled = requestTemplate.isNotBlank(),
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.Code,
+                        contentDescription = "复制模型列表请求模板",
+                        tint = color,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
                 IconButton(
                     onClick = {
                         clipboardManager.setText(AnnotatedString(state.detail))

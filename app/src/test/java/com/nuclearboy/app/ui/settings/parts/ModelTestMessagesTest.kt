@@ -268,6 +268,60 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider model list curl template builds get request with redacted key`() {
+        val template = providerModelListCurlTemplate(
+            endpoint = " http://154.12.90.249:20128/v1/models ",
+            hasApiKey = true,
+        )
+
+        assertEquals(
+            "curl -X GET 'http://154.12.90.249:20128/v1/models' \\\n" +
+                "  -H 'Accept: application/json' \\\n" +
+                "  -H 'Authorization: Bearer <REDACTED_TOKEN>'",
+            template,
+        )
+    }
+
+    @Test
+    fun `provider model list curl template omits auth header without key`() {
+        val template = providerModelListCurlTemplate(
+            endpoint = "https://gateway.example.com/v1/models",
+            hasApiKey = false,
+        )
+
+        assertEquals(
+            "curl -X GET 'https://gateway.example.com/v1/models' \\\n" +
+                "  -H 'Accept: application/json'",
+            template,
+        )
+    }
+
+    @Test
+    fun `provider model list curl template escapes shell endpoint`() {
+        val template = providerModelListCurlTemplate(
+            endpoint = "https://gateway.example.com/v1/models?tag=it's",
+            hasApiKey = false,
+        )
+
+        assertEquals(
+            "curl -X GET 'https://gateway.example.com/v1/models?tag=it'\\''s' \\\n" +
+                "  -H 'Accept: application/json'",
+            template,
+        )
+    }
+
+    @Test
+    fun `provider model list curl template is empty for blank endpoint`() {
+        assertEquals(
+            "",
+            providerModelListCurlTemplate(
+                endpoint = " ",
+                hasApiKey = true,
+            ),
+        )
+    }
+
+    @Test
     fun `provider model list summary includes count endpoint samples and remaining count`() {
         val summary = providerModelListSummary(
             endpoint = " http://154.12.90.249:20128/v1/models ",

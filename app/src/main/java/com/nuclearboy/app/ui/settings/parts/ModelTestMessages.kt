@@ -136,6 +136,28 @@ internal fun providerRequestCurlTemplate(
     }
 }
 
+internal fun providerModelListCurlTemplate(
+    endpoint: String,
+    hasApiKey: Boolean,
+): String {
+    val normalizedEndpoint = endpoint.trim()
+    if (normalizedEndpoint.isBlank()) return ""
+
+    val headers = buildList {
+        add("  -H ${"Accept: application/json".shellSingleQuoted()}")
+        if (hasApiKey) {
+            add("  -H ${"Authorization: Bearer <REDACTED_TOKEN>".shellSingleQuoted()}")
+        }
+    }
+
+    return buildString {
+        append("curl -X GET ")
+        append(normalizedEndpoint.shellSingleQuoted())
+        append(" \\\n")
+        append(headers.joinToString(" \\\n"))
+    }
+}
+
 internal fun providerModelListSummary(
     endpoint: String,
     modelIds: List<String>,
