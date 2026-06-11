@@ -13,6 +13,26 @@ class FilePanelSortTest {
     )
 
     @Test
+    fun `sort mode description marks selected sort`() {
+        val description = filePanelSortModeDescription(
+            mode = FilePanelSortMode.Name,
+            selected = true,
+        )
+
+        assertEquals("当前按名称排序", description)
+    }
+
+    @Test
+    fun `sort mode description marks switch target`() {
+        val description = filePanelSortModeDescription(
+            mode = FilePanelSortMode.Size,
+            selected = false,
+        )
+
+        assertEquals("切换为按大小排序", description)
+    }
+
+    @Test
     fun `name sort keeps directories first and sorts entries by name`() {
         val sorted = sortFilePanelEntries(files, FilePanelSortMode.Name)
 

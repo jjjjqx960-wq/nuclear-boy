@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuclearboy.ui.chat.NuclearBoyTheme
 import com.nuclearboy.ui.chat.parts.FilePanelSortMode
+import com.nuclearboy.ui.chat.parts.filePanelSortModeDescription
 
 @Composable
 internal fun FilePanelSortBar(
@@ -74,7 +75,7 @@ private fun FilePanelSortChip(
         leadingIcon = {
             Icon(
                 imageVector = mode.icon(),
-                contentDescription = mode.label,
+                contentDescription = filePanelSortModeDescription(mode, selected),
                 modifier = Modifier.size(13.dp),
             )
         },

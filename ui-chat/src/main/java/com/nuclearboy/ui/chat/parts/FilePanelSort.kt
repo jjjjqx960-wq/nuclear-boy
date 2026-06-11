@@ -11,6 +11,17 @@ internal enum class FilePanelSortMode(
     Recent("最近"),
 }
 
+internal fun filePanelSortModeDescription(
+    mode: FilePanelSortMode,
+    selected: Boolean,
+): String {
+    return if (selected) {
+        "当前按${mode.label}排序"
+    } else {
+        "切换为按${mode.label}排序"
+    }
+}
+
 internal fun sortFilePanelEntries(
     files: List<FileInfo>,
     mode: FilePanelSortMode,
