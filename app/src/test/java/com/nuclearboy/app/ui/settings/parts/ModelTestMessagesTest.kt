@@ -34,4 +34,25 @@ class ModelTestMessagesTest {
 
         assertEquals(AppError.NetworkTimeout.humanMessage, message)
     }
+
+    @Test
+    fun `api key fingerprint summary uses sha256 prefix and length`() {
+        val summary = apiKeyFingerprintSummary("abc")
+
+        assertEquals("Key 指纹：sha256 ba7816bf8f01 · 3 位", summary)
+    }
+
+    @Test
+    fun `api key fingerprint summary trims input before hashing`() {
+        val summary = apiKeyFingerprintSummary(" abc ")
+
+        assertEquals("Key 指纹：sha256 ba7816bf8f01 · 3 位", summary)
+    }
+
+    @Test
+    fun `api key fingerprint summary is empty for blank input`() {
+        val summary = apiKeyFingerprintSummary(" ")
+
+        assertEquals("", summary)
+    }
 }

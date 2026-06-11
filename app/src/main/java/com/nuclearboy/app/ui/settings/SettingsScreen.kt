@@ -42,6 +42,7 @@ import com.nuclearboy.app.R
 import com.nuclearboy.app.diagnostics.AppDiagnostics
 import com.nuclearboy.app.diagnostics.DiagnosticResult
 import com.nuclearboy.app.diagnostics.DiagnosticStatus
+import com.nuclearboy.app.ui.settings.parts.apiKeyFingerprintSummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
@@ -186,11 +187,18 @@ class SettingsViewModel @Inject constructor(
             )
             return
         }
+        val keyFingerprint = apiKeyFingerprintSummary(key)
         _modelTestState.value = ModelTestUiState(
             targetId = targetId,
             inProgress = true,
             message = "正在测试 $label",
-            detail = "会发送一条 max_tokens=8 的 ping 请求，不会保存或输出明文 Key。",
+            detail = buildString {
+                append("会发送一条 max_tokens=8 的 ping 请求，不会保存或输出明文 Key。")
+                if (keyFingerprint.isNotBlank()) {
+                    append('\n')
+                    append(keyFingerprint)
+                }
+            },
         )
         viewModelScope.launch {
             _modelTestState.value = when (val result = apiClient.testCustomProvider(
@@ -210,6 +218,10 @@ class SettingsViewModel @Inject constructor(
                         append("协议：${result.data.protocol.displayName}\n")
                         append("地址模式：${result.data.endpointMode.displayName}\n")
                         append("耗时：${result.data.latencyMs} ms")
+                        if (keyFingerprint.isNotBlank()) {
+                            append('\n')
+                            append(keyFingerprint)
+                        }
                         if (result.data.replyPreview.isNotBlank()) {
                             append("\n响应：${result.data.replyPreview}")
                         }
@@ -542,6 +554,12 @@ fun SettingsScreen(
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         singleLine = true,
+                        supportingText = {
+                            val fingerprint = apiKeyFingerprintSummary(customKeyInput)
+                            if (fingerprint.isNotBlank()) {
+                                Text(fingerprint)
+                            }
+                        },
                     )
                     Spacer(Modifier.height(8.dp))
                     Row(

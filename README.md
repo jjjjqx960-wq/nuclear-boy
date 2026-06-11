@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.43
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.44
 
 ---
 
@@ -32,6 +32,12 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.44 重点
+
+- 第三方模型 API Key 输入框会显示脱敏指纹和长度，例如 `sha256 ba7816bf8f01 · 3 位`，不显示明文。
+- 模型测试进行中和成功详情也会带同一指纹，方便对照 ccswitch/crush 生效凭证是否一致。
+- 指纹计算下沉到设置页零件层，测试覆盖 sha256 前缀、输入裁剪和空值兜底。
 
 ## 1.0.43 重点
 
