@@ -185,6 +185,35 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `file reference toast message shows file name and size`() {
+        val message = fileReferenceToastMessage(
+            fileName = "README.md",
+            fileSizeLabel = "3 KB",
+        )
+
+        assertEquals("已引用: README.md · 3 KB", message)
+    }
+
+    @Test
+    fun `file reference toast message keeps old compact form without size`() {
+        val message = fileReferenceToastMessage(
+            fileName = "README.md",
+        )
+
+        assertEquals("已引用: README.md", message)
+    }
+
+    @Test
+    fun `file reference toast message falls back for blank name`() {
+        val message = fileReferenceToastMessage(
+            fileName = "",
+            fileSizeLabel = "3 KB",
+        )
+
+        assertEquals("已引用: 文件 · 3 KB", message)
+    }
+
+    @Test
     fun `matched reference closes panel when no selection remains`() {
         val shouldClose = shouldClosePanelAfterMatchedReference(
             remainingSelectedCount = 0,

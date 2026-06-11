@@ -65,6 +65,7 @@ import com.nuclearboy.ui.chat.parts.appendToChatDraft
 import com.nuclearboy.ui.chat.parts.buildFilePanelOverview
 import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
 import com.nuclearboy.ui.chat.parts.buildFileReferencesPrompt
+import com.nuclearboy.ui.chat.parts.fileReferenceToastMessage
 import com.nuclearboy.ui.chat.parts.fileSelectionStatusLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionTotalSizeBytes
 import com.nuclearboy.ui.chat.parts.fileReferencesToastMessage
@@ -374,7 +375,14 @@ fun ChatScreen(
                     inputDraft = appendToChatDraft(inputDraft, prompt)
                     showFiles = false
                     inputFocusRequest++
-                    Toast.makeText(context, "已引用: ${file.name}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        fileReferenceToastMessage(
+                            fileName = file.name,
+                            fileSizeLabel = fileSelectionTotalSizeBytes(listOf(file)).toFileSizeString(),
+                        ),
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 },
                 onReferenceFiles = { files, closePanel, remainingSelectedCount ->
                     val prompt = buildFileReferencesPrompt(
