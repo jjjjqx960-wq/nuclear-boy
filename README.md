@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.51
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.52
 
 ---
 
@@ -32,6 +32,12 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.52 重点
+
+- 完整地址模式下，如果实际请求 URL 不像完整接口，会直接提示风险。
+- OpenAI 兼容模式会提示应填写 `/v1/chat/completions` 结尾的完整 URL，或切回智能拼接。
+- 正确的 OpenAI/Anthropic 完整接口不提示，避免干扰已经配置正确的用户。
 
 ## 1.0.51 重点
 

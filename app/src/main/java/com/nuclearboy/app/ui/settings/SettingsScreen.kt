@@ -51,6 +51,7 @@ import com.nuclearboy.app.ui.settings.parts.fullDiagnosticsCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelTestCopySummary
 import com.nuclearboy.app.ui.settings.parts.modelNameCleanupSummary
 import com.nuclearboy.app.ui.settings.parts.modelTestFailureMessage
+import com.nuclearboy.app.ui.settings.parts.providerExactEndpointWarning
 import com.nuclearboy.app.ui.settings.parts.providerEndpointPreviewSummary
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
@@ -537,6 +538,33 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    val providerEndpointWarning = remember(
+                        baseUrlInput,
+                        protocolInput,
+                        endpointModeInput,
+                        sanitizedModelInput,
+                    ) {
+                        val baseUrl = baseUrlInput.trim()
+                        if (baseUrl.isBlank() || endpointModeInput != ProviderEndpointMode.EXACT) {
+                            ""
+                        } else {
+                            val resolvedProtocol = ProviderProtocol.resolve(
+                                protocolInput,
+                                baseUrl,
+                                sanitizedModelInput,
+                            )
+                            val endpoint = when (resolvedProtocol) {
+                                ProviderProtocol.ANTHROPIC ->
+                                    DeepSeekApiClient.buildAnthropicMessagesEndpoint(baseUrl, endpointModeInput)
+                                else ->
+                                    DeepSeekApiClient.buildOpenAiChatCompletionsEndpoint(baseUrl, endpointModeInput)
+                            }
+                            providerExactEndpointWarning(
+                                protocolLabel = resolvedProtocol.displayName,
+                                endpoint = endpoint,
+                            )
+                        }
+                    }
 
                     Text("添加模型",
                         style = MaterialTheme.typography.labelMedium,
@@ -618,6 +646,14 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                    if (providerEndpointWarning.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            providerEndpointWarning,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
                         )
                     }
                     Spacer(Modifier.height(8.dp))

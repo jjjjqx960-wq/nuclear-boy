@@ -59,6 +59,25 @@ internal fun providerEndpointPreviewSummary(
     return "实际请求：${protocolLabel.trim()} · ${endpointModeLabel.trim()}\nPOST $normalizedEndpoint"
 }
 
+internal fun providerExactEndpointWarning(
+    protocolLabel: String,
+    endpoint: String,
+): String {
+    val normalizedEndpoint = endpoint.trim()
+    if (normalizedEndpoint.isBlank()) return ""
+    val normalizedProtocol = protocolLabel.trim().ifBlank { "当前协议" }
+    val lowerEndpoint = normalizedEndpoint.lowercase()
+    val isAnthropic = normalizedProtocol.equals("Anthropic", ignoreCase = true)
+    val looksCompleteEndpoint = if (isAnthropic) {
+        lowerEndpoint.endsWith("/messages")
+    } else {
+        lowerEndpoint.endsWith("/chat/completions")
+    }
+    if (looksCompleteEndpoint) return ""
+    val expectedPath = if (isAnthropic) "/v1/messages" else "/v1/chat/completions"
+    return "完整地址模式会直接 POST 到此地址；当前不像完整 $normalizedProtocol 接口，建议填写 $expectedPath 结尾的完整 URL，或切回智能拼接。"
+}
+
 internal fun modelTestCopySummary(
     inProgress: Boolean,
     success: Boolean?,

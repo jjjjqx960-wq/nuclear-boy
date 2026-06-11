@@ -115,6 +115,39 @@ class ModelTestMessagesTest {
     }
 
     @Test
+    fun `provider exact endpoint warning flags openai root endpoint`() {
+        val warning = providerExactEndpointWarning(
+            protocolLabel = "OpenAI",
+            endpoint = "http://154.12.90.249:20128/v1",
+        )
+
+        assertEquals(
+            "完整地址模式会直接 POST 到此地址；当前不像完整 OpenAI 接口，建议填写 /v1/chat/completions 结尾的完整 URL，或切回智能拼接。",
+            warning,
+        )
+    }
+
+    @Test
+    fun `provider exact endpoint warning is empty for openai chat completions endpoint`() {
+        val warning = providerExactEndpointWarning(
+            protocolLabel = "OpenAI",
+            endpoint = "http://154.12.90.249:20128/v1/chat/completions",
+        )
+
+        assertEquals("", warning)
+    }
+
+    @Test
+    fun `provider exact endpoint warning is empty for anthropic messages endpoint`() {
+        val warning = providerExactEndpointWarning(
+            protocolLabel = "Anthropic",
+            endpoint = "https://api.example.com/v1/messages",
+        )
+
+        assertEquals("", warning)
+    }
+
+    @Test
     fun `model test copy summary includes status title and detail`() {
         val summary = modelTestCopySummary(
             inProgress = false,
