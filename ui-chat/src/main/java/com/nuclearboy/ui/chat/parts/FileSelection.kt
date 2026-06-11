@@ -106,6 +106,31 @@ internal fun fileSelectionSelectVisibleActionLabel(
     return "$action $addableCount"
 }
 
+internal fun fileSelectionClearActionDescription(
+    selectedCount: Int,
+): String {
+    val count = selectedCount.coerceAtLeast(0)
+    return if (count > 0) "清空 $count 个已选文件" else "清空选择"
+}
+
+internal fun fileSelectionUnselectVisibleActionDescription(
+    selectedVisibleCount: Int,
+    showSelectedOnly: Boolean,
+): String {
+    val count = selectedVisibleCount.coerceAtLeast(0)
+    return if (showSelectedOnly) {
+        "取消匹配 $count 个已选文件"
+    } else {
+        "取消当前可见 $count 个已选文件"
+    }
+}
+
+internal fun fileSelectionUnselectHiddenActionDescription(
+    hiddenSelectedCount: Int,
+): String {
+    return "取消隐藏 ${hiddenSelectedCount.coerceAtLeast(0)} 个已选文件"
+}
+
 internal fun selectedFileTotalSizeBytes(files: List<FileInfo>): Long {
     return files
         .filterNot { it.isDirectory }

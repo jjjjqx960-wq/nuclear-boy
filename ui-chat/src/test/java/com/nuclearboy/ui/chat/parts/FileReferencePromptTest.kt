@@ -250,6 +250,44 @@ class FileReferencePromptTest {
     }
 
     @Test
+    fun `clear selection action description shows selected count`() {
+        val description = fileSelectionClearActionDescription(
+            selectedCount = 7,
+        )
+
+        assertEquals("清空 7 个已选文件", description)
+    }
+
+    @Test
+    fun `unselect visible action description shows visible selected count`() {
+        val description = fileSelectionUnselectVisibleActionDescription(
+            selectedVisibleCount = 3,
+            showSelectedOnly = false,
+        )
+
+        assertEquals("取消当前可见 3 个已选文件", description)
+    }
+
+    @Test
+    fun `unselect visible action description uses matched wording in selected only mode`() {
+        val description = fileSelectionUnselectVisibleActionDescription(
+            selectedVisibleCount = 2,
+            showSelectedOnly = true,
+        )
+
+        assertEquals("取消匹配 2 个已选文件", description)
+    }
+
+    @Test
+    fun `unselect hidden action description shows hidden selected count`() {
+        val description = fileSelectionUnselectHiddenActionDescription(
+            hiddenSelectedCount = 4,
+        )
+
+        assertEquals("取消隐藏 4 个已选文件", description)
+    }
+
+    @Test
     fun `selected file panel entries returns selected files only`() {
         val entries = selectedFilePanelEntries(
             files = listOf(

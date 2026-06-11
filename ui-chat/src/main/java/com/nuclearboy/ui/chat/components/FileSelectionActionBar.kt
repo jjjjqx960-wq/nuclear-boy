@@ -35,9 +35,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuclearboy.ui.chat.NuclearBoyTheme
+import com.nuclearboy.ui.chat.parts.fileSelectionClearActionDescription
 import com.nuclearboy.ui.chat.parts.fileSelectionReferenceMatchedActionLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionReferenceSelectedActionLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionSelectVisibleActionLabel
+import com.nuclearboy.ui.chat.parts.fileSelectionUnselectHiddenActionDescription
+import com.nuclearboy.ui.chat.parts.fileSelectionUnselectVisibleActionDescription
 import com.nuclearboy.ui.chat.parts.shouldShowReferenceMatchedAction
 import com.nuclearboy.ui.chat.parts.shouldShowUnselectVisibleAction
 
@@ -114,7 +117,7 @@ internal fun FileSelectionActionBar(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "清空选择",
+                            contentDescription = fileSelectionClearActionDescription(selectedCount),
                             modifier = Modifier.size(15.dp),
                             tint = nc.material.onSurfaceVariant,
                         )
@@ -126,7 +129,10 @@ internal fun FileSelectionActionBar(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.RemoveCircleOutline,
-                                contentDescription = if (showSelectedOnly) "取消匹配选择" else "取消当前可见选择",
+                                contentDescription = fileSelectionUnselectVisibleActionDescription(
+                                    selectedVisibleCount = selectedVisibleCount,
+                                    showSelectedOnly = showSelectedOnly,
+                                ),
                                 modifier = Modifier.size(16.dp),
                                 tint = nc.material.secondary,
                             )
@@ -139,7 +145,9 @@ internal fun FileSelectionActionBar(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.VisibilityOff,
-                                contentDescription = "取消隐藏选择",
+                                contentDescription = fileSelectionUnselectHiddenActionDescription(
+                                    hiddenSelectedCount = hiddenSelectedCount,
+                                ),
                                 modifier = Modifier.size(16.dp),
                                 tint = nc.material.secondary,
                             )
