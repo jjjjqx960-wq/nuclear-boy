@@ -593,12 +593,13 @@ else:
     ) = listOf(
         ToolDefinition(
             name = "pc_cli_run",
-            description = "把编程任务下发给用户电脑上的 AI 编程 CLI（Claude Code 或 Codex）执行，返回执行结果。使用场景：1) 用户明确要求\"让电脑上的 claude/codex 做某事\"；2) 任务需要电脑上的完整开发环境（大型项目构建、桌面端工具链）；3) 用户想远程操作电脑里的代码仓库。前提是用户已在设置页开启并配置\"远程电脑\"。任务可能耗时数分钟，耐心等待结果。示例：pc_cli_run(cli=\"claude\", prompt=\"修复 D:/myproject 里的编译错误\", cwd=\"D:/myproject\")",
+            description = "把编程任务下发给用户电脑上的 AI 编程 CLI（Claude Code 或 Codex）执行，返回执行结果。使用场景：1) 用户明确要求\"让电脑上的 claude/codex 做某事\"；2) 任务需要电脑上的完整开发环境（大型项目构建、桌面端工具链）；3) 用户想远程操作电脑里的代码仓库。前提是用户已在设置页开启并配置\"远程电脑\"。任务可能耗时数分钟，耐心等待结果。结果会返回会话 ID，对同一件事继续追问或迭代时把它传入 session 参数（仅 claude），CLI 就能记住之前的上下文。示例：pc_cli_run(cli=\"claude\", prompt=\"修复 D:/myproject 里的编译错误\", cwd=\"D:/myproject\")",
             parameters = listOf(
                 ToolParameter("cli", "string", "用哪个编程 CLI。claude=Claude Code，codex=Codex", required = true, enum = listOf("claude", "codex")),
                 ToolParameter("prompt", "string", "下发给 CLI 的任务描述，要完整、自包含（CLI 在电脑上独立执行，看不到当前对话）", required = true),
                 ToolParameter("cwd", "string", "电脑上的工作目录，如 D:/myproject。不传用电脑端默认目录", required = false),
                 ToolParameter("timeout", "integer", "任务超时秒数（默认 600）", required = false, default = "600"),
+                ToolParameter("session", "string", "上次结果里的会话 ID，传入后 claude 续传之前的对话上下文，适合连续迭代", required = false),
             ),
             executor = { params ->
                 val cli = params["cli"] ?: ""
@@ -612,6 +613,7 @@ else:
                         prompt = prompt,
                         cwd = params["cwd"],
                         timeoutSec = params["timeout"]?.toIntOrNull() ?: PcBridgeClient.DEFAULT_TASK_TIMEOUT_SEC,
+                        sessionId = params["session"],
                         onOutput = { kind, text ->
                             if (kind == "tool" || kind == "status") outputLines.add(text)
                         },
@@ -621,10 +623,12 @@ else:
                             val r = result.data
                             val process = if (outputLines.isEmpty()) "" else
                                 "\n\n执行过程:\n" + outputLines.takeLast(20).joinToString("\n")
-                            android.util.Log.e("NuclearBoy", "[DI] pc_cli_run done cli=$cli exit=${r.exitCode} ${r.durationMs}ms")
+                            val sessionHint = if (r.sessionId.isBlank()) "" else
+                                "\n\n会话 ID: ${r.sessionId}（继续这件事时传入 session 参数）"
+                            android.util.Log.e("NuclearBoy", "[DI] pc_cli_run done cli=$cli exit=${r.exitCode} ${r.durationMs}ms session=${r.sessionId.take(8)}")
                             ToolResult(
                                 success = r.exitCode == 0,
-                                output = "电脑端 $cli 执行完成（${r.durationMs / 1000}s）:\n${r.result}$process",
+                                output = "电脑端 $cli 执行完成（${r.durationMs / 1000}s）:\n${r.result}$process$sessionHint",
                                 error = if (r.exitCode == 0) null else "CLI 退出码 ${r.exitCode}",
                             )
                         }

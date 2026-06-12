@@ -62,10 +62,14 @@ class DebugPcBridgeConfigReceiver : BroadcastReceiver() {
                         Log.e(TAG, "test connection FAILED code=${result.error.code} detail=${result.technicalDetail}")
                 }
                 if (runCli.isNotBlank() && runPrompt.isNotBlank()) {
-                    Log.e(TAG, "test run start cli=$runCli promptLen=${runPrompt.length}")
-                    when (val run = bridgeClient.runCliTask(cli = runCli, prompt = runPrompt)) {
+                    val runSession = intent.getStringExtra(EXTRA_RUN_SESSION)?.trim().orEmpty()
+                    Log.e(TAG, "test run start cli=$runCli promptLen=${runPrompt.length} resume=${runSession.take(8)}")
+                    when (val run = bridgeClient.runCliTask(
+                        cli = runCli, prompt = runPrompt,
+                        sessionId = runSession.takeIf { it.isNotBlank() },
+                    )) {
                         is AppResult.Success ->
-                            Log.e(TAG, "test run OK exit=${run.data.exitCode} ${run.data.durationMs}ms result=${run.data.result.take(200)}")
+                            Log.e(TAG, "test run OK exit=${run.data.exitCode} ${run.data.durationMs}ms session=${run.data.sessionId} result=${run.data.result.take(200)}")
                         is AppResult.Failure ->
                             Log.e(TAG, "test run FAILED code=${run.error.code} detail=${run.technicalDetail}")
                     }
@@ -84,5 +88,6 @@ class DebugPcBridgeConfigReceiver : BroadcastReceiver() {
         const val EXTRA_ENABLED = "enabled"
         const val EXTRA_RUN_CLI = "run_cli"
         const val EXTRA_RUN_PROMPT = "run_prompt"
+        const val EXTRA_RUN_SESSION = "run_session"
     }
 }

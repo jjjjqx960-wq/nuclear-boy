@@ -55,6 +55,24 @@ class PcBridgeProtocolTest {
         assertEquals(0, done.exitCode)
         assertEquals("2", done.result)
         assertEquals(8719L, done.durationMs)
+        assertEquals("", done.sessionId)
+    }
+
+    @Test
+    fun `parse done with session id for resume`() {
+        val msg = PcBridgeProtocol.parseInbound(
+            """{"type":"done","id":"t1","exitCode":0,"result":"已记住","durationMs":8780,"sessionId":"f632d877-1060-4663-8782-b5115a77b1e7"}"""
+        )
+        val done = msg as PcBridgeProtocol.Inbound.Done
+        assertEquals("f632d877-1060-4663-8782-b5115a77b1e7", done.sessionId)
+    }
+
+    @Test
+    fun `encodeRun includes session id when resuming`() {
+        val raw = PcBridgeProtocol.encodeRun(
+            PcBridgeProtocol.RunMessage(id = "t2", cli = "claude", prompt = "继续", sessionId = "abc-123")
+        )
+        assertTrue(raw.contains("\"sessionId\":\"abc-123\""))
     }
 
     @Test

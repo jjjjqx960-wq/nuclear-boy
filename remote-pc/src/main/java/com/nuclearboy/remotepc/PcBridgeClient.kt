@@ -29,6 +29,8 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         val result: String,
         val durationMs: Long,
         val outputLog: List<String>,
+        /** 本次任务的会话 ID，下次传入 runCliTask 的 sessionId 可继续对话（仅 claude） */
+        val sessionId: String = "",
     )
 
     private val httpClient = OkHttpClient.Builder()
@@ -61,6 +63,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         prompt: String,
         cwd: String? = null,
         timeoutSec: Int = DEFAULT_TASK_TIMEOUT_SEC,
+        sessionId: String? = null,
         onOutput: suspend (kind: String, text: String) -> Unit = { _, _ -> },
     ): AppResult<CliTaskResult> {
         if (!configStore.isEnabled()) {
@@ -79,6 +82,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
                     PcBridgeProtocol.RunMessage(
                         id = taskId, cli = cli, prompt = prompt,
                         cwd = cwd?.takeIf { it.isNotBlank() }, timeoutSec = timeoutSec,
+                        sessionId = sessionId?.takeIf { it.isNotBlank() },
                     )
                 )
             )
@@ -96,7 +100,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
                     }
                     is PcBridgeProtocol.Inbound.Done -> if (msg.id == taskId) {
                         return@withSession AppResult.success(
-                            CliTaskResult(msg.exitCode, msg.result, msg.durationMs, outputLog)
+                            CliTaskResult(msg.exitCode, msg.result, msg.durationMs, outputLog, msg.sessionId)
                         )
                     }
                     is PcBridgeProtocol.Inbound.Error -> if (msg.id == taskId || msg.id.isBlank()) {

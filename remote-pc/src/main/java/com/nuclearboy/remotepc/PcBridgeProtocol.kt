@@ -37,6 +37,8 @@ object PcBridgeProtocol {
         val prompt: String,
         val cwd: String? = null,
         val timeoutSec: Int? = null,
+        /** 续传已有 claude 会话（上次 Done.sessionId） */
+        val sessionId: String? = null,
     )
 
     @Serializable
@@ -57,7 +59,13 @@ object PcBridgeProtocol {
         data class AuthFail(val message: String) : Inbound
         data class Accepted(val id: String) : Inbound
         data class Output(val id: String, val kind: String, val text: String) : Inbound
-        data class Done(val id: String, val exitCode: Int, val result: String, val durationMs: Long) : Inbound
+        data class Done(
+            val id: String,
+            val exitCode: Int,
+            val result: String,
+            val durationMs: Long,
+            val sessionId: String = "",
+        ) : Inbound
         data class Error(val id: String, val message: String) : Inbound
         data object Pong : Inbound
         data class Unknown(val type: String) : Inbound
@@ -91,6 +99,7 @@ object PcBridgeProtocol {
                 exitCode = obj["exitCode"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1,
                 result = obj.stringOrEmpty("result"),
                 durationMs = obj["durationMs"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
+                sessionId = obj.stringOrEmpty("sessionId"),
             )
             "error" -> Inbound.Error(
                 id = obj.stringOrEmpty("id"),

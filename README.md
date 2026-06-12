@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.72
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.73
 
 ---
 
@@ -32,6 +32,13 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.73 重点
+
+- 远程电脑任务支持会话续传：pc_cli_run 结果返回会话 ID，下次传入 session 参数即可让电脑端 claude 带着之前的上下文继续干活，适合"修完再改、改完再问"的连续迭代。
+- 方案借鉴同赛道开源项目 ccpocket（870 星）和 cc-connect 的 claude --resume 实践，参考库归档于 D:
+b-reference。
+- 真机实测：第一个任务记下暗号、第二个任务续传会话准确答出，跨任务记忆 10.8s 回传。
 
 ## 1.0.72 重点
 
