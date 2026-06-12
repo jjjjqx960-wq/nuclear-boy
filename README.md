@@ -64,7 +64,9 @@ b-pc-bridge
    python bridge.py install-autostart   # 注册登录自启（可选）
    python bridge.py serve               # 或手动启动
    ```
-2. **手机端**：设置 → 远程电脑 → 打开开关，填电脑地址（如 `ws://192.168.1.10:7860`）和 token → 测试连接。
+2. **手机端**：设置 → 远程电脑 → 打开开关。
+   - **扫码配对（推荐）**：电脑端 `python bridge.py pair` 打印二维码，手机点「📷 扫码配对」对准电脑屏幕，地址和 token 自动填好并保存。中继场景用 `python bridge.py pair --relay ws://服务器:8970 --relay-key 口令`。
+   - 或手动填电脑地址（如 `ws://192.168.1.10:7860`）和 token → 测试连接。
 3. **使用**：直接对核弹男孩说——
    - "让电脑上的 claude 修复 D:/myproject 的编译错误"
    - "用 codex 在电脑上写个脚本"（自动返回会话 ID）

@@ -1,3 +1,4 @@
+2026-06-12 1.0.82 配对载荷：新增 PcPairingPayload.parse 解析 nbpair://pair?u=&t= 二维码（纯 JVM 不依赖 android.net.Uri，URLDecoder 还原内嵌 query），扫码后回填 url+token；PcPairingPayloadTest 覆盖局域网/中继/非法/空白用例。
 2026-06-12 1.0.81 公网中继接入：手机地址直接填中继 client URL（ws://服务器:8970/client/<room>?key=口令）即走中继，toHttpWsUrl 透传 path+query 复用既有连接逻辑无需改协议；设置页新增外网控制说明。
 2026-06-12 1.0.80 权限审批：RunMessage.approval=ask、permission_request 入站、permission_response 出站；PermissionPromptBus 驱动聊天界面审批弹窗。
 2026-06-12 1.0.78 session="last" 别名自动续传；配置存储记录各 CLI 最近会话 ID。

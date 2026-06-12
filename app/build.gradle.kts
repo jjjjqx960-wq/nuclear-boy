@@ -16,8 +16,8 @@ android {
         applicationId = "com.nuclearboy.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 91
-        versionName = "1.0.81"
+        versionCode = 92
+        versionName = "1.0.82"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -146,6 +146,9 @@ dependencies {
 
     // Logging
     implementation(libs.timber)
+
+    // 配对二维码扫描（远程电脑设置）
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     // Testing
     testImplementation(libs.junit)

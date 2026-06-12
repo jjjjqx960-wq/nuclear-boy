@@ -1,3 +1,4 @@
+2026-06-12 1.0.82 扫码配对：电脑端 python bridge.py pair 打印二维码（局域网/公网中继都支持），手机设置页「扫码配对」一扫自动填地址+token 并保存，免去手输长串中继 URL 和 token。载荷用 nbpair://pair?u=&t= 紧凑 URI（中继 room/key 已含在 url 里），PC 生成 + 手机解析双侧单测通过；扫码 UI 用 zxing-android-embedded（自带相机权限+预览）。相机识别需对屏实扫人工确认。
 2026-06-12 1.0.81 自建公网中继：在有公网 IP 的服务器跑 relay_server.py，电脑端 bridge serve --relay 反连挂为 agent，手机外网填 ws://服务器:8970/client/<room>?key=口令 即可控制家里电脑。中继按 cid 分流多手机互不串台，token 端到端鉴权中继看不到明文；设置页加外网控制说明，PC 端 serve 启动打印 room 和手机填写地址。全链路 + 双手机并发 demux 实测通过。
 2026-06-12 1.0.80 远程任务权限转发到手机审批（借鉴 ccpocket canUseTool）：pc_cli_run 传 approval=ask 时，电脑端 claude 每个写文件/执行命令操作弹到手机让用户允许/拒绝，经本地 MCP 审批服务 + --permission-prompt-tool 实现；批准/拒绝双路径电脑端实测通过。
 2026-06-12 1.0.79 接入 OpenCode CLI：主流编程 CLI 三件套（Claude Code / Codex / OpenCode）齐全，opencode 支持 JSON 事件流解析和 -s 会话续传，旧配置自动合并新增 CLI。

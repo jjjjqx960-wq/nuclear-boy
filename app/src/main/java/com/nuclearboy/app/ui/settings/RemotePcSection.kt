@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,8 +32,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.nuclearboy.remotepc.PcBridgeClient
 import com.nuclearboy.remotepc.PcBridgeConfigStore
+import com.nuclearboy.remotepc.PcPairingPayload
 
 /**
  * 设置页 · 远程电脑区块。
@@ -85,6 +89,56 @@ fun RemotePcSection(
 
                 var urlInput by remember(config.url) { mutableStateOf(config.url) }
                 var tokenInput by remember { mutableStateOf("") }
+                var scanMessage by remember { mutableStateOf("") }
+
+                val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+                    val contents = result.contents
+                    when {
+                        contents == null -> scanMessage = ""  // 用户取消
+                        else -> {
+                            val payload = PcPairingPayload.parse(contents)
+                            if (payload == null) {
+                                scanMessage = "这个二维码不是核弹男孩配对码 🤔 请扫电脑端 bridge.py pair 生成的码"
+                            } else {
+                                urlInput = payload.url
+                                tokenInput = payload.token
+                                scanMessage = "扫到了，正在保存… ✨"
+                                onSave(payload.url, payload.token)
+                            }
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        scanMessage = ""
+                        scanLauncher.launch(
+                            ScanOptions()
+                                .setOrientationLocked(false)
+                                .setBeepEnabled(false)
+                                .setPrompt("对准电脑屏幕上 bridge.py pair 的二维码")
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("📷 扫码配对（推荐）") }
+
+                if (scanMessage.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        scanMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp,
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "或手动填写：",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
 
                 OutlinedTextField(
                     value = urlInput,
@@ -176,7 +230,7 @@ fun RemotePcSection(
 
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "电脑端先运行 nb-pc-bridge：python bridge.py init 生成 token，python bridge.py serve 启动服务。手机和电脑要在同一网络（WiFi 或 USB 共享网络）。",
+                    "电脑端先运行 nb-pc-bridge：python bridge.py init 生成 token，python bridge.py serve 启动服务。手机和电脑要在同一网络（WiFi 或 USB 共享网络）。配对最省事：电脑端 python bridge.py pair 打印二维码，手机点上面「扫码配对」对准即可。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 18.sp,
