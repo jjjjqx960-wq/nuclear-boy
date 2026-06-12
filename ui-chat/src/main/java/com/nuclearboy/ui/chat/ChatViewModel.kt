@@ -90,7 +90,22 @@ class ChatViewModel @Inject constructor(
     fun setMode(mode: Int) { selectedMode = mode.coerceIn(0, 2) }
     fun selectModel(modelId: String) { apiKeyManager.selectModel(modelId) }
 
+    /** 远程电脑权限审批弹窗：非 null 时聊天界面弹出确认框 */
+    private val _permissionPrompt = MutableStateFlow<com.nuclearboy.common.PermissionPromptBus.PermissionRequest?>(null)
+    val permissionPrompt: StateFlow<com.nuclearboy.common.PermissionPromptBus.PermissionRequest?> = _permissionPrompt.asStateFlow()
+
+    fun respondPermission(approved: Boolean) {
+        _permissionPrompt.value?.decision?.complete(approved)
+        _permissionPrompt.value = null
+    }
+
     init {
+        // 远程电脑权限请求 → 弹窗等用户决定
+        viewModelScope.launch {
+            com.nuclearboy.common.PermissionPromptBus.requests.collect { request ->
+                _permissionPrompt.value = request
+            }
+        }
         // 长耗时工具（如 pc_cli_run）的实时进度 → 追加到当前 RUNNING 工具卡片的输出
         viewModelScope.launch {
             com.nuclearboy.common.ToolProgressBus.events.collect { progress ->

@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.79
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.80
 
 ---
 
@@ -32,6 +32,12 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.80 重点
+
+- 权限转发到手机审批（借鉴 ccpocket）：pc_cli_run 传 approval=ask（仅 claude），电脑端每个写文件/执行命令操作都弹到手机上让用户「允许/拒绝」，拒绝则该操作不执行；适合高危或不放心的远程任务。
+- 实现：电脑端独立 MCP 审批服务（mcp_approval.py）+ claude --permission-prompt-tool + 隔离 settings（绕开本机 allow 列表），审批请求经 bridge 路由到手机弹窗，决定原路返回。
+- 实测：电脑端批准路径文件被创建、拒绝路径文件未创建，双路径端到端通过；审批通道异常/超时一律保守拒绝。
 
 ## 1.0.79 重点
 

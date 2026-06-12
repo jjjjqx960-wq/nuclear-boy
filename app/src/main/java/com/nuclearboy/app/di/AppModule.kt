@@ -604,6 +604,7 @@ else:
                 ToolParameter("timeout", "integer", "任务超时秒数（默认 600）", required = false, default = "600"),
                 ToolParameter("session", "string", "上次结果里的会话 ID，或直接传 \"last\" 续传该 CLI 最近一次任务的会话，CLI 会记住之前的上下文", required = false),
                 ToolParameter("isolate", "string", "传 \"true\" 时在 git 仓库旁创建隔离 worktree 执行，改动不碰主工作区，适合实验性修改或并行多任务", required = false, enum = listOf("true", "false")),
+                ToolParameter("approval", "string", "传 \"ask\" 时（仅 claude）电脑端每个写文件/执行命令操作都弹到手机上让用户批准，适合高危或不放心的任务；默认 auto 自动放行", required = false, enum = listOf("auto", "ask")),
             ),
             executor = { params ->
                 val cli = params["cli"] ?: ""
@@ -619,10 +620,17 @@ else:
                         timeoutSec = params["timeout"]?.toIntOrNull() ?: PcBridgeClient.DEFAULT_TASK_TIMEOUT_SEC,
                         sessionId = params["session"],
                         useWorktree = params["isolate"] == "true",
+                        approval = params["approval"]?.takeIf { it == "ask" },
                         onOutput = { kind, text ->
                             if (kind == "tool" || kind == "status") outputLines.add(text)
                             // 实时进度推给聊天界面的工具卡片
                             ToolProgressBus.report("pc_cli_run", text)
+                        },
+                        onPermissionRequest = { toolName, inputSummary ->
+                            ToolProgressBus.report("pc_cli_run", "等待你在手机上批准: $toolName")
+                            PermissionPromptBus.requestApproval(
+                                taskId = "pc_cli_run", toolName = toolName, inputSummary = inputSummary,
+                            )
                         },
                     )
                     when (result) {

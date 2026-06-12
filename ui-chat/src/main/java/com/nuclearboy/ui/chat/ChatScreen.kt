@@ -419,6 +419,33 @@ fun ChatScreen(
                 },
             )
         }
+
+        // 远程电脑权限审批弹窗
+        val permissionPrompt by viewModel.permissionPrompt.collectAsState()
+        permissionPrompt?.let { request ->
+            AlertDialog(
+                onDismissRequest = { viewModel.respondPermission(false) },
+                title = { Text("电脑请求权限", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column {
+                        Text("电脑上的 ${request.toolName} 操作需要你批准：")
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            request.inputSummary.ifBlank { "(无参数详情)" },
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            color = NuclearBoyTheme.colorScheme.material.onSurfaceVariant,
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.respondPermission(true) }) { Text("允许") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.respondPermission(false) }) { Text("拒绝") }
+                },
+            )
+        }
     } // Box
 }
 

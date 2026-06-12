@@ -145,6 +145,31 @@ class PcBridgeProtocolTest {
     }
 
     @Test
+    fun `parse permission_request with input summary`() {
+        val msg = PcBridgeProtocol.parseInbound(
+            """{"type":"permission_request","id":"t1","toolName":"Bash","input":{"command":"rm -rf x"}}"""
+        )
+        val req = msg as PcBridgeProtocol.Inbound.PermissionRequest
+        assertEquals("Bash", req.toolName)
+        assertTrue(req.inputSummary.contains("command"))
+    }
+
+    @Test
+    fun `encodePermissionResponse carries decision`() {
+        val raw = PcBridgeProtocol.encodePermissionResponse("t1", approved = true)
+        assertTrue(raw.contains("\"type\":\"permission_response\""))
+        assertTrue(raw.contains("\"approved\":true"))
+    }
+
+    @Test
+    fun `encodeRun includes approval mode`() {
+        val raw = PcBridgeProtocol.encodeRun(
+            PcBridgeProtocol.RunMessage(id = "t4", cli = "claude", prompt = "x", approval = "ask")
+        )
+        assertTrue(raw.contains("\"approval\":\"ask\""))
+    }
+
+    @Test
     fun `parse invalid json returns null`() {
         assertNull(PcBridgeProtocol.parseInbound("not json"))
         assertNull(PcBridgeProtocol.parseInbound("""{"noType":1}"""))

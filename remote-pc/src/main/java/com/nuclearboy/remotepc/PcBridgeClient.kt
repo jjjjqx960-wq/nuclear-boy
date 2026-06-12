@@ -84,7 +84,9 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         timeoutSec: Int = DEFAULT_TASK_TIMEOUT_SEC,
         sessionId: String? = null,
         useWorktree: Boolean = false,
+        approval: String? = null,
         onOutput: suspend (kind: String, text: String) -> Unit = { _, _ -> },
+        onPermissionRequest: (suspend (toolName: String, inputSummary: String) -> Boolean)? = null,
     ): AppResult<CliTaskResult> {
         if (!configStore.isEnabled()) {
             return AppResult.failure(AppError.InvalidRequest, "远程电脑功能未开启，去设置页打开并配置连接")
@@ -123,6 +125,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
                             cwd = cwd?.takeIf { it.isNotBlank() }, timeoutSec = timeoutSec,
                             sessionId = resolvedSessionId?.takeIf { it.isNotBlank() },
                             worktree = if (useWorktree) true else null,
+                            approval = approval?.takeIf { it.isNotBlank() },
                         )
                     )
                 } else {
@@ -149,6 +152,13 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
                                     msg.exitCode, msg.result, msg.durationMs, outputLog,
                                     msg.sessionId, msg.worktreePath, msg.worktreeBranch,
                                 )
+                            )
+                        }
+                        is PcBridgeProtocol.Inbound.PermissionRequest -> if (msg.id == taskId) {
+                            // 电脑端 claude 请求权限：交给界面决定，结果回传 bridge
+                            val approved = onPermissionRequest?.invoke(msg.toolName, msg.inputSummary) ?: false
+                            session.ws.send(
+                                PcBridgeProtocol.encodePermissionResponse(taskId, approved)
                             )
                         }
                         is PcBridgeProtocol.Inbound.Error -> if (msg.id == taskId || msg.id.isBlank()) {

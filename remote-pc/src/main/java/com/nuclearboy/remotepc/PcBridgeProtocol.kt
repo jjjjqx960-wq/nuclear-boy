@@ -41,6 +41,8 @@ object PcBridgeProtocol {
         val sessionId: String? = null,
         /** true 时在 cwd 仓库旁创建隔离 git worktree 执行，互不干扰 */
         val worktree: Boolean? = null,
+        /** "ask" 时电脑端每个工具操作弹手机审批（仅 claude） */
+        val approval: String? = null,
     )
 
     @Serializable
@@ -53,6 +55,14 @@ object PcBridgeProtocol {
     data class ListTasksMessage(val type: String = "list_tasks")
 
     @Serializable
+    data class PermissionResponseMessage(
+        val type: String = "permission_response",
+        val id: String,
+        val approved: Boolean,
+        val message: String = "",
+    )
+
+    @Serializable
     data class PingMessage(val type: String = "ping")
 
     fun encodeAuth(token: String): String = json.encodeToString(AuthMessage(token = token))
@@ -60,6 +70,8 @@ object PcBridgeProtocol {
     fun encodeCancel(id: String): String = json.encodeToString(CancelMessage(id = id))
     fun encodeGetResult(id: String): String = json.encodeToString(GetResultMessage(id = id))
     fun encodeListTasks(): String = json.encodeToString(ListTasksMessage())
+    fun encodePermissionResponse(id: String, approved: Boolean, message: String = ""): String =
+        json.encodeToString(PermissionResponseMessage(id = id, approved = approved, message = message))
     fun encodePing(): String = json.encodeToString(PingMessage())
 
     // ── 入站消息 ─────────────────────────────────────
@@ -82,6 +94,11 @@ object PcBridgeProtocol {
         data object Pong : Inbound
         data class Cancelled(val id: String) : Inbound
         data class Tasks(val tasks: List<RunningTask>) : Inbound
+        data class PermissionRequest(
+            val id: String,
+            val toolName: String,
+            val inputSummary: String,
+        ) : Inbound
         data class Unknown(val type: String) : Inbound
     }
 
@@ -131,6 +148,15 @@ object PcBridgeProtocol {
             )
             "pong" -> Inbound.Pong
             "cancelled" -> Inbound.Cancelled(obj.stringOrEmpty("id"))
+            "permission_request" -> Inbound.PermissionRequest(
+                id = obj.stringOrEmpty("id"),
+                toolName = obj.stringOrEmpty("toolName"),
+                inputSummary = (obj["input"] as? JsonObject)?.let { inp ->
+                    inp.entries.joinToString("，") { (k, v) ->
+                        "$k=${v.toString().take(120)}"
+                    }
+                } ?: "",
+            )
             "tasks" -> Inbound.Tasks(
                 (obj["tasks"] as? kotlinx.serialization.json.JsonArray)
                     ?.mapNotNull { el ->
