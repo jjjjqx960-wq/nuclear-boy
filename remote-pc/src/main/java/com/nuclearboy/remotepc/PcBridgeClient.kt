@@ -305,7 +305,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                inbox.close(BridgeClosedException(reason.ifBlank { "连接已关闭($code)" }))
+                inbox.close(BridgeClosedException(friendlyCloseMessage(code, reason)))
             }
         })
         cont.invokeOnCancellation { ws.cancel() }
@@ -322,6 +322,21 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
     companion object {
         const val DEFAULT_TASK_TIMEOUT_SEC = 600
         const val LAST_SESSION_ALIAS = "last"
+
+        /**
+         * 把 WebSocket 关闭码翻译成给用户看的可操作中文提示。
+         *
+         * 4003/4004/4009/4000 是公网中继（relay_server.py）的应用关闭码，
+         * 4029 是电脑端 bridge 鉴权限速封禁；其余回退到原因文本或通用提示。
+         */
+        fun friendlyCloseMessage(code: Int, reason: String): String = when (code) {
+            4003 -> "中继口令不对，检查手机地址里的 key 和电脑端 --relay-key 是否一致"
+            4004 -> "电脑还没上线（中继里这个房间没有电脑）。先在电脑端运行 bridge serve --relay 反连中继"
+            4009 -> "这个房间已经有另一台电脑了，换个 room 或确认电脑没重复启动"
+            4000 -> "中继地址格式不对，应是 ws://中继地址:端口/client/<房间>"
+            4029 -> "连接被电脑临时拒绝：短时间内 token 错误次数过多被封禁，等几分钟再试"
+            else -> reason.ifBlank { "连接已关闭（$code）" }
+        }
         private const val SESSION_GRACE_SEC = 30
         private const val CONNECT_TEST_TIMEOUT_MS = 15_000L
         private const val MAX_OUTPUT_LOG_LINES = 200
