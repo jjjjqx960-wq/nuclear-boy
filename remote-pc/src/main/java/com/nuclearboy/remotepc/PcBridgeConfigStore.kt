@@ -67,6 +67,15 @@ class PcBridgeConfigStore(context: Context) {
         refresh()
     }
 
+    /** 记录某 CLI 最近一次任务的会话 ID，供 session="last" 自动续传。 */
+    fun recordLastSession(cli: String, sessionId: String) {
+        if (sessionId.isBlank()) return
+        prefs.edit().putString("$KEY_LAST_SESSION_PREFIX$cli", sessionId).apply()
+    }
+
+    fun lastSession(cli: String): String =
+        prefs.getString("$KEY_LAST_SESSION_PREFIX$cli", "") ?: ""
+
     fun currentUrl(): String = prefs.getString(KEY_URL, "") ?: ""
 
     fun currentToken(): String = prefs.getString(KEY_TOKEN, "") ?: ""
@@ -103,5 +112,6 @@ class PcBridgeConfigStore(context: Context) {
         const val KEY_TOKEN = "pc_bridge_token"
         const val KEY_LAST_HOST = "pc_bridge_last_host"
         const val KEY_LAST_CLIS = "pc_bridge_last_clis"
+        const val KEY_LAST_SESSION_PREFIX = "pc_bridge_last_session_"
     }
 }

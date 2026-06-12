@@ -92,6 +92,13 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         if (!configStore.isConfigured()) {
             return AppResult.failure(AppError.InvalidRequest, "远程电脑还没配置好，去设置页填写地址和 token")
         }
+        // session="last" → 自动续传该 CLI 最近一次任务的会话
+        val resolvedSessionId = when {
+            sessionId == LAST_SESSION_ALIAS -> configStore.lastSession(cli).ifBlank {
+                return AppResult.failure(AppError.InvalidRequest, "还没有可续传的 $cli 会话，先跑一次任务再用 last")
+            }
+            else -> sessionId
+        }
         val taskId = UUID.randomUUID().toString().replace("-", "")
         // 任务超时之外额外留出连接和收尾的余量
         val deadline = System.currentTimeMillis() + (timeoutSec + SESSION_GRACE_SEC) * 1000L
@@ -114,7 +121,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
                         PcBridgeProtocol.RunMessage(
                             id = taskId, cli = cli, prompt = prompt,
                             cwd = cwd?.takeIf { it.isNotBlank() }, timeoutSec = timeoutSec,
-                            sessionId = sessionId?.takeIf { it.isNotBlank() },
+                            sessionId = resolvedSessionId?.takeIf { it.isNotBlank() },
                             worktree = if (useWorktree) true else null,
                         )
                     )
@@ -136,6 +143,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
                             }
                         }
                         is PcBridgeProtocol.Inbound.Done -> if (msg.id == taskId) {
+                            configStore.recordLastSession(cli, msg.sessionId)
                             return@withSession AppResult.success(
                                 CliTaskResult(
                                     msg.exitCode, msg.result, msg.durationMs, outputLog,
@@ -303,6 +311,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
 
     companion object {
         const val DEFAULT_TASK_TIMEOUT_SEC = 600
+        const val LAST_SESSION_ALIAS = "last"
         private const val SESSION_GRACE_SEC = 30
         private const val CONNECT_TEST_TIMEOUT_MS = 15_000L
         private const val MAX_OUTPUT_LOG_LINES = 200

@@ -1,3 +1,4 @@
+2026-06-12 1.0.78 session="last" 别名自动续传；配置存储记录各 CLI 最近会话 ID。
 2026-06-12 1.0.77 RunMessage.worktree 隔离标记、Done.worktreePath/worktreeBranch 回传；runCliTask 新增 useWorktree 参数。
 2026-06-12 1.0.76 新增 listRunningTasks 任务列表查询和 cancelActiveTasksAsync 批量取消；客户端跟踪本机发起的在途任务。
 2026-06-12 1.0.74 断线自动恢复：runCliTask 网络波动后重连（最多 5 次），用 get_result 取回结果或重挂输出流，避免任务白跑。

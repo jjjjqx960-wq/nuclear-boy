@@ -602,7 +602,7 @@ else:
                 ToolParameter("prompt", "string", "下发给 CLI 的任务描述，要完整、自包含（CLI 在电脑上独立执行，看不到当前对话）", required = true),
                 ToolParameter("cwd", "string", "电脑上的工作目录，如 D:/myproject。不传用电脑端默认目录", required = false),
                 ToolParameter("timeout", "integer", "任务超时秒数（默认 600）", required = false, default = "600"),
-                ToolParameter("session", "string", "上次结果里的会话 ID，传入后 CLI 续传之前的对话上下文，适合连续迭代", required = false),
+                ToolParameter("session", "string", "上次结果里的会话 ID，或直接传 \"last\" 续传该 CLI 最近一次任务的会话，CLI 会记住之前的上下文", required = false),
                 ToolParameter("isolate", "string", "传 \"true\" 时在 git 仓库旁创建隔离 worktree 执行，改动不碰主工作区，适合实验性修改或并行多任务", required = false, enum = listOf("true", "false")),
             ),
             executor = { params ->

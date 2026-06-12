@@ -41,6 +41,8 @@ class AppDiagnostics @Inject constructor(
     private val pythonSandbox: PythonSandbox,
     private val fileOperations: FileOperations,
     private val toolRegistry: ToolRegistry,
+    private val pcBridgeConfigStore: com.nuclearboy.remotepc.PcBridgeConfigStore,
+    private val pcBridgeClient: com.nuclearboy.remotepc.PcBridgeClient,
 ) {
     suspend fun runAll(): List<DiagnosticResult> = withContext(Dispatchers.IO) {
         val checks = listOf<suspend () -> DiagnosticResult>(
@@ -53,6 +55,7 @@ class AppDiagnostics @Inject constructor(
             { checkFileOperations() },
             { checkToolRegistry() },
             { checkToolPythonBridge() },
+            { checkPcBridge() },
         )
         checks.map { check ->
             runCatching { check() }.getOrElse { error ->
@@ -68,6 +71,39 @@ class AppDiagnostics @Inject constructor(
                     "[Diag] ${result.name} status=${result.status} durationMs=${result.durationMs} detailLen=${result.detail.length}",
                 )
             }
+        }
+    }
+
+    private suspend fun checkPcBridge(): DiagnosticResult = timedSuspend("远程电脑桥接") {
+        if (!pcBridgeConfigStore.isEnabled()) {
+            return@timedSuspend DiagnosticResult(
+                name = "远程电脑桥接",
+                status = DiagnosticStatus.WARN,
+                message = "未开启（可选功能）",
+                detail = "设置 → 远程电脑 可开启手机控制电脑编程 CLI",
+            )
+        }
+        if (!pcBridgeConfigStore.isConfigured()) {
+            return@timedSuspend DiagnosticResult(
+                name = "远程电脑桥接",
+                status = DiagnosticStatus.WARN,
+                message = "已开启但未配置地址或 token",
+                detail = "去 设置 → 远程电脑 填写电脑地址和 token",
+            )
+        }
+        when (val result = pcBridgeClient.testConnection()) {
+            is com.nuclearboy.common.AppResult.Success -> DiagnosticResult(
+                name = "远程电脑桥接",
+                status = DiagnosticStatus.PASS,
+                message = "已连上 ${result.data.host}",
+                detail = result.data.clis.entries.joinToString("；") { "${it.key}: ${it.value}" },
+            )
+            is com.nuclearboy.common.AppResult.Failure -> DiagnosticResult(
+                name = "远程电脑桥接",
+                status = DiagnosticStatus.FAIL,
+                message = "连不上电脑",
+                detail = (result.technicalDetail ?: result.error.humanMessage).take(300),
+            )
         }
     }
 

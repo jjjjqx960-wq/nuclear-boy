@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.77
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.78
 
 ---
 
@@ -32,6 +32,35 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.78 重点
+
+- session="last"：续传不再需要复制会话 ID，AI 直接传 last 就接上该 CLI 最近一次任务的上下文（按 CLI 分别记忆、加密落盘、重启 App 仍有效），真机实测通过。
+- 全量自检新增"远程电脑桥接"检查项：未开启给提示、未配置给指引、已配置实测连通并列出可用 CLI。
+- bridge 安全加固：同一来源连续 5 次鉴权失败封禁 5 分钟（实测第 6 次起连正确 token 也被拒），防 token 爆破。
+- README 新增远程电脑使用指南（电脑端三条命令 + 手机端配置 + 常用说法）。
+
+## 远程电脑使用指南
+
+让手机上的核弹男孩控制电脑上的 Claude Code / Codex：
+
+1. **电脑端**（一次性）：
+   ```bash
+   cd D:	ools
+b-pc-bridge
+   python bridge.py init                # 生成 token，记下显示的 ws:// 地址
+   python bridge.py install-autostart   # 注册登录自启（可选）
+   python bridge.py serve               # 或手动启动
+   ```
+2. **手机端**：设置 → 远程电脑 → 打开开关，填电脑地址（如 `ws://192.168.1.10:7860`）和 token → 测试连接。
+3. **使用**：直接对核弹男孩说——
+   - "让电脑上的 claude 修复 D:/myproject 的编译错误"
+   - "用 codex 在电脑上写个脚本"（自动返回会话 ID）
+   - "继续刚才那个任务，再加上单元测试"（AI 用 session=last 续传）
+   - "电脑上在跑什么？"（pc_task_list）
+   - 实验性改动可要求"隔离执行"（worktree，不碰主工作区）
+
+特性：任务输出实时流到聊天工具卡片；手机断线任务不丢（重连自动取回）；取消对话自动终止电脑任务；鉴权失败 5 次封禁 5 分钟防爆破。
 
 ## 1.0.77 重点
 
