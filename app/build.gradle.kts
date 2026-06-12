@@ -16,8 +16,8 @@ android {
         applicationId = "com.nuclearboy.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 81
-        versionName = "1.0.71"
+        versionCode = 82
+        versionName = "1.0.72"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -92,6 +92,7 @@ dependencies {
     implementation(project(":agent-core"))
     implementation(project(":python-bridge"))
     implementation(project(":memory"))
+    implementation(project(":remote-pc"))
     implementation(project(":skills"))
     implementation(project(":tools-docgen"))
     implementation(project(":ui-chat"))

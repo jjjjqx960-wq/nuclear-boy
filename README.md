@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.71
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.72
 
 ---
 
@@ -32,6 +32,14 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.72 重点
+
+- 新增"远程电脑"能力：在设置页配置电脑地址和 token 后，AI 可通过 pc_cli_run 把编程任务下发给电脑上的 Claude Code / Codex 执行，结果流式回传手机。
+- 电脑端配套 nb-pc-bridge 守护进程（Python WebSocket 服务，token 鉴权，hmac 时序安全比对），支持局域网/USB 共享网络直连，协议预留自建中继扩展。
+- 新增 pc_bridge_status 工具，AI 可自查电脑连接状态和可用 CLI 版本。
+- 新增 DEBUG_SAVE_PC_BRIDGE 调试广播，ADB 一条命令写入配置并实跑任务验证。
+- 真机实测：USB 直连下手机下发 claude 任务 11 秒回传结果，token 错误正确拒绝，全模块单测和聊天旅程门禁通过。
 
 ## 1.0.70 重点
 

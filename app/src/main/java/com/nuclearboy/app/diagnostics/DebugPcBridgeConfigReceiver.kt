@@ -1,0 +1,88 @@
+package com.nuclearboy.app.diagnostics
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.util.Log
+import com.nuclearboy.app.BuildConfig
+import com.nuclearboy.common.AppResult
+import com.nuclearboy.remotepc.PcBridgeClient
+import com.nuclearboy.remotepc.PcBridgeConfigStore
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+/**
+ * 调试入口：通过 ADB 广播写入远程电脑桥接配置，便于真机端到端测试。
+ *
+ * adb shell am broadcast -a com.nuclearboy.app.DEBUG_SAVE_PC_BRIDGE \
+ *   -n com.nuclearboy.app.debug/com.nuclearboy.app.diagnostics.DebugPcBridgeConfigReceiver \
+ *   --es url "ws://192.168.1.10:7860" --es token "<token>" --ez enabled true
+ *
+ * 仅 debug 构建注册；日志不输出明文 token。
+ */
+@AndroidEntryPoint
+class DebugPcBridgeConfigReceiver : BroadcastReceiver() {
+
+    @Inject lateinit var configStore: PcBridgeConfigStore
+    @Inject lateinit var bridgeClient: PcBridgeClient
+
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != ACTION_SAVE_PC_BRIDGE) return
+        if (!BuildConfig.DEBUG) {
+            Log.e(TAG, "ignored in non-debug build")
+            return
+        }
+
+        val url = intent.getStringExtra(EXTRA_URL).orEmpty().trim()
+        val token = intent.getStringExtra(EXTRA_TOKEN)?.trim().orEmpty()
+        val enabled = intent.getBooleanExtra(EXTRA_ENABLED, true)
+
+        if (url.isBlank()) {
+            Log.e(TAG, "missing url extra")
+            return
+        }
+        configStore.saveConnection(url, token.takeIf { it.isNotBlank() })
+        configStore.setEnabled(enabled)
+        Log.e(TAG, "saved pc bridge url=$url enabled=$enabled hasToken=${token.isNotBlank()} tokenLength=${token.length}")
+
+        // 保存后立即测试连接；传了 run_cli/run_prompt 时再实跑一条任务。
+        // 结果打到 logcat，便于 ADB 端到端验证
+        val runCli = intent.getStringExtra(EXTRA_RUN_CLI)?.trim().orEmpty()
+        val runPrompt = intent.getStringExtra(EXTRA_RUN_PROMPT)?.trim().orEmpty()
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                when (val result = bridgeClient.testConnection()) {
+                    is AppResult.Success ->
+                        Log.e(TAG, "test connection OK host=${result.data.host} clis=${result.data.clis}")
+                    is AppResult.Failure ->
+                        Log.e(TAG, "test connection FAILED code=${result.error.code} detail=${result.technicalDetail}")
+                }
+                if (runCli.isNotBlank() && runPrompt.isNotBlank()) {
+                    Log.e(TAG, "test run start cli=$runCli promptLen=${runPrompt.length}")
+                    when (val run = bridgeClient.runCliTask(cli = runCli, prompt = runPrompt)) {
+                        is AppResult.Success ->
+                            Log.e(TAG, "test run OK exit=${run.data.exitCode} ${run.data.durationMs}ms result=${run.data.result.take(200)}")
+                        is AppResult.Failure ->
+                            Log.e(TAG, "test run FAILED code=${run.error.code} detail=${run.technicalDetail}")
+                    }
+                }
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    companion object {
+        private const val TAG = "NuclearBoyDebugPcBridge"
+        const val ACTION_SAVE_PC_BRIDGE = "com.nuclearboy.app.DEBUG_SAVE_PC_BRIDGE"
+        const val EXTRA_URL = "url"
+        const val EXTRA_TOKEN = "token"
+        const val EXTRA_ENABLED = "enabled"
+        const val EXTRA_RUN_CLI = "run_cli"
+        const val EXTRA_RUN_PROMPT = "run_prompt"
+    }
+}

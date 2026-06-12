@@ -25,6 +25,7 @@ include(
     ":agent-core",
     ":python-bridge",
     ":memory",
+    ":remote-pc",
     ":skills",
     ":tools-docgen",
     ":ui-chat",

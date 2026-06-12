@@ -13,6 +13,8 @@ import com.nuclearboy.app.python.ChaquopyPythonExecutor
 import com.nuclearboy.memory.MemoryStore
 import com.nuclearboy.python.PythonExecutor
 import com.nuclearboy.python.PythonSandbox
+import com.nuclearboy.remotepc.PcBridgeClient
+import com.nuclearboy.remotepc.PcBridgeConfigStore
 import com.nuclearboy.skills.SkillManager
 import com.nuclearboy.skills.SkillMarketPlace
 import com.nuclearboy.tools.docgen.FileOperations
@@ -153,6 +155,22 @@ object AppModule {
         return FileOperations(root)
     }
 
+    // ── Remote PC Bridge ──────────────────────────────
+
+    @Provides
+    @Singleton
+    fun providePcBridgeConfigStore(@ApplicationContext context: Context): PcBridgeConfigStore {
+        android.util.Log.e("NuclearBoy", "[DI] providePcBridgeConfigStore")
+        return PcBridgeConfigStore(context)
+    }
+
+    @Provides
+    @Singleton
+    fun providePcBridgeClient(configStore: PcBridgeConfigStore): PcBridgeClient {
+        android.util.Log.e("NuclearBoy", "[DI] providePcBridgeClient")
+        return PcBridgeClient(configStore)
+    }
+
     // ── Agent ─────────────────────────────────────────
 
     @Provides
@@ -162,6 +180,8 @@ object AppModule {
         fileOperations: FileOperations,
         skillManager: SkillManager,
         memoryStore: MemoryStore,
+        pcBridgeClient: PcBridgeClient,
+        pcBridgeConfigStore: PcBridgeConfigStore,
     ): ToolRegistry {
         android.util.Log.e("NuclearBoy", "[DI] provideToolRegistry — entry")
         val registry = ToolRegistry()
@@ -181,6 +201,10 @@ object AppModule {
             val memTools = buildMemoryTools(fileOperations)
             android.util.Log.e("NuclearBoy", "[DI] buildMemoryTools — ${memTools.size} tools: ${memTools.joinToString { it.name }}")
             registry.registerAll(memTools)
+
+            val pcTools = buildRemotePcTools(pcBridgeClient, pcBridgeConfigStore)
+            android.util.Log.e("NuclearBoy", "[DI] buildRemotePcTools — ${pcTools.size} tools: ${pcTools.joinToString { it.name }}")
+            registry.registerAll(pcTools)
 
         }
 
@@ -561,5 +585,76 @@ else:
                 android.util.Log.e("NuclearBoy", "[DI] remember saved to ${memFile.absolutePath} total=${trimmed.size}")
                 ToolResult(true, "已记住: $value")
             }),
+    )
+
+    private fun buildRemotePcTools(
+        client: PcBridgeClient,
+        configStore: PcBridgeConfigStore,
+    ) = listOf(
+        ToolDefinition(
+            name = "pc_cli_run",
+            description = "把编程任务下发给用户电脑上的 AI 编程 CLI（Claude Code 或 Codex）执行，返回执行结果。使用场景：1) 用户明确要求\"让电脑上的 claude/codex 做某事\"；2) 任务需要电脑上的完整开发环境（大型项目构建、桌面端工具链）；3) 用户想远程操作电脑里的代码仓库。前提是用户已在设置页开启并配置\"远程电脑\"。任务可能耗时数分钟，耐心等待结果。示例：pc_cli_run(cli=\"claude\", prompt=\"修复 D:/myproject 里的编译错误\", cwd=\"D:/myproject\")",
+            parameters = listOf(
+                ToolParameter("cli", "string", "用哪个编程 CLI。claude=Claude Code，codex=Codex", required = true, enum = listOf("claude", "codex")),
+                ToolParameter("prompt", "string", "下发给 CLI 的任务描述，要完整、自包含（CLI 在电脑上独立执行，看不到当前对话）", required = true),
+                ToolParameter("cwd", "string", "电脑上的工作目录，如 D:/myproject。不传用电脑端默认目录", required = false),
+                ToolParameter("timeout", "integer", "任务超时秒数（默认 600）", required = false, default = "600"),
+            ),
+            executor = { params ->
+                val cli = params["cli"] ?: ""
+                val prompt = params["prompt"] ?: ""
+                if (prompt.isBlank()) {
+                    ToolResult.failure("缺少 prompt 参数，告诉我要让电脑做什么")
+                } else {
+                    val outputLines = mutableListOf<String>()
+                    val result = client.runCliTask(
+                        cli = cli,
+                        prompt = prompt,
+                        cwd = params["cwd"],
+                        timeoutSec = params["timeout"]?.toIntOrNull() ?: PcBridgeClient.DEFAULT_TASK_TIMEOUT_SEC,
+                        onOutput = { kind, text ->
+                            if (kind == "tool" || kind == "status") outputLines.add(text)
+                        },
+                    )
+                    when (result) {
+                        is AppResult.Success -> {
+                            val r = result.data
+                            val process = if (outputLines.isEmpty()) "" else
+                                "\n\n执行过程:\n" + outputLines.takeLast(20).joinToString("\n")
+                            android.util.Log.e("NuclearBoy", "[DI] pc_cli_run done cli=$cli exit=${r.exitCode} ${r.durationMs}ms")
+                            ToolResult(
+                                success = r.exitCode == 0,
+                                output = "电脑端 $cli 执行完成（${r.durationMs / 1000}s）:\n${r.result}$process",
+                                error = if (r.exitCode == 0) null else "CLI 退出码 ${r.exitCode}",
+                            )
+                        }
+                        is AppResult.Failure -> {
+                            android.util.Log.e("NuclearBoy", "[DI] pc_cli_run failed cli=$cli code=${result.error.code}")
+                            ToolResult.failure(result.technicalDetail ?: result.error.humanMessage)
+                        }
+                    }
+                }
+            },
+        ),
+        ToolDefinition(
+            name = "pc_bridge_status",
+            description = "检查和电脑的连接状态，返回电脑主机名和可用的编程 CLI 版本。使用场景：1) 用户问\"电脑连上了吗\"；2) pc_cli_run 失败时排查连接。",
+            parameters = emptyList(),
+            executor = { _ ->
+                if (!configStore.isEnabled()) {
+                    ToolResult.failure("远程电脑功能未开启。提醒用户去 设置 → 远程电脑 打开开关并配置连接")
+                } else {
+                    when (val result = client.testConnection()) {
+                        is AppResult.Success -> {
+                            val info = result.data
+                            val clis = info.clis.entries.joinToString("\n") { "  ${it.key}: ${it.value}" }
+                            ToolResult.success("已连上电脑 ${info.host}，可用 CLI:\n$clis")
+                        }
+                        is AppResult.Failure ->
+                            ToolResult.failure(result.technicalDetail ?: result.error.humanMessage)
+                    }
+                }
+            },
+        ),
     )
 }

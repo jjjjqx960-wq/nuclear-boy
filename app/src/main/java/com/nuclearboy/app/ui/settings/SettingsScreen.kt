@@ -70,6 +70,8 @@ import com.nuclearboy.app.ui.settings.parts.providerModelListVisibleModels
 import com.nuclearboy.app.ui.settings.parts.providerModelRouteHint
 import com.nuclearboy.app.ui.settings.parts.providerModelRouteSuggestedModel
 import com.nuclearboy.app.ui.settings.parts.providerRequestCurlTemplate
+import com.nuclearboy.remotepc.PcBridgeClient
+import com.nuclearboy.remotepc.PcBridgeConfigStore
 import com.nuclearboy.app.update.UpdateDownloader
 import com.nuclearboy.app.update.UpdateManager
 import com.nuclearboy.common.AppResult
@@ -105,11 +107,19 @@ data class FullDiagnosticsUiState(
     val results: List<DiagnosticResult> = emptyList(),
 )
 
+data class PcBridgeTestUiState(
+    val inProgress: Boolean = false,
+    val success: Boolean? = null,
+    val message: String = "",
+)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     val apiKeyManager: ApiKeyManager,
     private val apiClient: DeepSeekApiClient,
     private val appDiagnostics: AppDiagnostics,
+    private val pcBridgeConfigStore: PcBridgeConfigStore,
+    private val pcBridgeClient: PcBridgeClient,
 ) : androidx.lifecycle.ViewModel() {
 
     val apiKeyState = apiKeyManager.state
@@ -119,6 +129,40 @@ class SettingsViewModel @Inject constructor(
     val modelListProbeState: StateFlow<ModelListProbeUiState> = _modelListProbeState.asStateFlow()
     private val _fullDiagnosticsState = MutableStateFlow(FullDiagnosticsUiState())
     val fullDiagnosticsState: StateFlow<FullDiagnosticsUiState> = _fullDiagnosticsState.asStateFlow()
+    val pcBridgeState = pcBridgeConfigStore.state
+    private val _pcBridgeTestState = MutableStateFlow(PcBridgeTestUiState())
+    val pcBridgeTestState: StateFlow<PcBridgeTestUiState> = _pcBridgeTestState.asStateFlow()
+
+    fun setPcBridgeEnabled(enabled: Boolean) {
+        pcBridgeConfigStore.setEnabled(enabled)
+    }
+
+    /** token 传 null 表示保留已存的不变 */
+    fun savePcBridgeConnection(url: String, token: String?) {
+        pcBridgeConfigStore.saveConnection(url, token)
+        _pcBridgeTestState.value = PcBridgeTestUiState(message = "已保存，点测试连接试试 ✨")
+    }
+
+    fun testPcBridgeConnection(url: String, token: String?) {
+        _pcBridgeTestState.value = PcBridgeTestUiState(inProgress = true)
+        viewModelScope.launch {
+            val result = pcBridgeClient.testConnection(
+                url = url.takeIf { it.isNotBlank() },
+                token = token?.takeIf { it.isNotBlank() },
+            )
+            _pcBridgeTestState.value = when (result) {
+                is AppResult.Success -> {
+                    val clis = result.data.clis.entries
+                        .joinToString("，") { "${it.key} ${it.value}" }
+                    PcBridgeTestUiState(success = true, message = "连上了 ${result.data.host} ✨ 可用：$clis")
+                }
+                is AppResult.Failure -> PcBridgeTestUiState(
+                    success = false,
+                    message = result.technicalDetail ?: result.error.humanMessage,
+                )
+            }
+        }
+    }
 
     fun setApiKey(key: String) {
         viewModelScope.launch {
@@ -447,6 +491,8 @@ fun SettingsScreen(
     val modelTestState by viewModel.modelTestState.collectAsState()
     val modelListProbeState by viewModel.modelListProbeState.collectAsState()
     val fullDiagnosticsState by viewModel.fullDiagnosticsState.collectAsState()
+    val pcBridgeState by viewModel.pcBridgeState.collectAsState()
+    val pcBridgeTestState by viewModel.pcBridgeTestState.collectAsState()
     val scrollState = rememberScrollState()
     var showSponsorDialog by remember { mutableStateOf(false) }
 
@@ -1296,6 +1342,15 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            // ── Remote PC Section ────────────────────────
+            RemotePcSection(
+                config = pcBridgeState,
+                testState = pcBridgeTestState,
+                onEnabledChange = { viewModel.setPcBridgeEnabled(it) },
+                onSave = { url, token -> viewModel.savePcBridgeConnection(url, token) },
+                onTest = { url, token -> viewModel.testPcBridgeConnection(url, token) },
+            )
 
             // ── Sponsor Section ──────────────────────────
             Text("❤️ 投喂作者",

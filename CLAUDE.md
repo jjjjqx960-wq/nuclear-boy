@@ -13,6 +13,7 @@ NuclearBoy/
 ├── agent-core/             # Agent 引擎 + 工具注册
 ├── python-bridge/          # Chaquopy Python 沙箱
 ├── memory/                 # Room 三层记忆系统
+├── remote-pc/              # 远程电脑桥接客户端（对端: D:\tools\nb-pc-bridge）
 ├── skills/                 # Skill 管理 + 市场
 ├── tools-docgen/           # Word/Excel 文档生成
 ├── ui-chat/                # 聊天界面 Compose

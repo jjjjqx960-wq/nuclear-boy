@@ -21,6 +21,16 @@
                 <action android:name="com.nuclearboy.app.DEBUG_SAVE_CUSTOM_MODEL" />
             </intent-filter>
         </receiver>
+
+        <!-- 调试配置入口：通过 ADB 写入远程电脑桥接配置。
+             仅 debug 构建注册；接收器内部禁止输出明文 token。 -->
+        <receiver
+            android:name="com.nuclearboy.app.diagnostics.DebugPcBridgeConfigReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.nuclearboy.app.DEBUG_SAVE_PC_BRIDGE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
