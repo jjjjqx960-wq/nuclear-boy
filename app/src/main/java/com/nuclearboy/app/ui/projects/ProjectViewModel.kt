@@ -64,6 +64,26 @@ class ProjectViewModel @Inject constructor(
         }
     }
 
+    fun renameProject(projectId: String, newName: String) {
+        val project = _projects.value.find { it.id == projectId } ?: return
+        if (newName.isBlank() || newName.trim() == project.name) return
+        viewModelScope.launch {
+            val saved = fileOperations.currentProjectDir
+            fileOperations.currentProjectDir = ""
+            val result = withContext(Dispatchers.IO) { fileOperations.renameProject(project.name, newName) }
+            // 若当前选中的就是被改名的项目，更新指向新名
+            fileOperations.currentProjectDir =
+                if (saved == project.name && result is com.nuclearboy.common.AppResult.Success) result.data else saved
+            if (result is com.nuclearboy.common.AppResult.Success) {
+                android.util.Log.e("NuclearBoy", "[ProjectVM] renameProject SUCCESS: ${project.name} -> ${result.data}")
+                loadProjects()
+            } else {
+                val err = (result as com.nuclearboy.common.AppResult.Failure).error.humanMessage
+                android.util.Log.e("NuclearBoy", "[ProjectVM] renameProject FAILED: $err")
+            }
+        }
+    }
+
     fun selectProject(projectId: String) {
         val project = _projects.value.find { it.id == projectId }
         if (project != null) {

@@ -35,6 +35,7 @@ fun SidebarContent(
     onProjectSelected: (String) -> Unit,
     onCreateProject: (String) -> Unit,
     onDeleteProject: (String) -> Unit,
+    onRenameProject: (String, String) -> Unit = { _, _ -> },
     onSkillManagerClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onClose: () -> Unit,
@@ -42,6 +43,8 @@ fun SidebarContent(
     var showCreateDialog by remember { mutableStateOf(false) }
     var newProjectName by remember { mutableStateOf("") }
     var projectToDelete by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var projectToRename by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var renameText by remember { mutableStateOf("") }
 
     android.util.Log.e("NuclearBoy", "[Sidebar] SidebarContent composed projects=${projects.size} currentId=$currentProjectId activeSkills=${activeSkills.size}")
 
@@ -169,6 +172,17 @@ fun SidebarContent(
                                 )
                             }
                             IconButton(
+                                onClick = {
+                                    projectToRename = project.id to project.name
+                                    renameText = project.name
+                                },
+                                modifier = Modifier.size(24.dp),
+                            ) {
+                                Icon(Icons.Default.Edit, "重命名",
+                                    tint = Color(0xFF4E515B),
+                                    modifier = Modifier.size(14.dp))
+                            }
+                            IconButton(
                                 onClick = { projectToDelete = project.id to project.name },
                                 modifier = Modifier.size(24.dp),
                             ) {
@@ -249,6 +263,43 @@ fun SidebarContent(
             },
             dismissButton = {
                 TextButton(onClick = { projectToDelete = null }) {
+                    Text("取消", color = Color(0xFF838896))
+                }
+            },
+        )
+    }
+
+    // Rename project dialog
+    projectToRename?.let { (id, oldName) ->
+        AlertDialog(
+            onDismissRequest = { projectToRename = null },
+            containerColor = Color(0xFF111318),
+            title = { Text("重命名项目", color = Color(0xFFE3E5E8)) },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    label = { Text("新项目名") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFFE3E5E8),
+                        unfocusedTextColor = Color(0xFFE3E5E8),
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (renameText.isNotBlank() && renameText.trim() != oldName) {
+                            onRenameProject(id, renameText.trim())
+                        }
+                        projectToRename = null
+                    },
+                    enabled = renameText.isNotBlank(),
+                ) { Text("保存", color = Color(0xFF00E676)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { projectToRename = null }) {
                     Text("取消", color = Color(0xFF838896))
                 }
             },

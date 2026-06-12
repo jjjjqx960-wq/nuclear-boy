@@ -371,6 +371,36 @@ class FileOperations(
     }
 
     /**
+     * 重命名项目：把项目目录改名。新名清洗后不能为空、不能与已有项目重名。
+     */
+    suspend fun renameProject(oldName: String, newName: String): AppResult<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                val sanitized = sanitizeProjectName(newName)
+                if (sanitized.isBlank()) {
+                    return@withContext AppResult.failure(AppError.InvalidRequest, "项目名不能为空")
+                }
+                val src = File(workspaceRoot, oldName)
+                if (!src.exists() || !src.isDirectory) {
+                    return@withContext AppResult.failure(AppError.FileNotFound, "项目不存在: $oldName")
+                }
+                if (sanitized == oldName) return@withContext AppResult.success(sanitized)
+                val dst = File(workspaceRoot, sanitized)
+                if (dst.exists()) {
+                    return@withContext AppResult.failure(AppError.FileWriteDenied, "已存在同名项目: $sanitized")
+                }
+                if (!src.renameTo(dst)) {
+                    return@withContext AppResult.failure(AppError.FileWriteDenied, "重命名失败")
+                }
+                AppResult.success(sanitized)
+            } catch (e: SecurityException) {
+                AppResult.failure(AppError.FileWriteDenied, e.message)
+            } catch (e: IOException) {
+                AppResult.failure(AppError.FileWriteDenied, e.message)
+            }
+        }
+
+    /**
      * Get the absolute File for a project directory by name.
      */
     fun getProjectPath(projectName: String): File {

@@ -129,6 +129,7 @@ private fun NuclearBoyMainScreen() {
                 onProjectSelected = { navigateToProject(it) },
                 onCreateProject = { createAndNavigate(it) },
                 onDeleteProject = { projectViewModel.deleteProject(it) },
+                onRenameProject = { id, newName -> projectViewModel.renameProject(id, newName) },
                 onSettingsClick = {
                     scope.launch { drawerState.close() }
                     navController.navigate(NavRoutes.SETTINGS)
