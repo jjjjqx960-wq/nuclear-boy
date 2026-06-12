@@ -9,7 +9,13 @@ package com.nuclearboy.remotepc
  */
 class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
 
-    data class Cell(val ch: Char = ' ', val fg: Int? = null, val bold: Boolean = false)
+    data class Cell(
+        val ch: Char = ' ',
+        val fg: Int? = null,
+        val bold: Boolean = false,
+        /** 宽字符（CJK）占两格，第二格是占位续格，渲染时跳过。 */
+        val continuation: Boolean = false,
+    )
 
     var cols = cols.coerceAtLeast(1); private set
     var rows = rows.coerceAtLeast(1); private set
@@ -142,9 +148,15 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     }
 
     private fun putChar(ch: Char) {
-        if (col >= cols) { col = 0; lineFeed() }
+        val w = CharWidth.of(ch)
+        if (w == 0) return // 组合记号：MVP 暂不并入前一格，直接丢弃避免错位
+        if (col + w > cols) { col = 0; lineFeed() } // 宽字符放不下则换行
         grid[row][col] = Cell(ch, curFg, curBold)
-        col++
+        if (w == 2) {
+            if (col + 1 < cols) grid[row][col + 1] = Cell(' ', curFg, curBold, continuation = true)
+        }
+        col += w
+        if (col > cols) col = cols
     }
 
     private fun lineFeed() {
@@ -248,10 +260,11 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         var lastFg: Int? = null
         var lastBold = false
         var lastNonBlank = -1
-        for (c in line.indices) if (line[c].ch != ' ' || line[c].fg != null) lastNonBlank = c
+        for (c in line.indices) if ((line[c].ch != ' ' && !line[c].continuation) || line[c].fg != null) lastNonBlank = c
         val end = lastNonBlank + 1
         for (c in 0 until end) {
             val cell = line[c]
+            if (cell.continuation) continue // 宽字符续格不重复输出
             if (sb.isNotEmpty() && (cell.fg != lastFg || cell.bold != lastBold)) {
                 spans.add(TerminalAnsi.Span(sb.toString(), lastFg, lastBold)); sb.setLength(0)
             }

@@ -140,6 +140,31 @@ class TerminalEmulatorTest {
     }
 
     @Test
+    fun `cjk chars advance cursor by two cells keeping alignment`() {
+        val e = TerminalEmulator(20, 3)
+        val zh = "${0x4E2D.toChar()}${0x6587.toChar()}" // "中文"
+        e.feed(zh)
+        e.feed("X")
+        // 中(2) + 文(2) = 第 5 列(index4) 才是 X
+        val text = e.renderText().split("\n")[0]
+        assertEquals(zh + "X", text)
+        // 用 CUP 定位到第 5 列写 Y，应正好落在 X 处（说明宽字符占了 4 格）
+        e.feed("${esc}[1;5HY")
+        assertEquals(zh + "Y", e.renderText().split("\n")[0])
+    }
+
+    @Test
+    fun `cjk wraps when only one cell remains`() {
+        val e = TerminalEmulator(3, 3)  // 3 列
+        e.feed("a${0x4E2D.toChar()}")    // a 占 1 列，中 需要 2 列但只剩 2 列(col1,2) 放得下
+        assertEquals("a${0x4E2D.toChar()}", e.renderText().split("\n")[0])
+        val e2 = TerminalEmulator(3, 3)
+        e2.feed("ab${0x4E2D.toChar()}")  // ab 占 2 列，只剩 1 列 → 中 换行
+        assertEquals("ab", e2.renderText().split("\n")[0])
+        assertEquals("${0x4E2D.toChar()}", e2.renderText().split("\n")[1])
+    }
+
+    @Test
     fun `ignores OSC title sequence`() {
         val e = TerminalEmulator(20, 2)
         e.feed("${esc}]0;my title${7.toChar()}done")

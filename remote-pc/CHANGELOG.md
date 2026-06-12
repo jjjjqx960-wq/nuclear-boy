@@ -1,3 +1,4 @@
+2026-06-12 1.0.89 CJK 双宽字符：新增 CharWidth.of（东亚宽度判定，CJK/全角=2、组合记号=0）；TerminalEmulator.putChar 按宽度推进光标、宽字符占两格（续格 continuation 标记，渲染跳过），放不下时换行。CharWidthTest 6 例 + 模拟器 CJK 对齐/换行 2 例。
 2026-06-12 1.0.88 特殊键 + 尺寸自适应：TerminalKeys（方向/翻页/Home-End/Ctrl 组合/Esc-Tab-Del → xterm 序列，借鉴 ReTerminal）、TerminalGeometry（像素+字符尺寸算 cols/rows，带钳制与回退）；ViewModel 新增 sendKey/onResize（resize emulator+session）。TerminalKeysGeometryTest 7 例。
 2026-06-12 1.0.87 屏幕缓冲模拟器：新增 TerminalEmulator（rows×cols 网格 + 光标，处理 CUP/CUU-D/ED/EL/IL/DL/ICH/DCH/ECH/滚动区 DECSTBM/SU-SD/DECSC-RC/备用屏 ?1049/47），renderWithScrollback 普通缓冲带 2000 行回滚、备用屏只显当前屏；ViewModel 改用 emulator.feed + 渲染按行 span。TerminalEmulatorTest 15 例。
 2026-06-12 1.0.86 终端颜色解析：TerminalAnsi.parseSpans 解析 SGR（30-37/90-97/38;5;n/38;2;r;g;b/加粗/复位）产出带 ARGB 的 Span 列表，背景与光标/OSC 序列忽略；ViewModel 改存原始流由界面渲染。TerminalAnsiTest 新增 6 个颜色用例。
