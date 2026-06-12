@@ -34,6 +34,7 @@ class PcBridgeConfigStore(context: Context) {
         val tokenMasked: String = "",
         val lastConnectedHost: String = "",
         val lastConnectedClis: String = "",
+        val encrypted: Boolean = false,
     )
 
     private val _state = MutableStateFlow(readState())
@@ -84,6 +85,14 @@ class PcBridgeConfigStore(context: Context) {
 
     fun isConfigured(): Boolean = currentUrl().isNotBlank() && currentToken().isNotBlank()
 
+    /** 端到端加密开关（默认关）。开启后须确保电脑端 bridge 已更新并重启。 */
+    fun isEncryptionEnabled(): Boolean = prefs.getBoolean(KEY_ENCRYPTION, false)
+
+    fun setEncryptionEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ENCRYPTION, enabled).apply()
+        refresh()
+    }
+
     private fun refresh() {
         _state.value = readState()
     }
@@ -97,6 +106,7 @@ class PcBridgeConfigStore(context: Context) {
             tokenMasked = maskToken(token),
             lastConnectedHost = prefs.getString(KEY_LAST_HOST, "") ?: "",
             lastConnectedClis = prefs.getString(KEY_LAST_CLIS, "") ?: "",
+            encrypted = prefs.getBoolean(KEY_ENCRYPTION, false),
         )
     }
 
@@ -113,5 +123,6 @@ class PcBridgeConfigStore(context: Context) {
         const val KEY_LAST_HOST = "pc_bridge_last_host"
         const val KEY_LAST_CLIS = "pc_bridge_last_clis"
         const val KEY_LAST_SESSION_PREFIX = "pc_bridge_last_session_"
+        const val KEY_ENCRYPTION = "pc_bridge_encryption"
     }
 }

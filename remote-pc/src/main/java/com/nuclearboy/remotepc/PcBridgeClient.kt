@@ -132,7 +132,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
                     // 断线前任务已开始：取回结果或重新挂上输出流，避免重复执行
                     PcBridgeProtocol.encodeGetResult(taskId)
                 }
-                session.ws.send(request)
+                session.send(request)
                 while (true) {
                     when (val msg = session.receive()) {
                         is PcBridgeProtocol.Inbound.Accepted -> if (msg.id == taskId) taskAccepted = true
@@ -157,7 +157,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
                         is PcBridgeProtocol.Inbound.PermissionRequest -> if (msg.id == taskId) {
                             // 电脑端 claude 请求权限：交给界面决定，结果回传 bridge
                             val approved = onPermissionRequest?.invoke(msg.toolName, msg.inputSummary) ?: false
-                            session.ws.send(
+                            session.send(
                                 PcBridgeProtocol.encodePermissionResponse(taskId, approved)
                             )
                         }
@@ -195,7 +195,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         if (snapshot.isEmpty() || !configStore.isConfigured()) return
         clientScope.launch {
             withSession(configStore.currentUrl(), configStore.currentToken(), CONNECT_TEST_TIMEOUT_MS) { session ->
-                snapshot.forEach { id -> session.ws.send(PcBridgeProtocol.encodeCancel(id)) }
+                snapshot.forEach { id -> session.send(PcBridgeProtocol.encodeCancel(id)) }
                 AppResult.success(true)
             }
         }
@@ -210,7 +210,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
             return AppResult.failure(AppError.InvalidRequest, "远程电脑还没配置好，去设置页填写地址和 token")
         }
         return withSession(configStore.currentUrl(), configStore.currentToken(), CONNECT_TEST_TIMEOUT_MS) { session ->
-            session.ws.send(PcBridgeProtocol.encodeListTasks())
+            session.send(PcBridgeProtocol.encodeListTasks())
             while (true) {
                 when (val msg = session.receive()) {
                     is PcBridgeProtocol.Inbound.Tasks -> return@withSession AppResult.success(
@@ -235,7 +235,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
             return AppResult.failure(AppError.InvalidRequest, "远程电脑还没配置好，去设置页填写地址和 token")
         }
         return withSession(configStore.currentUrl(), configStore.currentToken(), CONNECT_TEST_TIMEOUT_MS) { session ->
-            session.ws.send(PcBridgeProtocol.encodeListDir("ld", path))
+            session.send(PcBridgeProtocol.encodeListDir("ld", path))
             while (true) {
                 when (val msg = session.receive()) {
                     is PcBridgeProtocol.Inbound.DirListing ->
@@ -256,7 +256,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
             return AppResult.failure(AppError.InvalidRequest, "远程电脑还没配置好，去设置页填写地址和 token")
         }
         return withSession(configStore.currentUrl(), configStore.currentToken(), CONNECT_TEST_TIMEOUT_MS) { session ->
-            session.ws.send(PcBridgeProtocol.encodeReadFile("rf", path, maxBytes))
+            session.send(PcBridgeProtocol.encodeReadFile("rf", path, maxBytes))
             while (true) {
                 when (val msg = session.receive()) {
                     is PcBridgeProtocol.Inbound.FileContent ->
@@ -279,7 +279,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
             return AppResult.failure(AppError.InvalidRequest, "远程电脑还没配置好，去设置页填写地址和 token")
         }
         return withSession(configStore.currentUrl(), configStore.currentToken(), CONNECT_TEST_TIMEOUT_MS) { session ->
-            session.ws.send(PcBridgeProtocol.encodeWriteFile("wf", path, content, if (append) true else null))
+            session.send(PcBridgeProtocol.encodeWriteFile("wf", path, content, if (append) true else null))
             while (true) {
                 when (val msg = session.receive()) {
                     is PcBridgeProtocol.Inbound.FileWritten ->
@@ -300,8 +300,13 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         val ws: WebSocket,
         val info: BridgeInfo,
         private val inbox: Channel<PcBridgeProtocol.Inbound>,
+        private val cryptoKey: ByteArray?,
     ) {
         suspend fun receive(): PcBridgeProtocol.Inbound = inbox.receive()
+        /** 发送消息：开启加密时包成 AES-GCM 信封，否则明文。 */
+        fun send(message: String) {
+            ws.send(if (cryptoKey != null) PcCrypto.envelope(cryptoKey, message) else message)
+        }
     }
 
     /**
@@ -315,15 +320,22 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         block: suspend (Session) -> AppResult<T>,
     ): AppResult<T> {
         val inbox = Channel<PcBridgeProtocol.Inbound>(Channel.UNLIMITED)
+        val cryptoKey = if (configStore.isEncryptionEnabled() && token.isNotBlank())
+            PcCrypto.deriveKey(token) else null
         var webSocket: WebSocket? = null
         return try {
             withTimeout(timeoutMs) {
-                val ws = openWebSocket(url, inbox)
+                val ws = openWebSocket(url, inbox, cryptoKey)
                 webSocket = ws
-                ws.send(PcBridgeProtocol.encodeAuth(token))
+                // 加密时握手用信封（不含 token，解密成功即证明知道 token）；否则明文带 token
+                if (cryptoKey != null) {
+                    ws.send(PcCrypto.envelope(cryptoKey, """{"type":"auth"}"""))
+                } else {
+                    ws.send(PcBridgeProtocol.encodeAuth(token))
+                }
                 when (val first = inbox.receive()) {
                     is PcBridgeProtocol.Inbound.AuthOk -> {
-                        val session = Session(ws, BridgeInfo(first.host, first.clis), inbox)
+                        val session = Session(ws, BridgeInfo(first.host, first.clis), inbox, cryptoKey)
                         block(session)
                     }
                     is PcBridgeProtocol.Inbound.AuthFail ->
@@ -350,9 +362,14 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
 
     private class BridgeClosedException(message: String) : Exception(message)
 
+    /** 从 {"enc":"<base64>"} 信封里取出密文 base64。 */
+    private fun extractEnc(raw: String): String =
+        raw.substringAfter(""""enc":"""").substringBeforeLast("\"")
+
     private suspend fun openWebSocket(
         url: String,
         inbox: Channel<PcBridgeProtocol.Inbound>,
+        cryptoKey: ByteArray? = null,
     ): WebSocket = suspendCancellableCoroutine { cont ->
         val request = Request.Builder().url(url.toHttpWsUrl()).build()
         val ws = httpClient.newWebSocket(request, object : WebSocketListener() {
@@ -361,7 +378,11 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                PcBridgeProtocol.parseInbound(text)?.let { inbox.trySend(it) }
+                // 加密会话：先解出明文再解析；解密失败（密钥不符/篡改）丢弃
+                val plain = if (cryptoKey != null) {
+                    runCatching { PcCrypto.decrypt(cryptoKey, extractEnc(text)) }.getOrNull() ?: return
+                } else text
+                PcBridgeProtocol.parseInbound(plain)?.let { inbox.trySend(it) }
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {

@@ -54,6 +54,7 @@ fun RemotePcSection(
     onTest: (url: String, token: String?) -> Unit,
     onLoadTasks: () -> Unit,
     onOpenTerminal: () -> Unit = {},
+    onEncryptionChange: (Boolean) -> Unit = {},
 ) {
     Text(
         "🖥️ 远程电脑",
@@ -240,9 +241,27 @@ fun RemotePcSection(
                     lineHeight = 18.sp,
                 )
 
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("端到端加密", fontWeight = FontWeight.Bold)
+                        Text(
+                            "走公网中继时，中继也看不到任务内容和 token（AES-256-GCM）。开启前请先更新并重启电脑端 bridge。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp,
+                        )
+                    }
+                    Switch(checked = config.encrypted, onCheckedChange = onEncryptionChange)
+                }
+
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "外网控制：在公网服务器跑 python relay/relay_server.py --port 8970 --key 口令，电脑端加 --relay ws://服务器IP:8970 --relay-key 口令 反连，手机这里填 ws://服务器IP:8970/client/<room>?key=口令（room 即电脑端 serve 显示的 room）。token 仍端到端校验，中继看不到明文。",
+                    "外网控制：在公网服务器跑 python relay/relay_server.py --port 8970 --key 口令，电脑端加 --relay ws://服务器IP:8970 --relay-key 口令 反连，手机这里填 ws://服务器IP:8970/client/<room>?key=口令（room 即电脑端 serve 显示的 room）。token 仍端到端校验，开启上面的加密后中继连密文都看不懂。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 18.sp,

@@ -137,6 +137,10 @@ class SettingsViewModel @Inject constructor(
         pcBridgeConfigStore.setEnabled(enabled)
     }
 
+    fun setPcEncryption(enabled: Boolean) {
+        pcBridgeConfigStore.setEncryptionEnabled(enabled)
+    }
+
     /** token 传 null 表示保留已存的不变 */
     fun savePcBridgeConnection(url: String, token: String?) {
         pcBridgeConfigStore.saveConnection(url, token)
@@ -1373,6 +1377,7 @@ fun SettingsScreen(
                 onTest = { url, token -> viewModel.testPcBridgeConnection(url, token) },
                 onLoadTasks = { viewModel.loadPcTasks() },
                 onOpenTerminal = onNavigateToTerminal,
+                onEncryptionChange = { viewModel.setPcEncryption(it) },
             )
 
             // ── Sponsor Section ──────────────────────────

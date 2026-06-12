@@ -56,7 +56,7 @@ class TerminalViewModel @Inject constructor(
         _state.value = UiState(status = Status.CONNECTING, message = "正在连接电脑…")
         val newSession = PcTerminalSession(
             url = url, token = token, cwd = cwd?.takeIf { it.isNotBlank() },
-            cols = cols, rows = rows,
+            cols = cols, rows = rows, encrypted = configStore.isEncryptionEnabled(),
         )
         session = newSession
         collectJob = viewModelScope.launch {

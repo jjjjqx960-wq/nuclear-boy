@@ -1,3 +1,4 @@
+2026-06-12 1.0.92 通道加密：新增 PcCrypto（SHA-256 派生密钥 + AES-256-GCM，java.util.Base64）；PcBridgeClient/PcTerminalSession 开启加密时握手发 {"type":"auth"} 信封、收发走 envelope/解密；配置加 isEncryptionEnabled/setEncryptionEnabled + PcBridgeConfig.encrypted。PcCryptoTest 6 例（含与 Python 字节级一致的固定向量）。
 2026-06-12 1.0.91 写文件协议：协议加 write_file 出站与 FileWritten 入站；PcBridgeClient.writeFile（覆盖/追加）。PcBridgeProtocolTest +2 例。审批在 :app 的 pc_write_file 工具里走 PermissionPromptBus，client 仅负责传输。
 2026-06-12 1.0.90 只读文件浏览：协议加 list_dir/read_file 出站与 DirListing/FileContent 入站；PcBridgeClient.listDir/readFile（withSession 请求-响应）。PcBridgeProtocolTest +3 例（编码、目录列表、文件内容解析）。
 2026-06-12 1.0.89 CJK 双宽字符：新增 CharWidth.of（东亚宽度判定，CJK/全角=2、组合记号=0）；TerminalEmulator.putChar 按宽度推进光标、宽字符占两格（续格 continuation 标记，渲染跳过），放不下时换行。CharWidthTest 6 例 + 模拟器 CJK 对齐/换行 2 例。

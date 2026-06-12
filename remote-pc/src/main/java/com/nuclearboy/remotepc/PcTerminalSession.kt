@@ -25,8 +25,22 @@ class PcTerminalSession(
     private val cmd: String? = null,
     private val cols: Int = 80,
     private val rows: Int = 24,
+    private val encrypted: Boolean = false,
 ) {
     private val termId: String = UUID.randomUUID().toString().replace("-", "")
+    private val cryptoKey: ByteArray? =
+        if (encrypted && token.isNotBlank()) PcCrypto.deriveKey(token) else null
+
+    private fun send(ws: WebSocket, message: String) {
+        ws.send(if (cryptoKey != null) PcCrypto.envelope(cryptoKey, message) else message)
+    }
+
+    private fun plainOf(text: String): String? {
+        val key = cryptoKey ?: return text
+        return runCatching {
+            PcCrypto.decrypt(key, text.substringAfter(""""enc":"""").substringBeforeLast("\""))
+        }.getOrNull()
+    }
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -53,13 +67,15 @@ class PcTerminalSession(
         val request = Request.Builder().url(url.toHttpWsUrl()).build()
         val listener = object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
-                ws.send(PcBridgeProtocol.encodeAuth(token))
+                if (cryptoKey != null) send(ws, """{"type":"auth"}""")
+                else ws.send(PcBridgeProtocol.encodeAuth(token))
             }
 
             override fun onMessage(ws: WebSocket, text: String) {
-                when (val msg = PcBridgeProtocol.parseInbound(text)) {
+                val plain = plainOf(text) ?: return
+                when (val msg = PcBridgeProtocol.parseInbound(plain)) {
                     is PcBridgeProtocol.Inbound.AuthOk ->
-                        ws.send(PcBridgeProtocol.encodeTermOpen(termId, cols, rows, cwd, cmd))
+                        send(ws, PcBridgeProtocol.encodeTermOpen(termId, cols, rows, cwd, cmd))
                     is PcBridgeProtocol.Inbound.AuthFail -> {
                         trySend(TerminalEvent.Failed("电脑拒绝连接：${msg.message}"))
                         close()
@@ -95,7 +111,7 @@ class PcTerminalSession(
         webSocket = httpClient.newWebSocket(request, listener)
 
         awaitClose {
-            runCatching { webSocket?.send(PcBridgeProtocol.encodeTermClose(termId)) }
+            runCatching { webSocket?.let { send(it, PcBridgeProtocol.encodeTermClose(termId)) } }
             webSocket?.close(1000, "done")
             webSocket = null
         }
@@ -103,16 +119,16 @@ class PcTerminalSession(
 
     /** 发送键入（含控制字符，如回车 \r、Ctrl-C ）。 */
     fun input(data: String) {
-        webSocket?.send(PcBridgeProtocol.encodeTermInput(termId, data))
+        webSocket?.let { send(it, PcBridgeProtocol.encodeTermInput(termId, data)) }
     }
 
     /** 终端窗口大小变化时同步给电脑端，保证排版正确。 */
     fun resize(cols: Int, rows: Int) {
-        webSocket?.send(PcBridgeProtocol.encodeTermResize(termId, cols, rows))
+        webSocket?.let { send(it, PcBridgeProtocol.encodeTermResize(termId, cols, rows)) }
     }
 
     fun close() {
-        runCatching { webSocket?.send(PcBridgeProtocol.encodeTermClose(termId)) }
+        runCatching { webSocket?.let { send(it, PcBridgeProtocol.encodeTermClose(termId)) } }
         webSocket?.close(1000, "done")
         webSocket = null
     }
