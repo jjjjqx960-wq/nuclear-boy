@@ -1,3 +1,4 @@
+2026-06-12 1.0.95 顶栏导出/分享对话：buildExportMarkdown 调 ConversationExporter，顶栏 Share 按钮走 ACTION_SEND 系统分享面板。
 2026-06-12 1.0.71 refreshProjectFiles 用 HIDDEN_FILE_ENTRIES 统一过滤内部状态与构建缓存目录。
 2026-06-12 1.0.70 第三方模型激活时聊天页隐藏 DeepSeek 模式选择条，避免展示不生效的档位选项。
 2026-06-12 1.0.70 文件面板与输入栏改为不透明消除文字鬼影；文件列表过滤 .agent 和 __general__ 内部目录，附件角标不再误报。

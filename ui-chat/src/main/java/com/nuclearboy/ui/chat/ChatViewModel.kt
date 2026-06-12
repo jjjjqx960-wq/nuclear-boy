@@ -394,6 +394,14 @@ class ChatViewModel @Inject constructor(
         return _messages.value.findLast { it.role == MessageRole.ASSISTANT }?.content ?: ""
     }
 
+    /** 把当前对话导出成 Markdown 文本，供分享/存档。空对话返回占位说明。 */
+    fun buildExportMarkdown(): String {
+        val title = projectName.value.ifBlank { "核弹男孩对话" }
+        val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        return com.nuclearboy.common.ConversationExporter.toMarkdown(title, _messages.value, date)
+    }
+
     fun retryLastMessage() {
         android.util.Log.e("NuclearBoy", "[ChatVM] retryLastMessage() entry isProcessing=${_isProcessing.value}")
         if (_isProcessing.value) return

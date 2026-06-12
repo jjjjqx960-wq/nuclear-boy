@@ -244,6 +244,32 @@ fun ChatScreen(
                         }
                     }
                     Spacer(Modifier.weight(1f))
+                    // 导出/分享当前对话为 Markdown
+                    val exportContext = LocalContext.current
+                    IconButton(
+                        onClick = {
+                            val md = viewModel.buildExportMarkdown()
+                            val share = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_TITLE, "核弹男孩对话")
+                                putExtra(android.content.Intent.EXTRA_TEXT, md)
+                            }
+                            runCatching {
+                                exportContext.startActivity(
+                                    android.content.Intent.createChooser(share, "分享对话")
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }
+                        },
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Share,
+                            "导出对话",
+                            tint = NuclearBoyTheme.colorScheme.material.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
                     // 文件面板按钮 — 类似首页设置图标
                     IconButton(
                         onClick = {
