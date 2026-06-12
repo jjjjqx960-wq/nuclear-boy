@@ -232,6 +232,27 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         }
     }
 
+    /** 列出电脑上 Claude 的历史会话，供挑选续聊。 */
+    suspend fun listSessions(limit: Int = 20, cwd: String? = null): AppResult<List<PcBridgeProtocol.SessionInfo>> {
+        if (!configStore.isConfigured()) {
+            return AppResult.failure(AppError.InvalidRequest, "远程电脑还没配置好，去设置页填写地址和 token")
+        }
+        return withSession(configStore.currentUrl(), configStore.currentToken(), CONNECT_TEST_TIMEOUT_MS) { session ->
+            session.send(PcBridgeProtocol.encodeListSessions(limit, cwd))
+            while (true) {
+                when (val msg = session.receive()) {
+                    is PcBridgeProtocol.Inbound.SessionsList ->
+                        return@withSession AppResult.success(msg.sessions)
+                    is PcBridgeProtocol.Inbound.Error ->
+                        return@withSession AppResult.failure(AppError.ServerError, msg.message)
+                    else -> Unit
+                }
+            }
+            @Suppress("UNREACHABLE_CODE")
+            AppResult.failure(AppError.Unknown, "列会话意外结束")
+        }
+    }
+
     data class DirListing(val path: String, val entries: List<PcBridgeProtocol.DirEntry>, val truncated: Boolean)
     data class FileContent(val path: String, val content: String, val size: Long, val truncated: Boolean)
 

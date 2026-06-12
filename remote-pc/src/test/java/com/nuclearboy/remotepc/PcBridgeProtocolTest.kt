@@ -277,6 +277,25 @@ class PcBridgeProtocolTest {
     }
 
     @Test
+    fun `encodeListSessions carries limit and optional cwd`() {
+        assertTrue(PcBridgeProtocol.encodeListSessions(5, "D:/p").contains("\"type\":\"list_sessions\""))
+        assertTrue(PcBridgeProtocol.encodeListSessions(5, "D:/p").contains("\"cwd\":\"D:/p\""))
+        assertTrue(!PcBridgeProtocol.encodeListSessions(5).contains("cwd"))
+    }
+
+    @Test
+    fun `parse sessions_list`() {
+        val msg = PcBridgeProtocol.parseInbound(
+            """{"type":"sessions_list","id":"ls","sessions":[{"sessionId":"abc","cli":"claude","cwd":"D:/p","preview":"修 bug","mtimeMs":1700000000000}]}"""
+        )
+        val sl = msg as PcBridgeProtocol.Inbound.SessionsList
+        assertEquals(1, sl.sessions.size)
+        assertEquals("abc", sl.sessions[0].sessionId)
+        assertEquals("修 bug", sl.sessions[0].preview)
+        assertEquals(1700000000000L, sl.sessions[0].mtimeMs)
+    }
+
+    @Test
     fun `parse file_written`() {
         val msg = PcBridgeProtocol.parseInbound("""{"type":"file_written","id":"w1","path":"D:/p/a.kt","bytes":42}""")
         val fw = msg as PcBridgeProtocol.Inbound.FileWritten

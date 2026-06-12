@@ -734,6 +734,30 @@ else:
             },
         ),
         ToolDefinition(
+            name = "pc_list_sessions",
+            description = "列出电脑上 Claude Code 最近的历史会话（会话 ID、工作目录、首条消息预览、时间），用于找回之前的对话继续干。使用场景：1) 用户说\"继续昨天/之前在电脑上那个任务\"；2) 想接着某次远程会话迭代但忘了会话 ID。拿到 sessionId 后传给 pc_cli_run 的 session 参数即可续聊（仅 claude）。可传 cwd 只看某项目目录的会话。",
+            parameters = listOf(
+                ToolParameter("limit", "integer", "最多返回多少个会话（默认 20）", required = false, default = "20"),
+                ToolParameter("cwd", "string", "只看这个工作目录下的会话，如 D:/myproject。不传则看全部", required = false),
+            ),
+            executor = { params ->
+                val limit = params["limit"]?.toIntOrNull() ?: 20
+                when (val result = client.listSessions(limit, params["cwd"]?.takeIf { it.isNotBlank() })) {
+                    is AppResult.Success -> {
+                        if (result.data.isEmpty()) {
+                            ToolResult.success("电脑上没有找到 Claude 历史会话")
+                        } else {
+                            val lines = result.data.joinToString("\n") { s ->
+                                "· ${s.preview.ifBlank { "(无预览)" }}（${s.cwd}，session: ${s.sessionId}）"
+                            }
+                            ToolResult.success("电脑上最近 ${result.data.size} 个 Claude 会话:\n$lines\n\n续聊：pc_cli_run(cli=\"claude\", session=\"<上面的 sessionId>\", prompt=\"...\")")
+                        }
+                    }
+                    is AppResult.Failure -> ToolResult.failure(result.technicalDetail ?: result.error.humanMessage)
+                }
+            },
+        ),
+        ToolDefinition(
             name = "pc_write_file",
             description = "把文本内容写入电脑上的文件（覆盖或追加），用于直接落地小改动而不必起 CLI。这是会改动电脑文件的危险操作，每次都会弹到手机让用户确认后才执行。使用场景：1) 用户要你\"把这段代码写到电脑上的某文件\"；2) 创建/更新配置或脚本文件。父目录必须已存在（不自动创建）。复杂的多文件改动仍建议用 pc_cli_run 交给 claude/codex。",
             parameters = listOf(

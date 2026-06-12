@@ -60,6 +60,14 @@ object PcBridgeProtocol {
     data class ListTasksMessage(val type: String = "list_tasks")
 
     @Serializable
+    data class ListSessionsMessage(
+        val type: String = "list_sessions",
+        val id: String = "ls",
+        val limit: Int = 20,
+        val cwd: String? = null,
+    )
+
+    @Serializable
     data class PermissionResponseMessage(
         val type: String = "permission_response",
         val id: String,
@@ -115,6 +123,8 @@ object PcBridgeProtocol {
     fun encodeGetResult(id: String, sinceSeq: Int? = null): String =
         json.encodeToString(GetResultMessage(id = id, sinceSeq = sinceSeq))
     fun encodeListTasks(): String = json.encodeToString(ListTasksMessage())
+    fun encodeListSessions(limit: Int = 20, cwd: String? = null): String =
+        json.encodeToString(ListSessionsMessage(limit = limit, cwd = cwd))
     fun encodePermissionResponse(id: String, approved: Boolean, message: String = ""): String =
         json.encodeToString(PermissionResponseMessage(id = id, approved = approved, message = message))
     fun encodePing(): String = json.encodeToString(PingMessage())
@@ -173,10 +183,18 @@ object PcBridgeProtocol {
             val truncated: Boolean,
         ) : Inbound
         data class FileWritten(val id: String, val path: String, val bytes: Long) : Inbound
+        data class SessionsList(val id: String, val sessions: List<SessionInfo>) : Inbound
         data class Unknown(val type: String) : Inbound
     }
 
     data class DirEntry(val name: String, val isDir: Boolean, val size: Long)
+    data class SessionInfo(
+        val sessionId: String,
+        val cli: String,
+        val cwd: String,
+        val preview: String,
+        val mtimeMs: Long,
+    )
 
     data class RunningTask(
         val id: String,
@@ -259,6 +277,21 @@ object PcBridgeProtocol {
                 id = obj.stringOrEmpty("id"),
                 path = obj.stringOrEmpty("path"),
                 bytes = obj["bytes"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
+            )
+            "sessions_list" -> Inbound.SessionsList(
+                id = obj.stringOrEmpty("id"),
+                sessions = (obj["sessions"] as? kotlinx.serialization.json.JsonArray)
+                    ?.mapNotNull { el ->
+                        (el as? JsonObject)?.let { s ->
+                            SessionInfo(
+                                sessionId = s.stringOrEmpty("sessionId"),
+                                cli = s.stringOrEmpty("cli"),
+                                cwd = s.stringOrEmpty("cwd"),
+                                preview = s.stringOrEmpty("preview"),
+                                mtimeMs = s["mtimeMs"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
+                            )
+                        }
+                    } ?: emptyList(),
             )
             "permission_request" -> Inbound.PermissionRequest(
                 id = obj.stringOrEmpty("id"),
