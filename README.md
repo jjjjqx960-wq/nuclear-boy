@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.76
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.77
 
 ---
 
@@ -32,6 +32,13 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.77 重点
+
+- worktree 隔离执行（借鉴 ccpocket）：pc_cli_run 传 isolate=true 时在 git 仓库旁创建独立 worktree + nb/ 分支执行，改动不碰主工作区，结果返回 worktree 路径；适合实验性修改和并行多任务。
+- bridge 新增 clean-worktrees --repo 一键清理 nb/ worktree 和分支。
+- 设置页"远程电脑"新增"查看电脑任务"按钮，直接看正在执行的任务列表。
+- 实测：claude 真实在 worktree 写文件、主仓库零污染、清理命令生效；3 并发任务（队列上限 2）全部正确完成。
 
 ## 1.0.76 重点
 

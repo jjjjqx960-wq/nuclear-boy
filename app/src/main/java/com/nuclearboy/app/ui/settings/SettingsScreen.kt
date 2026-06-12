@@ -143,6 +143,24 @@ class SettingsViewModel @Inject constructor(
         _pcBridgeTestState.value = PcBridgeTestUiState(message = "已保存，点测试连接试试 ✨")
     }
 
+    private val _pcTasksState = MutableStateFlow<List<PcBridgeClient.RunningTask>?>(null)
+    val pcTasksState: StateFlow<List<PcBridgeClient.RunningTask>?> = _pcTasksState.asStateFlow()
+
+    fun loadPcTasks() {
+        viewModelScope.launch {
+            _pcTasksState.value = when (val result = pcBridgeClient.listRunningTasks()) {
+                is AppResult.Success -> result.data
+                is AppResult.Failure -> {
+                    _pcBridgeTestState.value = PcBridgeTestUiState(
+                        success = false,
+                        message = result.technicalDetail ?: result.error.humanMessage,
+                    )
+                    null
+                }
+            }
+        }
+    }
+
     fun testPcBridgeConnection(url: String, token: String?) {
         _pcBridgeTestState.value = PcBridgeTestUiState(inProgress = true)
         viewModelScope.launch {
@@ -1344,12 +1362,15 @@ fun SettingsScreen(
             }
 
             // ── Remote PC Section ────────────────────────
+            val pcTasks by viewModel.pcTasksState.collectAsState()
             RemotePcSection(
                 config = pcBridgeState,
                 testState = pcBridgeTestState,
+                runningTasks = pcTasks,
                 onEnabledChange = { viewModel.setPcBridgeEnabled(it) },
                 onSave = { url, token -> viewModel.savePcBridgeConnection(url, token) },
                 onTest = { url, token -> viewModel.testPcBridgeConnection(url, token) },
+                onLoadTasks = { viewModel.loadPcTasks() },
             )
 
             // ── Sponsor Section ──────────────────────────

@@ -39,6 +39,8 @@ object PcBridgeProtocol {
         val timeoutSec: Int? = null,
         /** 续传已有 claude 会话（上次 Done.sessionId） */
         val sessionId: String? = null,
+        /** true 时在 cwd 仓库旁创建隔离 git worktree 执行，互不干扰 */
+        val worktree: Boolean? = null,
     )
 
     @Serializable
@@ -73,6 +75,8 @@ object PcBridgeProtocol {
             val result: String,
             val durationMs: Long,
             val sessionId: String = "",
+            val worktreePath: String = "",
+            val worktreeBranch: String = "",
         ) : Inbound
         data class Error(val id: String, val message: String) : Inbound
         data object Pong : Inbound
@@ -118,6 +122,8 @@ object PcBridgeProtocol {
                 result = obj.stringOrEmpty("result"),
                 durationMs = obj["durationMs"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
                 sessionId = obj.stringOrEmpty("sessionId"),
+                worktreePath = obj.stringOrEmpty("worktreePath"),
+                worktreeBranch = obj.stringOrEmpty("worktreeBranch"),
             )
             "error" -> Inbound.Error(
                 id = obj.stringOrEmpty("id"),

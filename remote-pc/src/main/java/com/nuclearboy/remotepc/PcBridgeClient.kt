@@ -33,8 +33,11 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         val result: String,
         val durationMs: Long,
         val outputLog: List<String>,
-        /** 本次任务的会话 ID，下次传入 runCliTask 的 sessionId 可继续对话（仅 claude） */
+        /** 本次任务的会话 ID，下次传入 runCliTask 的 sessionId 可继续对话 */
         val sessionId: String = "",
+        /** 隔离执行时改动所在的 worktree 路径和分支 */
+        val worktreePath: String = "",
+        val worktreeBranch: String = "",
     )
 
     data class RunningTask(
@@ -80,6 +83,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         cwd: String? = null,
         timeoutSec: Int = DEFAULT_TASK_TIMEOUT_SEC,
         sessionId: String? = null,
+        useWorktree: Boolean = false,
         onOutput: suspend (kind: String, text: String) -> Unit = { _, _ -> },
     ): AppResult<CliTaskResult> {
         if (!configStore.isEnabled()) {
@@ -111,6 +115,7 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
                             id = taskId, cli = cli, prompt = prompt,
                             cwd = cwd?.takeIf { it.isNotBlank() }, timeoutSec = timeoutSec,
                             sessionId = sessionId?.takeIf { it.isNotBlank() },
+                            worktree = if (useWorktree) true else null,
                         )
                     )
                 } else {
@@ -132,7 +137,10 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
                         }
                         is PcBridgeProtocol.Inbound.Done -> if (msg.id == taskId) {
                             return@withSession AppResult.success(
-                                CliTaskResult(msg.exitCode, msg.result, msg.durationMs, outputLog, msg.sessionId)
+                                CliTaskResult(
+                                    msg.exitCode, msg.result, msg.durationMs, outputLog,
+                                    msg.sessionId, msg.worktreePath, msg.worktreeBranch,
+                                )
                             )
                         }
                         is PcBridgeProtocol.Inbound.Error -> if (msg.id == taskId || msg.id.isBlank()) {

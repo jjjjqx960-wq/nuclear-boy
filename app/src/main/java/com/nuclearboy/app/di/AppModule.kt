@@ -602,7 +602,8 @@ else:
                 ToolParameter("prompt", "string", "下发给 CLI 的任务描述，要完整、自包含（CLI 在电脑上独立执行，看不到当前对话）", required = true),
                 ToolParameter("cwd", "string", "电脑上的工作目录，如 D:/myproject。不传用电脑端默认目录", required = false),
                 ToolParameter("timeout", "integer", "任务超时秒数（默认 600）", required = false, default = "600"),
-                ToolParameter("session", "string", "上次结果里的会话 ID，传入后 claude 续传之前的对话上下文，适合连续迭代", required = false),
+                ToolParameter("session", "string", "上次结果里的会话 ID，传入后 CLI 续传之前的对话上下文，适合连续迭代", required = false),
+                ToolParameter("isolate", "string", "传 \"true\" 时在 git 仓库旁创建隔离 worktree 执行，改动不碰主工作区，适合实验性修改或并行多任务", required = false, enum = listOf("true", "false")),
             ),
             executor = { params ->
                 val cli = params["cli"] ?: ""
@@ -617,6 +618,7 @@ else:
                         cwd = params["cwd"],
                         timeoutSec = params["timeout"]?.toIntOrNull() ?: PcBridgeClient.DEFAULT_TASK_TIMEOUT_SEC,
                         sessionId = params["session"],
+                        useWorktree = params["isolate"] == "true",
                         onOutput = { kind, text ->
                             if (kind == "tool" || kind == "status") outputLines.add(text)
                             // 实时进度推给聊天界面的工具卡片
@@ -630,10 +632,12 @@ else:
                                 "\n\n执行过程:\n" + outputLines.takeLast(20).joinToString("\n")
                             val sessionHint = if (r.sessionId.isBlank()) "" else
                                 "\n\n会话 ID: ${r.sessionId}（继续这件事时传入 session 参数）"
+                            val worktreeHint = if (r.worktreePath.isBlank()) "" else
+                                "\n隔离执行：改动在 ${r.worktreePath}（分支 ${r.worktreeBranch}），确认满意后需要合并回主分支"
                             android.util.Log.e("NuclearBoy", "[DI] pc_cli_run done cli=$cli exit=${r.exitCode} ${r.durationMs}ms session=${r.sessionId.take(8)}")
                             ToolResult(
                                 success = r.exitCode == 0,
-                                output = "电脑端 $cli 执行完成（${r.durationMs / 1000}s）:\n${r.result}$process$sessionHint",
+                                output = "电脑端 $cli 执行完成（${r.durationMs / 1000}s）:\n${r.result}$process$sessionHint$worktreeHint",
                                 error = if (r.exitCode == 0) null else "CLI 退出码 ${r.exitCode}",
                             )
                         }

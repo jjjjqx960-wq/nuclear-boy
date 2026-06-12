@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nuclearboy.remotepc.PcBridgeClient
 import com.nuclearboy.remotepc.PcBridgeConfigStore
 
 /**
@@ -43,9 +44,11 @@ import com.nuclearboy.remotepc.PcBridgeConfigStore
 fun RemotePcSection(
     config: PcBridgeConfigStore.PcBridgeConfig,
     testState: PcBridgeTestUiState,
+    runningTasks: List<PcBridgeClient.RunningTask>?,
     onEnabledChange: (Boolean) -> Unit,
     onSave: (url: String, token: String?) -> Unit,
     onTest: (url: String, token: String?) -> Unit,
+    onLoadTasks: () -> Unit,
 ) {
     Text(
         "🖥️ 远程电脑",
@@ -135,6 +138,30 @@ fun RemotePcSection(
                         },
                         lineHeight = 18.sp,
                     )
+                }
+
+                if (config.hasToken && config.url.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = onLoadTasks) { Text("查看电脑任务") }
+                    if (runningTasks != null) {
+                        Spacer(Modifier.height(4.dp))
+                        if (runningTasks.isEmpty()) {
+                            Text(
+                                "电脑当前没有正在执行的远程任务",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            runningTasks.forEach { task ->
+                                Text(
+                                    "· [${task.cli}] ${task.elapsedMs / 1000}s — ${task.promptPreview}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
                 }
 
                 if (config.lastConnectedHost.isNotBlank()) {

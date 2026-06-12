@@ -127,6 +127,24 @@ class PcBridgeProtocolTest {
     }
 
     @Test
+    fun `parse done with worktree info`() {
+        val msg = PcBridgeProtocol.parseInbound(
+            """{"type":"done","id":"t1","exitCode":0,"result":"done","durationMs":100,"worktreePath":"D:/x/.nb-worktrees/repo-ab","worktreeBranch":"nb/ab"}"""
+        )
+        val done = msg as PcBridgeProtocol.Inbound.Done
+        assertTrue(done.worktreePath.contains(".nb-worktrees"))
+        assertEquals("nb/ab", done.worktreeBranch)
+    }
+
+    @Test
+    fun `encodeRun includes worktree flag when isolating`() {
+        val raw = PcBridgeProtocol.encodeRun(
+            PcBridgeProtocol.RunMessage(id = "t3", cli = "claude", prompt = "改", worktree = true)
+        )
+        assertTrue(raw.contains("\"worktree\":true"))
+    }
+
+    @Test
     fun `parse invalid json returns null`() {
         assertNull(PcBridgeProtocol.parseInbound("not json"))
         assertNull(PcBridgeProtocol.parseInbound("""{"noType":1}"""))
