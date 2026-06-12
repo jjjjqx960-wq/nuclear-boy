@@ -402,6 +402,17 @@ class ChatViewModel @Inject constructor(
         return com.nuclearboy.common.ConversationExporter.toMarkdown(title, _messages.value, date)
     }
 
+    /**
+     * 编辑重发：截断到指定用户消息之前，返回该消息内容供输入框回填。
+     * 正在处理中或目标非用户消息时返回 null。
+     */
+    fun editAndResend(messageId: String): String? {
+        if (_isProcessing.value) return null
+        val result = com.nuclearboy.common.ChatEditing.prepareEdit(_messages.value, messageId) ?: return null
+        _messages.value = result.remaining
+        return result.content
+    }
+
     fun retryLastMessage() {
         android.util.Log.e("NuclearBoy", "[ChatVM] retryLastMessage() entry isProcessing=${_isProcessing.value}")
         if (_isProcessing.value) return

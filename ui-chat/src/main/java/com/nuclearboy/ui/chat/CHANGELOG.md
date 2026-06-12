@@ -1,3 +1,4 @@
+2026-06-12 1.0.96 编辑重发：MessageBubble 用户消息菜单加"编辑重发"，ChatViewModel.editAndResend 截断+回填 inputDraft+聚焦输入。
 2026-06-12 1.0.95 顶栏导出/分享对话：buildExportMarkdown 调 ConversationExporter，顶栏 Share 按钮走 ACTION_SEND 系统分享面板。
 2026-06-12 1.0.71 refreshProjectFiles 用 HIDDEN_FILE_ENTRIES 统一过滤内部状态与构建缓存目录。
 2026-06-12 1.0.70 第三方模型激活时聊天页隐藏 DeepSeek 模式选择条，避免展示不生效的档位选项。

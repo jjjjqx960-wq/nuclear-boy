@@ -367,6 +367,12 @@ fun ChatScreen(
                                 copyToClipboard(context, text)
                                 Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
                             },
+                            onEdit = {
+                                viewModel.editAndResend(message.id)?.let { content ->
+                                    inputDraft = content
+                                    inputFocusRequest++
+                                }
+                            },
                         )
                     }
                     item { Spacer(Modifier.height(4.dp)) }

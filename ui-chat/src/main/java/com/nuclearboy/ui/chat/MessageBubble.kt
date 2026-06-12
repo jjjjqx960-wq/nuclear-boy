@@ -52,6 +52,7 @@ fun MessageBubble(
     onRetry: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     onCopy: ((String) -> Unit)? = null,
+    onEdit: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val nuclearColors = NuclearBoyTheme.colorScheme
@@ -188,6 +189,13 @@ fun MessageBubble(
                         text = { Text("重新生成") },
                         onClick = { showMenu = false; onRetry() },
                         leadingIcon = { Icon(Icons.Default.Refresh, null, Modifier.size(16.dp)) },
+                    )
+                }
+                if (message.role == MessageRole.USER && onEdit != null) {
+                    DropdownMenuItem(
+                        text = { Text("编辑重发") },
+                        onClick = { showMenu = false; onEdit() },
+                        leadingIcon = { Icon(Icons.Default.Edit, null, Modifier.size(16.dp)) },
                     )
                 }
             }
