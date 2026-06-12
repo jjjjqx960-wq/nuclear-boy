@@ -263,6 +263,7 @@ object AppModule {
         tokenTracker: TokenTracker,
         modelRouter: ModelRouter,
         memoryStore: MemoryStore,
+        pcBridgeClient: PcBridgeClient,
     ): AgentEngine {
         android.util.Log.e("NuclearBoy", "[DI] provideAgentEngine")
         val engine = AgentEngine(
@@ -276,6 +277,8 @@ object AppModule {
         // 用户取消对话时的清理回调
         engine.onCancel = {
             // Python 执行器暂不支持外部中断，正在执行的脚本会自然完成（结果丢弃）
+            // 远程电脑任务：通知电脑端终止，避免白跑
+            pcBridgeClient.cancelActiveTasksAsync()
         }
         return engine
     }
@@ -639,6 +642,27 @@ else:
                             ToolResult.failure(result.technicalDetail ?: result.error.humanMessage)
                         }
                     }
+                }
+            },
+        ),
+        ToolDefinition(
+            name = "pc_task_list",
+            description = "查看电脑上正在执行的远程任务列表（任务 ID、CLI、已运行时长、任务摘要）。使用场景：1) 用户问\"电脑上在跑什么\"；2) 下发新任务前确认电脑是否空闲；3) 配合会话续传查找之前的任务。",
+            parameters = emptyList(),
+            executor = { _ ->
+                when (val result = client.listRunningTasks()) {
+                    is AppResult.Success -> {
+                        if (result.data.isEmpty()) {
+                            ToolResult.success("电脑当前没有正在执行的远程任务")
+                        } else {
+                            val lines = result.data.joinToString("\n") { t ->
+                                "· [${t.cli}] 已运行 ${t.elapsedMs / 1000}s — ${t.promptPreview}（id: ${t.id.take(8)}…，目录: ${t.cwd}）"
+                            }
+                            ToolResult.success("电脑上正在执行 ${result.data.size} 个任务:\n$lines")
+                        }
+                    }
+                    is AppResult.Failure ->
+                        ToolResult.failure(result.technicalDetail ?: result.error.humanMessage)
                 }
             },
         ),

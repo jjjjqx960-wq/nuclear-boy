@@ -3,7 +3,11 @@ package com.nuclearboy.remotepc
 import com.nuclearboy.common.AppError
 import com.nuclearboy.common.AppResult
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
@@ -32,6 +36,18 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         /** 本次任务的会话 ID，下次传入 runCliTask 的 sessionId 可继续对话（仅 claude） */
         val sessionId: String = "",
     )
+
+    data class RunningTask(
+        val id: String,
+        val cli: String,
+        val promptPreview: String,
+        val cwd: String,
+        val elapsedMs: Long,
+    )
+
+    /** 当前由本客户端发起、还在电脑上执行的任务 ID */
+    private val activeTasks = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val clientScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -81,6 +97,8 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         var lastFailure: AppResult<CliTaskResult> =
             AppResult.failure(AppError.NetworkUnavailable, "没能连上电脑")
 
+        activeTasks.add(taskId)
+        try {
         repeat(MAX_TASK_ATTEMPTS) { attempt ->
             val remainingMs = deadline - System.currentTimeMillis()
             if (remainingMs <= 0) {
@@ -137,6 +155,49 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
             }
         }
         return lastFailure
+        } finally {
+            activeTasks.remove(taskId)
+        }
+    }
+
+    /**
+     * 取消所有由本客户端发起、仍在电脑上执行的任务。
+     * 用户取消对话时调用（fire-and-forget），避免电脑端白跑。
+     */
+    fun cancelActiveTasksAsync() {
+        val snapshot = activeTasks.toList()
+        if (snapshot.isEmpty() || !configStore.isConfigured()) return
+        clientScope.launch {
+            withSession(configStore.currentUrl(), configStore.currentToken(), CONNECT_TEST_TIMEOUT_MS) { session ->
+                snapshot.forEach { id -> session.ws.send(PcBridgeProtocol.encodeCancel(id)) }
+                AppResult.success(true)
+            }
+        }
+    }
+
+    /** 查询电脑上正在执行的任务列表。 */
+    suspend fun listRunningTasks(): AppResult<List<RunningTask>> {
+        if (!configStore.isEnabled()) {
+            return AppResult.failure(AppError.InvalidRequest, "远程电脑功能未开启，去设置页打开并配置连接")
+        }
+        if (!configStore.isConfigured()) {
+            return AppResult.failure(AppError.InvalidRequest, "远程电脑还没配置好，去设置页填写地址和 token")
+        }
+        return withSession(configStore.currentUrl(), configStore.currentToken(), CONNECT_TEST_TIMEOUT_MS) { session ->
+            session.ws.send(PcBridgeProtocol.encodeListTasks())
+            while (true) {
+                when (val msg = session.receive()) {
+                    is PcBridgeProtocol.Inbound.Tasks -> return@withSession AppResult.success(
+                        msg.tasks.map { RunningTask(it.id, it.cli, it.promptPreview, it.cwd, it.elapsedMs) }
+                    )
+                    is PcBridgeProtocol.Inbound.Error ->
+                        return@withSession AppResult.failure(AppError.ServerError, msg.message)
+                    else -> Unit
+                }
+            }
+            @Suppress("UNREACHABLE_CODE")
+            AppResult.failure(AppError.Unknown, "查询意外结束")
+        }
     }
 
     // ── 会话管理 ─────────────────────────────────────

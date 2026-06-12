@@ -61,6 +61,14 @@ class DebugPcBridgeConfigReceiver : BroadcastReceiver() {
                     is AppResult.Failure ->
                         Log.e(TAG, "test connection FAILED code=${result.error.code} detail=${result.technicalDetail}")
                 }
+                if (intent.getBooleanExtra(EXTRA_LIST_TASKS, false)) {
+                    when (val list = bridgeClient.listRunningTasks()) {
+                        is AppResult.Success ->
+                            Log.e(TAG, "task list OK count=${list.data.size} tasks=${list.data.joinToString { "${it.cli}/${it.id.take(8)}/${it.elapsedMs}ms" }}")
+                        is AppResult.Failure ->
+                            Log.e(TAG, "task list FAILED ${list.technicalDetail}")
+                    }
+                }
                 if (runCli.isNotBlank() && runPrompt.isNotBlank()) {
                     val runSession = intent.getStringExtra(EXTRA_RUN_SESSION)?.trim().orEmpty()
                     Log.e(TAG, "test run start cli=$runCli promptLen=${runPrompt.length} resume=${runSession.take(8)}")
@@ -89,5 +97,6 @@ class DebugPcBridgeConfigReceiver : BroadcastReceiver() {
         const val EXTRA_RUN_CLI = "run_cli"
         const val EXTRA_RUN_PROMPT = "run_prompt"
         const val EXTRA_RUN_SESSION = "run_session"
+        const val EXTRA_LIST_TASKS = "list_tasks"
     }
 }

@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.75
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.76
 
 ---
 
@@ -32,6 +32,13 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.76 重点
+
+- 取消联动：用户在手机上取消对话时，自动通知电脑端终止正在执行的远程任务，不再白烧 token。
+- 新增 pc_task_list 工具：AI 可回答"电脑上在跑什么"，显示任务 ID、CLI、已运行时长和任务摘要。
+- 电脑端 bridge 新增 install-autostart/uninstall-autostart：注册 Windows 登录自启计划任务（pythonw 后台 + bridge.log 日志），电脑重启后手机随时能连。
+- 桥接协议新增 list_tasks/cancelled 消息；取消、列表、取消后移除、未知任务报错全路径实测通过。
 
 ## 1.0.75 重点
 

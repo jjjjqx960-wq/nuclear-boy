@@ -48,12 +48,16 @@ object PcBridgeProtocol {
     data class GetResultMessage(val type: String = "get_result", val id: String)
 
     @Serializable
+    data class ListTasksMessage(val type: String = "list_tasks")
+
+    @Serializable
     data class PingMessage(val type: String = "ping")
 
     fun encodeAuth(token: String): String = json.encodeToString(AuthMessage(token = token))
     fun encodeRun(msg: RunMessage): String = json.encodeToString(msg)
     fun encodeCancel(id: String): String = json.encodeToString(CancelMessage(id = id))
     fun encodeGetResult(id: String): String = json.encodeToString(GetResultMessage(id = id))
+    fun encodeListTasks(): String = json.encodeToString(ListTasksMessage())
     fun encodePing(): String = json.encodeToString(PingMessage())
 
     // ── 入站消息 ─────────────────────────────────────
@@ -72,8 +76,18 @@ object PcBridgeProtocol {
         ) : Inbound
         data class Error(val id: String, val message: String) : Inbound
         data object Pong : Inbound
+        data class Cancelled(val id: String) : Inbound
+        data class Tasks(val tasks: List<RunningTask>) : Inbound
         data class Unknown(val type: String) : Inbound
     }
+
+    data class RunningTask(
+        val id: String,
+        val cli: String,
+        val promptPreview: String,
+        val cwd: String,
+        val elapsedMs: Long,
+    )
 
     /**
      * 解析服务端消息。非法 JSON 或缺 type 字段返回 null（调用方按协议错误处理）。
@@ -110,6 +124,21 @@ object PcBridgeProtocol {
                 message = obj.stringOrEmpty("message"),
             )
             "pong" -> Inbound.Pong
+            "cancelled" -> Inbound.Cancelled(obj.stringOrEmpty("id"))
+            "tasks" -> Inbound.Tasks(
+                (obj["tasks"] as? kotlinx.serialization.json.JsonArray)
+                    ?.mapNotNull { el ->
+                        (el as? JsonObject)?.let { t ->
+                            RunningTask(
+                                id = t.stringOrEmpty("id"),
+                                cli = t.stringOrEmpty("cli"),
+                                promptPreview = t.stringOrEmpty("promptPreview"),
+                                cwd = t.stringOrEmpty("cwd"),
+                                elapsedMs = t["elapsedMs"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
+                            )
+                        }
+                    } ?: emptyList()
+            )
             else -> Inbound.Unknown(type)
         }
     }

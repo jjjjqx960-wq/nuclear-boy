@@ -99,6 +99,34 @@ class PcBridgeProtocolTest {
     }
 
     @Test
+    fun `parse tasks list with running entries`() {
+        val msg = PcBridgeProtocol.parseInbound(
+            """{"type":"tasks","tasks":[{"id":"t1","cli":"claude","promptPreview":"修 bug","cwd":"D:\\proj","elapsedMs":3007}]}"""
+        )
+        val tasks = (msg as PcBridgeProtocol.Inbound.Tasks).tasks
+        assertEquals(1, tasks.size)
+        assertEquals("claude", tasks[0].cli)
+        assertEquals(3007L, tasks[0].elapsedMs)
+    }
+
+    @Test
+    fun `parse empty tasks list`() {
+        val msg = PcBridgeProtocol.parseInbound("""{"type":"tasks","tasks":[]}""")
+        assertTrue((msg as PcBridgeProtocol.Inbound.Tasks).tasks.isEmpty())
+    }
+
+    @Test
+    fun `parse cancelled confirmation`() {
+        val msg = PcBridgeProtocol.parseInbound("""{"type":"cancelled","id":"t9"}""")
+        assertEquals("t9", (msg as PcBridgeProtocol.Inbound.Cancelled).id)
+    }
+
+    @Test
+    fun `encodeListTasks produces list_tasks message`() {
+        assertTrue(PcBridgeProtocol.encodeListTasks().contains("\"type\":\"list_tasks\""))
+    }
+
+    @Test
     fun `parse invalid json returns null`() {
         assertNull(PcBridgeProtocol.parseInbound("not json"))
         assertNull(PcBridgeProtocol.parseInbound("""{"noType":1}"""))
