@@ -337,6 +337,20 @@ private fun ToolExecutionCard(toolCall: ToolCallRecord) {
             }
         }
 
+        // 执行中实时显示最新一行进度（点开可看完整日志）
+        if (toolCall.status == ToolCallStatus.RUNNING && hasOutput && !expanded) {
+            Text(
+                text = toolCall.output.orEmpty().trimEnd().substringAfterLast('\n'),
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontFamily = FontFamily.Monospace, fontSize = 10.sp,
+                    color = nuclearColors.material.onSurfaceVariant,
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+
         // Expandable output
         AnimatedVisibility(
             visible = expanded && hasOutput,

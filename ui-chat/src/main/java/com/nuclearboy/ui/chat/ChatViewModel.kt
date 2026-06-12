@@ -90,6 +90,32 @@ class ChatViewModel @Inject constructor(
     fun setMode(mode: Int) { selectedMode = mode.coerceIn(0, 2) }
     fun selectModel(modelId: String) { apiKeyManager.selectModel(modelId) }
 
+    init {
+        // 长耗时工具（如 pc_cli_run）的实时进度 → 追加到当前 RUNNING 工具卡片的输出
+        viewModelScope.launch {
+            com.nuclearboy.common.ToolProgressBus.events.collect { progress ->
+                val msgId = currentAssistantMsgId ?: return@collect
+                updateAssistantMessage(msgId) { msg ->
+                    val idx = msg.toolCalls.indexOfLast {
+                        it.toolName == progress.toolName && it.status == ToolCallStatus.RUNNING
+                    }
+                    if (idx < 0) {
+                        msg
+                    } else {
+                        val call = msg.toolCalls[idx]
+                        val appended = (call.output.orEmpty() + progress.text + "\n")
+                            .takeLast(MAX_TOOL_PROGRESS_CHARS)
+                        msg.copy(
+                            toolCalls = msg.toolCalls.toMutableList().also {
+                                it[idx] = call.copy(output = appended)
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     private val _projectFiles = MutableStateFlow<List<FileInfo>>(emptyList())
     val projectFiles: StateFlow<List<FileInfo>> = _projectFiles.asStateFlow()
 
@@ -975,6 +1001,9 @@ class ChatViewModel @Inject constructor(
     }
 
     companion object {
+        /** 工具卡片实时进度日志的最大保留字符数 */
+        private const val MAX_TOOL_PROGRESS_CHARS = 4000
+
         /** /loop 默认轮数与上限 */
         private const val LOOP_DEFAULT_ITERATIONS = 5
         private const val LOOP_MAX_ITERATIONS = 10

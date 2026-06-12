@@ -616,6 +616,8 @@ else:
                         sessionId = params["session"],
                         onOutput = { kind, text ->
                             if (kind == "tool" || kind == "status") outputLines.add(text)
+                            // 实时进度推给聊天界面的工具卡片
+                            ToolProgressBus.report("pc_cli_run", text)
                         },
                     )
                     when (result) {

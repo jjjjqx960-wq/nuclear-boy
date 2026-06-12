@@ -1,3 +1,4 @@
+2026-06-12 1.0.75 远程电脑任务执行过程实时可见：新增 ToolProgressBus 进度总线，pc_cli_run 执行中电脑端输出实时追加到聊天工具卡片，卡片收起时显示最新一行进度、点开看完整日志，不再干等数分钟无反馈。
 2026-06-12 1.0.74 远程电脑能力升级：codex 也支持会话续传（exec resume）；断线不再丢任务——手机掉线时电脑端任务后台继续，重连自动取回结果或重挂输出流（结果缓存最近 100 条），借鉴 ccpocket 离线缓冲方案。
 2026-06-12 1.0.73 远程电脑任务支持会话续传：pc_cli_run 返回会话 ID，传入 session 参数可让电脑端 claude 记住之前的上下文连续迭代（借鉴 ccpocket/cc-connect 的 --resume 方案），真机实测跨任务记忆通过。
 2026-06-12 1.0.72 新增远程电脑能力：手机端可把任务下发给电脑上的 Claude Code / Codex 执行。包含电脑端 nb-pc-bridge 守护进程（WebSocket+token 鉴权）、remote-pc 客户端模块、pc_cli_run/pc_bridge_status 工具、设置页远程电脑配置区和 debug 配置广播，真机 USB 直连全链路实测通过。

@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.74
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.75
 
 ---
 
@@ -32,6 +32,12 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.75 重点
+
+- 远程任务执行过程实时可见：pc_cli_run 跑任务时，电脑端 claude/codex 的输出实时流到聊天界面的工具卡片——收起时显示最新一行进度，点开看完整滚动日志（保留最近 4000 字符）。
+- 新增 common 层 ToolProgressBus 进度总线，任何长耗时工具都可以接入实时进度，UI 与工具实现解耦。
+- 借鉴 happy（21.8k 星）的工具调用生命周期卡片渲染思路（tool-call-start/end + 增量更新）。
 
 ## 1.0.74 重点
 
