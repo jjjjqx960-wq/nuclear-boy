@@ -127,8 +127,8 @@ object TerminalAnsi {
         return spans
     }
 
-    /** 处理 SGR 参数串，返回新的 (前景色, 加粗)。 */
-    private fun applySgr(params: String, fg0: Int?, bold0: Boolean): Pair<Int?, Boolean> {
+    /** 处理 SGR 参数串，返回新的 (前景色, 加粗)。internal 供 TerminalEmulator 复用。 */
+    internal fun applySgr(params: String, fg0: Int?, bold0: Boolean): Pair<Int?, Boolean> {
         if (params.isEmpty()) return Pair(null, false) // ESC[m == ESC[0m 复位
         val codes = params.split(';').map { it.toIntOrNull() ?: 0 }
         var fg = fg0

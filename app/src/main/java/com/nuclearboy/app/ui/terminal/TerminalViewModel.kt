@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nuclearboy.remotepc.PcBridgeConfigStore
 import com.nuclearboy.remotepc.PcTerminalSession
+import com.nuclearboy.remotepc.TerminalAnsi
+import com.nuclearboy.remotepc.TerminalEmulator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,8 +15,9 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 远程终端界面的状态机：用 [PcTerminalSession] 连电脑开 ConPTY，输出剥掉 ANSI
- * 后追加显示，键入回传。属于"工具调用 + 远程终端界面"里的远程终端形态。
+ * 远程终端界面的状态机：用 [PcTerminalSession] 连电脑开 ConPTY，输出喂进
+ * [TerminalEmulator] 屏幕缓冲（支持光标定位/擦除/滚动/颜色/备用屏，能跑全屏 TUI），
+ * 渲染成按行的彩色 span 给界面。属于"工具调用 + 远程终端界面"里的远程终端形态。
  */
 @HiltViewModel
 class TerminalViewModel @Inject constructor(
@@ -25,7 +28,7 @@ class TerminalViewModel @Inject constructor(
 
     data class UiState(
         val status: Status = Status.IDLE,
-        val output: String = "",
+        val lines: List<List<TerminalAnsi.Span>> = emptyList(),
         val message: String = "",
     )
 
@@ -34,7 +37,7 @@ class TerminalViewModel @Inject constructor(
 
     private var session: PcTerminalSession? = null
     private var collectJob: Job? = null
-    private val buffer = StringBuilder()
+    private var emulator = TerminalEmulator(COLS, ROWS)
 
     val isConfigured: Boolean get() = configStore.isConfigured()
 
@@ -46,9 +49,12 @@ class TerminalViewModel @Inject constructor(
             _state.value = UiState(status = Status.FAILED, message = "还没配置远程电脑，去设置页填地址和 token")
             return
         }
-        buffer.clear()
+        emulator = TerminalEmulator(COLS, ROWS)
         _state.value = UiState(status = Status.CONNECTING, message = "正在连接电脑…")
-        val newSession = PcTerminalSession(url = url, token = token, cwd = cwd?.takeIf { it.isNotBlank() })
+        val newSession = PcTerminalSession(
+            url = url, token = token, cwd = cwd?.takeIf { it.isNotBlank() },
+            cols = COLS, rows = ROWS,
+        )
         session = newSession
         collectJob = viewModelScope.launch {
             newSession.connect().collect { event ->
@@ -72,7 +78,7 @@ class TerminalViewModel @Inject constructor(
         session?.input(line + "\r")
     }
 
-    /** 发送原始键入（控制字符等，如 Ctrl-C = ""）。 */
+    /** 发送原始键入（控制字符等，如 Ctrl-C）。 */
     fun sendRaw(data: String) {
         session?.input(data)
     }
@@ -83,12 +89,8 @@ class TerminalViewModel @Inject constructor(
     }
 
     private fun appendOutput(data: String) {
-        // 保留原始（含 ANSI）流，由界面用 TerminalAnsi.parseSpans 渲染颜色
-        buffer.append(data)
-        if (buffer.length > MAX_BUFFER) {
-            buffer.delete(0, buffer.length - MAX_BUFFER)
-        }
-        _state.value = _state.value.copy(output = buffer.toString())
+        emulator.feed(data)
+        _state.value = _state.value.copy(lines = emulator.renderWithScrollback())
     }
 
     private fun stop() {
@@ -104,6 +106,7 @@ class TerminalViewModel @Inject constructor(
     }
 
     companion object {
-        private const val MAX_BUFFER = 40_000
+        private const val COLS = 80
+        private const val ROWS = 24
     }
 }

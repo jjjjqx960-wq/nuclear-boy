@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -53,16 +54,19 @@ import com.nuclearboy.remotepc.TerminalAnsi
  * MVP：输出剥 ANSI 后以等宽文本展示，输入栏发整行命令，并提供 Ctrl-C/Tab/Enter
  * 等常用键。完整 xterm 渲染（颜色、全屏 TUI）后续增强。
  */
-/** 把含 ANSI 的终端输出转成带颜色/加粗的 AnnotatedString（颜色解析在 :remote-pc 纯逻辑层）。 */
-private fun ansiToAnnotated(raw: String): AnnotatedString {
-    if (raw.isEmpty()) return AnnotatedString("(暂无输出)")
+/** 把屏幕缓冲渲染出的按行 span 转成带颜色/加粗的 AnnotatedString。 */
+private fun screenToAnnotated(lines: List<List<TerminalAnsi.Span>>): AnnotatedString {
+    if (lines.isEmpty()) return AnnotatedString("(暂无输出)")
     return buildAnnotatedString {
-        for (span in TerminalAnsi.parseSpans(raw)) {
-            val style = SpanStyle(
-                color = span.fgArgb?.let { Color(it) } ?: Color.Unspecified,
-                fontWeight = if (span.bold) FontWeight.Bold else null,
-            )
-            withStyle(style) { append(span.text) }
+        lines.forEachIndexed { idx, spans ->
+            for (span in spans) {
+                val style = SpanStyle(
+                    color = span.fgArgb?.let { Color(it) } ?: Color.Unspecified,
+                    fontWeight = if (span.bold) FontWeight.Bold else null,
+                )
+                withStyle(style) { append(span.text) }
+            }
+            if (idx < lines.size - 1) append('\n')
         }
     }
 }
@@ -119,24 +123,27 @@ fun TerminalScreen(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             )
 
-            // 输出区（黑底等宽，自动滚到底）
+            // 输出区（黑底等宽，自动滚到底，80 列宽允许横向滚动）
             val scroll = rememberScrollState()
-            LaunchedEffect(state.output) { scroll.scrollTo(scroll.maxValue) }
+            val hScroll = rememberScrollState()
+            LaunchedEffect(state.lines) { scroll.scrollTo(scroll.maxValue) }
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .background(Color(0xFF0C0C0C))
                     .verticalScroll(scroll)
+                    .horizontalScroll(hScroll)
                     .padding(8.dp),
             ) {
-                val rendered = remember(state.output) { ansiToAnnotated(state.output) }
+                val rendered = remember(state.lines) { screenToAnnotated(state.lines) }
                 Text(
                     text = rendered,
                     color = Color(0xFFD0D0D0),
                     fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
+                    softWrap = false,
                 )
             }
 
