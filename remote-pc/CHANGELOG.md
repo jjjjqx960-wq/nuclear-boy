@@ -1,3 +1,4 @@
+2026-06-12 1.0.93 增量同步：Output 加 seq、get_result 加 sinceSeq；runCliTask 跟踪 maxSeq、重连请求 sinceSeq=maxSeq+1 并按 seq 去重。PcBridgeProtocolTest +3 例（seq 解析、缺省回退、sinceSeq 编码）。
 2026-06-12 1.0.92 通道加密：新增 PcCrypto（SHA-256 派生密钥 + AES-256-GCM，java.util.Base64）；PcBridgeClient/PcTerminalSession 开启加密时握手发 {"type":"auth"} 信封、收发走 envelope/解密；配置加 isEncryptionEnabled/setEncryptionEnabled + PcBridgeConfig.encrypted。PcCryptoTest 6 例（含与 Python 字节级一致的固定向量）。
 2026-06-12 1.0.91 写文件协议：协议加 write_file 出站与 FileWritten 入站；PcBridgeClient.writeFile（覆盖/追加）。PcBridgeProtocolTest +2 例。审批在 :app 的 pc_write_file 工具里走 PermissionPromptBus，client 仅负责传输。
 2026-06-12 1.0.90 只读文件浏览：协议加 list_dir/read_file 出站与 DirListing/FileContent 入站；PcBridgeClient.listDir/readFile（withSession 请求-响应）。PcBridgeProtocolTest +3 例（编码、目录列表、文件内容解析）。

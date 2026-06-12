@@ -107,6 +107,8 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         val outputLog = mutableListOf<String>()
         // 任务是否已被电脑接受：决定断线重连后是补发 run 还是用 get_result 取回
         var taskAccepted = false
+        // 已处理的最大输出 seq：重连时据此请求增量补发，并去重（历史增量同步）
+        var maxSeq = -1
         var lastFailure: AppResult<CliTaskResult> =
             AppResult.failure(AppError.NetworkUnavailable, "没能连上电脑")
 
@@ -129,15 +131,19 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
                         )
                     )
                 } else {
-                    // 断线前任务已开始：取回结果或重新挂上输出流，避免重复执行
-                    PcBridgeProtocol.encodeGetResult(taskId)
+                    // 断线前任务已开始：取回结果或重挂流，并请求增量补发漏掉的输出
+                    PcBridgeProtocol.encodeGetResult(taskId, sinceSeq = maxSeq + 1)
                 }
                 session.send(request)
                 while (true) {
                     when (val msg = session.receive()) {
                         is PcBridgeProtocol.Inbound.Accepted -> if (msg.id == taskId) taskAccepted = true
                         is PcBridgeProtocol.Inbound.Output -> {
-                            if (msg.id == taskId && msg.text.isNotBlank()) {
+                            // seq<=maxSeq 说明是重连补发里已见过的，去重跳过
+                            if (msg.id == taskId && msg.text.isNotBlank() &&
+                                (msg.seq < 0 || msg.seq > maxSeq)
+                            ) {
+                                if (msg.seq >= 0) maxSeq = msg.seq
                                 taskAccepted = true
                                 if (outputLog.size < MAX_OUTPUT_LOG_LINES) {
                                     outputLog.add("[${msg.kind}] ${msg.text}")

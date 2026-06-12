@@ -49,7 +49,12 @@ object PcBridgeProtocol {
     data class CancelMessage(val type: String = "cancel", val id: String)
 
     @Serializable
-    data class GetResultMessage(val type: String = "get_result", val id: String)
+    data class GetResultMessage(
+        val type: String = "get_result",
+        val id: String,
+        /** 已收到的最大 seq+1，桥接据此只补发漏掉的输出（历史增量同步） */
+        val sinceSeq: Int? = null,
+    )
 
     @Serializable
     data class ListTasksMessage(val type: String = "list_tasks")
@@ -107,7 +112,8 @@ object PcBridgeProtocol {
     fun encodeAuth(token: String): String = json.encodeToString(AuthMessage(token = token))
     fun encodeRun(msg: RunMessage): String = json.encodeToString(msg)
     fun encodeCancel(id: String): String = json.encodeToString(CancelMessage(id = id))
-    fun encodeGetResult(id: String): String = json.encodeToString(GetResultMessage(id = id))
+    fun encodeGetResult(id: String, sinceSeq: Int? = null): String =
+        json.encodeToString(GetResultMessage(id = id, sinceSeq = sinceSeq))
     fun encodeListTasks(): String = json.encodeToString(ListTasksMessage())
     fun encodePermissionResponse(id: String, approved: Boolean, message: String = ""): String =
         json.encodeToString(PermissionResponseMessage(id = id, approved = approved, message = message))
@@ -132,7 +138,7 @@ object PcBridgeProtocol {
         data class AuthOk(val host: String, val clis: Map<String, String>) : Inbound
         data class AuthFail(val message: String) : Inbound
         data class Accepted(val id: String) : Inbound
-        data class Output(val id: String, val kind: String, val text: String) : Inbound
+        data class Output(val id: String, val kind: String, val text: String, val seq: Int = -1) : Inbound
         data class Done(
             val id: String,
             val exitCode: Int,
@@ -202,6 +208,7 @@ object PcBridgeProtocol {
                 id = obj.stringOrEmpty("id"),
                 kind = obj.stringOrEmpty("kind"),
                 text = obj.stringOrEmpty("text"),
+                seq = obj["seq"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1,
             )
             "done" -> Inbound.Done(
                 id = obj.stringOrEmpty("id"),

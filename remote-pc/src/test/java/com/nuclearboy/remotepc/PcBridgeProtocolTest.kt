@@ -44,6 +44,22 @@ class PcBridgeProtocolTest {
         assertEquals("t1", output.id)
         assertEquals("text", output.kind)
         assertEquals("hello", output.text)
+        assertEquals(-1, output.seq) // 无 seq 字段回退 -1
+    }
+
+    @Test
+    fun `parse output with seq for incremental sync`() {
+        val msg = PcBridgeProtocol.parseInbound(
+            """{"type":"output","id":"t1","kind":"text","text":"hi","seq":7}"""
+        )
+        assertEquals(7, (msg as PcBridgeProtocol.Inbound.Output).seq)
+    }
+
+    @Test
+    fun `encodeGetResult carries sinceSeq when given`() {
+        assertTrue(PcBridgeProtocol.encodeGetResult("t1", sinceSeq = 5).contains("\"sinceSeq\":5"))
+        // 不传则省略
+        assertTrue(!PcBridgeProtocol.encodeGetResult("t1").contains("sinceSeq"))
     }
 
     @Test
