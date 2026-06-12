@@ -226,6 +226,51 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         }
     }
 
+    data class DirListing(val path: String, val entries: List<PcBridgeProtocol.DirEntry>, val truncated: Boolean)
+    data class FileContent(val path: String, val content: String, val size: Long, val truncated: Boolean)
+
+    /** 列出电脑上某目录（只读）。 */
+    suspend fun listDir(path: String): AppResult<DirListing> {
+        if (!configStore.isConfigured()) {
+            return AppResult.failure(AppError.InvalidRequest, "远程电脑还没配置好，去设置页填写地址和 token")
+        }
+        return withSession(configStore.currentUrl(), configStore.currentToken(), CONNECT_TEST_TIMEOUT_MS) { session ->
+            session.ws.send(PcBridgeProtocol.encodeListDir("ld", path))
+            while (true) {
+                when (val msg = session.receive()) {
+                    is PcBridgeProtocol.Inbound.DirListing ->
+                        return@withSession AppResult.success(DirListing(msg.path, msg.entries, msg.truncated))
+                    is PcBridgeProtocol.Inbound.Error ->
+                        return@withSession AppResult.failure(AppError.ServerError, msg.message)
+                    else -> Unit
+                }
+            }
+            @Suppress("UNREACHABLE_CODE")
+            AppResult.failure(AppError.Unknown, "列目录意外结束")
+        }
+    }
+
+    /** 读取电脑上某文件文本（只读，默认上限 64KB）。 */
+    suspend fun readFile(path: String, maxBytes: Int? = null): AppResult<FileContent> {
+        if (!configStore.isConfigured()) {
+            return AppResult.failure(AppError.InvalidRequest, "远程电脑还没配置好，去设置页填写地址和 token")
+        }
+        return withSession(configStore.currentUrl(), configStore.currentToken(), CONNECT_TEST_TIMEOUT_MS) { session ->
+            session.ws.send(PcBridgeProtocol.encodeReadFile("rf", path, maxBytes))
+            while (true) {
+                when (val msg = session.receive()) {
+                    is PcBridgeProtocol.Inbound.FileContent ->
+                        return@withSession AppResult.success(FileContent(msg.path, msg.content, msg.size, msg.truncated))
+                    is PcBridgeProtocol.Inbound.Error ->
+                        return@withSession AppResult.failure(AppError.ServerError, msg.message)
+                    else -> Unit
+                }
+            }
+            @Suppress("UNREACHABLE_CODE")
+            AppResult.failure(AppError.Unknown, "读文件意外结束")
+        }
+    }
+
     // ── 会话管理 ─────────────────────────────────────
 
     private class Session(

@@ -690,6 +690,50 @@ else:
             },
         ),
         ToolDefinition(
+            name = "pc_list_dir",
+            description = "列出电脑上某个目录的内容（文件名、是否目录、大小），只读不改动。使用场景：1) 下发任务前先看看项目结构；2) 用户问\"电脑上 D:/xxx 里有什么\"；3) 定位要读/要改的文件。前提是用户已配置\"远程电脑\"。",
+            parameters = listOf(
+                ToolParameter("path", "string", "电脑上的目录路径，如 D:/myproject。不传用默认工作目录", required = false),
+            ),
+            executor = { params ->
+                when (val result = client.listDir(params["path"] ?: "")) {
+                    is AppResult.Success -> {
+                        val d = result.data
+                        if (d.entries.isEmpty()) {
+                            ToolResult.success("${d.path} 是空目录")
+                        } else {
+                            val lines = d.entries.joinToString("\n") { e ->
+                                if (e.isDir) "📁 ${e.name}/" else "📄 ${e.name}（${e.size} 字节）"
+                            }
+                            val more = if (d.truncated) "\n…（条目过多已截断）" else ""
+                            ToolResult.success("${d.path}:\n$lines$more")
+                        }
+                    }
+                    is AppResult.Failure -> ToolResult.failure(result.technicalDetail ?: result.error.humanMessage)
+                }
+            },
+        ),
+        ToolDefinition(
+            name = "pc_read_file",
+            description = "读取电脑上某个文件的文本内容（只读，默认上限 64KB）。使用场景：1) 查看电脑上代码/配置文件内容来理解或规划改动；2) 用户问某个文件里写了什么。前提是用户已配置\"远程电脑\"。读大文件会被截断，必要时配合 pc_cli_run 处理。",
+            parameters = listOf(
+                ToolParameter("path", "string", "电脑上的文件路径，如 D:/myproject/build.gradle", required = true),
+            ),
+            executor = { params ->
+                val path = params["path"] ?: ""
+                if (path.isBlank()) {
+                    ToolResult.failure("缺少 path 参数，告诉我要读电脑上哪个文件")
+                } else when (val result = client.readFile(path)) {
+                    is AppResult.Success -> {
+                        val f = result.data
+                        val note = if (f.truncated) "\n…（文件 ${f.size} 字节，超出已截断）" else ""
+                        ToolResult.success("${f.path}（${f.size} 字节）:\n${f.content}$note")
+                    }
+                    is AppResult.Failure -> ToolResult.failure(result.technicalDetail ?: result.error.humanMessage)
+                }
+            },
+        ),
+        ToolDefinition(
             name = "pc_bridge_status",
             description = "检查和电脑的连接状态，返回电脑主机名和可用的编程 CLI 版本。使用场景：1) 用户问\"电脑连上了吗\"；2) pc_cli_run 失败时排查连接。",
             parameters = emptyList(),

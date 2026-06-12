@@ -84,6 +84,17 @@ object PcBridgeProtocol {
     @Serializable
     data class TermCloseMessage(val type: String = "term_close", val id: String)
 
+    @Serializable
+    data class ListDirMessage(val type: String = "list_dir", val id: String, val path: String)
+
+    @Serializable
+    data class ReadFileMessage(
+        val type: String = "read_file",
+        val id: String,
+        val path: String,
+        val maxBytes: Int? = null,
+    )
+
     fun encodeAuth(token: String): String = json.encodeToString(AuthMessage(token = token))
     fun encodeRun(msg: RunMessage): String = json.encodeToString(msg)
     fun encodeCancel(id: String): String = json.encodeToString(CancelMessage(id = id))
@@ -99,6 +110,10 @@ object PcBridgeProtocol {
     fun encodeTermResize(id: String, cols: Int, rows: Int): String =
         json.encodeToString(TermResizeMessage(id = id, cols = cols, rows = rows))
     fun encodeTermClose(id: String): String = json.encodeToString(TermCloseMessage(id = id))
+    fun encodeListDir(id: String, path: String): String =
+        json.encodeToString(ListDirMessage(id = id, path = path))
+    fun encodeReadFile(id: String, path: String, maxBytes: Int? = null): String =
+        json.encodeToString(ReadFileMessage(id = id, path = path, maxBytes = maxBytes))
 
     // ── 入站消息 ─────────────────────────────────────
 
@@ -127,8 +142,23 @@ object PcBridgeProtocol {
         ) : Inbound
         data class TermOutput(val id: String, val data: String) : Inbound
         data class TermExit(val id: String, val code: Int) : Inbound
+        data class DirListing(
+            val id: String,
+            val path: String,
+            val entries: List<DirEntry>,
+            val truncated: Boolean,
+        ) : Inbound
+        data class FileContent(
+            val id: String,
+            val path: String,
+            val content: String,
+            val size: Long,
+            val truncated: Boolean,
+        ) : Inbound
         data class Unknown(val type: String) : Inbound
     }
+
+    data class DirEntry(val name: String, val isDir: Boolean, val size: Long)
 
     data class RunningTask(
         val id: String,
@@ -183,6 +213,28 @@ object PcBridgeProtocol {
             "term_exit" -> Inbound.TermExit(
                 id = obj.stringOrEmpty("id"),
                 code = obj["code"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
+            )
+            "dir_listing" -> Inbound.DirListing(
+                id = obj.stringOrEmpty("id"),
+                path = obj.stringOrEmpty("path"),
+                entries = (obj["entries"] as? kotlinx.serialization.json.JsonArray)
+                    ?.mapNotNull { el ->
+                        (el as? JsonObject)?.let { en ->
+                            DirEntry(
+                                name = en.stringOrEmpty("name"),
+                                isDir = en["isDir"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false,
+                                size = en["size"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
+                            )
+                        }
+                    } ?: emptyList(),
+                truncated = obj["truncated"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false,
+            )
+            "file_content" -> Inbound.FileContent(
+                id = obj.stringOrEmpty("id"),
+                path = obj.stringOrEmpty("path"),
+                content = obj.stringOrEmpty("content"),
+                size = obj["size"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
+                truncated = obj["truncated"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false,
             )
             "permission_request" -> Inbound.PermissionRequest(
                 id = obj.stringOrEmpty("id"),

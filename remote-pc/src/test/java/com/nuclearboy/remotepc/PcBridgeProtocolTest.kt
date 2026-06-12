@@ -218,6 +218,39 @@ class PcBridgeProtocolTest {
     }
 
     @Test
+    fun `encodeListDir and readFile`() {
+        assertTrue(PcBridgeProtocol.encodeListDir("d1", "D:/p").contains("\"type\":\"list_dir\""))
+        val rf = PcBridgeProtocol.encodeReadFile("r1", "D:/p/a.kt", 1024)
+        assertTrue(rf.contains("\"type\":\"read_file\""))
+        assertTrue(rf.contains("\"maxBytes\":1024"))
+        // 不传 maxBytes 时字段省略
+        assertTrue(!PcBridgeProtocol.encodeReadFile("r2", "x").contains("maxBytes"))
+    }
+
+    @Test
+    fun `parse dir_listing with entries`() {
+        val msg = PcBridgeProtocol.parseInbound(
+            """{"type":"dir_listing","id":"d1","path":"D:/p","entries":[{"name":"a.kt","isDir":false,"size":12},{"name":"sub","isDir":true,"size":0}],"truncated":false}"""
+        )
+        val dl = msg as PcBridgeProtocol.Inbound.DirListing
+        assertEquals(2, dl.entries.size)
+        assertEquals("a.kt", dl.entries[0].name)
+        assertEquals(12L, dl.entries[0].size)
+        assertTrue(dl.entries[1].isDir)
+    }
+
+    @Test
+    fun `parse file_content`() {
+        val msg = PcBridgeProtocol.parseInbound(
+            """{"type":"file_content","id":"r1","path":"D:/p/a.kt","content":"你好","size":6,"truncated":true}"""
+        )
+        val fc = msg as PcBridgeProtocol.Inbound.FileContent
+        assertEquals("你好", fc.content)
+        assertEquals(6L, fc.size)
+        assertTrue(fc.truncated)
+    }
+
+    @Test
     fun `parse done with missing fields falls back to defaults`() {
         val done = PcBridgeProtocol.parseInbound("""{"type":"done","id":"t1"}""")
             as PcBridgeProtocol.Inbound.Done
