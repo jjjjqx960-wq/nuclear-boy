@@ -1,3 +1,4 @@
+2026-06-12 1.1.0 token 用量改用 TokenUsageFormat.inline（↑输入/↓输出/·缓存）替换原总量显示。
 2026-06-12 1.0.98 删除消息：MessageBubble 菜单接上 onDelete，ChatViewModel.deleteMessage（处理中拒绝）。
 2026-06-12 1.0.97 会话内搜索：顶栏搜索开关+搜索行（match 计数/上下跳转），MessageSearch.find 定位，命中消息 searchHighlighted 高亮边框、animateScrollToItem 跳转。
 2026-06-12 1.0.96 编辑重发：MessageBubble 用户消息菜单加"编辑重发"，ChatViewModel.editAndResend 截断+回填 inputDraft+聚焦输入。

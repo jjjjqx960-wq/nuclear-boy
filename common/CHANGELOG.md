@@ -1,3 +1,4 @@
+2026-06-12 1.1.0 新增 TokenUsageFormat.inline：↑输入↓输出+缓存命中，无拆分回退总量，纯函数 5 单测。
 2026-06-12 1.0.98 ChatEditing.removeMessage：按 id 删单条消息，纯函数 2 单测。
 2026-06-12 1.0.97 新增 MessageSearch.find/count：会话内大小写不敏感子串匹配（跳过系统消息），返回命中下标，纯函数 6 单测。
 2026-06-12 1.0.96 新增 ChatEditing.prepareEdit：截断到目标用户消息之前并取回内容，纯函数 5 单测。

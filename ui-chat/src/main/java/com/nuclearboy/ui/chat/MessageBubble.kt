@@ -167,10 +167,10 @@ fun MessageBubble(
                             color = textColor.copy(alpha = 0.5f), fontSize = 10.sp,
                         ),
                     )
-                    if (message.tokenUsage != null) {
+                    message.tokenUsage?.let { usage ->
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = "· ${message.tokenUsage?.totalTokens?.toInt()?.let { formatTokenCount(it) } ?: "?"} tokens",
+                            text = "· ${com.nuclearboy.common.TokenUsageFormat.inline(usage)}",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = textColor.copy(alpha = 0.4f), fontSize = 9.sp,
                             ),
