@@ -131,6 +131,18 @@ fun ChatScreen(
     var inputDraft by rememberSaveable(projectId) { mutableStateOf("") }
     var inputFocusRequest by remember { mutableLongStateOf(0L) }
     var forceNextScrollToBottom by remember { mutableStateOf(true) }
+    // 会话内搜索
+    var showSearch by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var matchPointer by remember { mutableIntStateOf(0) }
+    val searchMatches = remember(searchQuery, uiState.messages) {
+        MessageSearch.find(uiState.messages, searchQuery)
+    }
+    val currentMatchId = searchMatches.getOrNull(matchPointer)
+        ?.let { uiState.messages.getOrNull(it)?.id }
+    LaunchedEffect(matchPointer, searchMatches) {
+        searchMatches.getOrNull(matchPointer)?.let { listState.animateScrollToItem(it) }
+    }
     val totalListItems by remember {
         derivedStateOf { listState.layoutInfo.totalItemsCount }
     }
@@ -244,6 +256,22 @@ fun ChatScreen(
                         }
                     }
                     Spacer(Modifier.weight(1f))
+                    // 会话内搜索开关
+                    IconButton(
+                        onClick = {
+                            showSearch = !showSearch
+                            if (!showSearch) { searchQuery = ""; matchPointer = 0 }
+                        },
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            "搜索对话",
+                            tint = if (showSearch) NuclearBoyTheme.colorScheme.material.primary
+                                   else NuclearBoyTheme.colorScheme.material.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
                     // 导出/分享当前对话为 Markdown
                     val exportContext = LocalContext.current
                     IconButton(
@@ -285,6 +313,37 @@ fun ChatScreen(
                                    else NuclearBoyTheme.colorScheme.material.onSurfaceVariant,
                             modifier = Modifier.size(26.dp),
                         )
+                    }
+                }
+                // 会话内搜索行
+                if (showSearch) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it; matchPointer = 0 },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            placeholder = { Text("搜索本次对话…", fontSize = 13.sp) },
+                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (searchMatches.isEmpty()) (if (searchQuery.isBlank()) "" else "无匹配")
+                            else "${matchPointer + 1}/${searchMatches.size}",
+                            fontSize = 12.sp,
+                            color = NuclearBoyTheme.colorScheme.material.onSurfaceVariant,
+                        )
+                        IconButton(
+                            onClick = { if (searchMatches.isNotEmpty()) matchPointer = (matchPointer - 1 + searchMatches.size) % searchMatches.size },
+                            enabled = searchMatches.isNotEmpty(), modifier = Modifier.size(36.dp),
+                        ) { Icon(Icons.Default.KeyboardArrowUp, "上一个", modifier = Modifier.size(20.dp)) }
+                        IconButton(
+                            onClick = { if (searchMatches.isNotEmpty()) matchPointer = (matchPointer + 1) % searchMatches.size },
+                            enabled = searchMatches.isNotEmpty(), modifier = Modifier.size(36.dp),
+                        ) { Icon(Icons.Default.KeyboardArrowDown, "下一个", modifier = Modifier.size(20.dp)) }
                     }
                 }
                 // 聊天/思考/专家是 DeepSeek 官方的模型档位路由（Flash/Pro + thinking），
@@ -373,6 +432,7 @@ fun ChatScreen(
                                     inputFocusRequest++
                                 }
                             },
+                            searchHighlighted = showSearch && message.id == currentMatchId,
                         )
                     }
                     item { Spacer(Modifier.height(4.dp)) }

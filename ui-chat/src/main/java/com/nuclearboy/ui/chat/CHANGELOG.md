@@ -1,3 +1,4 @@
+2026-06-12 1.0.97 会话内搜索：顶栏搜索开关+搜索行（match 计数/上下跳转），MessageSearch.find 定位，命中消息 searchHighlighted 高亮边框、animateScrollToItem 跳转。
 2026-06-12 1.0.96 编辑重发：MessageBubble 用户消息菜单加"编辑重发"，ChatViewModel.editAndResend 截断+回填 inputDraft+聚焦输入。
 2026-06-12 1.0.95 顶栏导出/分享对话：buildExportMarkdown 调 ConversationExporter，顶栏 Share 按钮走 ACTION_SEND 系统分享面板。
 2026-06-12 1.0.71 refreshProjectFiles 用 HIDDEN_FILE_ENTRIES 统一过滤内部状态与构建缓存目录。

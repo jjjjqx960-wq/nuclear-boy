@@ -53,6 +53,7 @@ fun MessageBubble(
     onDelete: (() -> Unit)? = null,
     onCopy: ((String) -> Unit)? = null,
     onEdit: (() -> Unit)? = null,
+    searchHighlighted: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val nuclearColors = NuclearBoyTheme.colorScheme
@@ -86,6 +87,9 @@ fun MessageBubble(
             Column(
                 modifier = Modifier
                     .widthIn(min = 80.dp, max = 340.dp)
+                    // 搜索当前命中：醒目高亮边框
+                    .then(if (searchHighlighted)
+                        Modifier.border(2.dp, nuclearColors.warning, cornerShape) else Modifier)
                     // Bold green border
                     .then(if (message.role == MessageRole.ASSISTANT)
                         Modifier.border(2.dp, nuclearColors.material.primary.copy(alpha = 0.25f), cornerShape)
