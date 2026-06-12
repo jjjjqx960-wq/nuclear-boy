@@ -569,6 +569,13 @@ class AgentEngine(
                 continue
             }
 
+            // 跳过无内容也无工具调用的 assistant 消息（如取消后留下的空 placeholder）——
+            // 它们浪费 token，部分网关还会拒绝空 assistant content。
+            if (msg.role == MessageRole.ASSISTANT && msg.content.isBlank() && msg.toolCalls.isEmpty()) {
+                android.util.Log.e("NuclearBoy", "[AgentEngine] buildHistoryMessages() skipping empty assistant message")
+                continue
+            }
+
             val contentTokens = (msg.content.length / 3L).coerceAtLeast(4)
             val reasoningTokens = ((msg.reasoningContent?.length ?: 0) / 3L)
 
@@ -600,7 +607,7 @@ class AgentEngine(
                 val dto = MessageDto(
                     role = "assistant",
                     content = msg.content,
-                    reasoningContent = msg.reasoningContent, // Preserved for thinking mode
+                    reasoningContent = msg.reasoningContent, // 仅用于 token 预算估算；发送前在 DeepSeekApiClient.sanitizeMessages 统一剥离
                     // ONLY include completed tool calls — pending ones have no result msg and cause API 400
                     toolCalls = if (completedCalls.isNotEmpty()) completedCalls.map { tc ->
                         ToolCallDto(
@@ -623,7 +630,7 @@ class AgentEngine(
                         MessageRole.SYSTEM -> "system"
                     },
                     content = msg.content,
-                    reasoningContent = msg.reasoningContent, // Preserved for thinking mode
+                    reasoningContent = msg.reasoningContent, // 仅用于 token 预算估算；发送前在 DeepSeekApiClient.sanitizeMessages 统一剥离
                     toolCalls = null,
                     name = null,
                 )

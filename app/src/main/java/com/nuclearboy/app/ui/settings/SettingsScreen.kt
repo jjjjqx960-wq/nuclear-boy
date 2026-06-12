@@ -485,19 +485,24 @@ fun SettingsScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                 Column(modifier = Modifier.padding(16.dp)) {
 
-                    // API Key status
+                    // API Key status — 第三方模型激活时不要报红色"未配置"，会和正常聊天状态矛盾
+                    val usingCustomProviderOnly = !apiKeyState.hasPrimaryKey && apiKeyState.customProviderEnabled
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            if (apiKeyState.hasPrimaryKey) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                            if (apiKeyState.hasPrimaryKey || usingCustomProviderOnly) Icons.Filled.CheckCircle
+                            else Icons.Filled.Warning,
                             contentDescription = null,
-                            tint = if (apiKeyState.hasPrimaryKey) MaterialTheme.colorScheme.primary
+                            tint = if (apiKeyState.hasPrimaryKey || usingCustomProviderOnly) MaterialTheme.colorScheme.primary
                                    else MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(20.dp),
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = if (apiKeyState.hasPrimaryKey) "已配置: ${apiKeyState.primaryKeyMasked}"
-                                   else "未配置 API Key",
+                            text = when {
+                                apiKeyState.hasPrimaryKey -> "已配置: ${apiKeyState.primaryKeyMasked}"
+                                usingCustomProviderOnly -> "正在使用第三方模型，官方 Key 未配置（可选）"
+                                else -> "未配置 API Key"
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -562,34 +567,38 @@ fun SettingsScreen(
             }
 
             // ── Model Section ────────────────────────────
-            Text("🧠 模型偏好",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+            // 模型偏好（Flash/Pro 档位、自动切换）只对 DeepSeek 官方 API 生效；
+            // 第三方模型固定走自定义网关和模型名，展示这些选项只会误导。
+            if (!apiKeyState.customProviderEnabled) {
+                Text("🧠 模型偏好",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
 
-            Card(modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("默认模型: ${ModelTier.V4_PRO.displayName}",
-                        style = MaterialTheme.typography.bodyMedium)
-                    Text("说明: 简单任务自动用 ${ModelTier.V4_FLASH.displayName} 省钱",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Card(modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("默认模型: ${ModelTier.V4_PRO.displayName}",
+                            style = MaterialTheme.typography.bodyMedium)
+                        Text("说明: 简单任务自动用 ${ModelTier.V4_FLASH.displayName} 省钱",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                    Spacer(Modifier.height(8.dp))
-                    var autoSwitch by remember { mutableStateOf(apiKeyState.autoSwitchEnabled) }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = autoSwitch, onCheckedChange = {
-                            autoSwitch = it; viewModel.setAutoSwitch(it)
-                        })
-                        Text("自动选择模型", style = MaterialTheme.typography.bodyMedium)
-                    }
-                    var simpleFlash by remember { mutableStateOf(apiKeyState.simpleTasksUseFlash) }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = simpleFlash, onCheckedChange = {
-                            simpleFlash = it; viewModel.setSimpleTasksUseFlash(it)
-                        })
-                        Text("简单任务用 Flash", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(8.dp))
+                        var autoSwitch by remember { mutableStateOf(apiKeyState.autoSwitchEnabled) }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = autoSwitch, onCheckedChange = {
+                                autoSwitch = it; viewModel.setAutoSwitch(it)
+                            })
+                            Text("自动选择模型", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        var simpleFlash by remember { mutableStateOf(apiKeyState.simpleTasksUseFlash) }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = simpleFlash, onCheckedChange = {
+                                simpleFlash = it; viewModel.setSimpleTasksUseFlash(it)
+                            })
+                            Text("简单任务用 Flash", style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
             }

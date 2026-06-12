@@ -131,8 +131,12 @@ class ChatViewModel @Inject constructor(
             _browseDir.value = path
             val result = fileOperations.listDirectory(path)
             if (result is AppResult.Success) {
-                _projectFiles.value = result.data
-                android.util.Log.e("NuclearBoy", "[ChatVM] refreshProjectFiles() filesFound=${result.data.size} path=$path")
+                // 文件面板只展示用户文件：隐藏内部状态目录（.agent、__general__），
+                // 它们既不该被引用为附件，也不该计入附件角标数量。
+                _projectFiles.value = result.data.filterNot { entry ->
+                    entry.name == ".agent" || entry.name == "__general__"
+                }
+                android.util.Log.e("NuclearBoy", "[ChatVM] refreshProjectFiles() filesFound=${_projectFiles.value.size} path=$path")
             }
         }
     }
@@ -319,7 +323,14 @@ class ChatViewModel @Inject constructor(
             agentEngine.processMessage(
                 userMessage = trimmed,
                 projectContext = enrichedContext,
-                conversationHistory = _messages.value.filter { it.role != MessageRole.SYSTEM },
+                // 排除本轮刚加入的用户消息和空 placeholder：
+                // AgentEngine 会自行追加 userMessage，否则用户消息会重复发送，
+                // 且 history 末尾会多一条空 assistant 消息。
+                conversationHistory = _messages.value.filter {
+                    it.role != MessageRole.SYSTEM &&
+                        it.id != userMessage.id &&
+                        it.id != assistantId
+                },
                 userMode = selectedMode,
             ).collect { event ->
                 handleAgentEvent(event, assistantId)
@@ -880,10 +891,10 @@ class ChatViewModel @Inject constructor(
             is kotlinx.coroutines.CancellationException -> "已取消"
             else -> "出了一点小问题…${error.message?.take(100) ?: ""}"
         }
-        // Update thinking placeholder with error
+        // Update thinking placeholder with error — 已流出的部分内容要保留，不能被错误文案覆盖
         updateAssistantMessage(thinkingId) { msg ->
             msg.copy(
-                content = friendlyMsg,
+                content = msg.content.ifBlank { friendlyMsg },
                 status = MessageStatus.ERROR,
             )
         }

@@ -192,8 +192,10 @@ abstract class MemoryDatabase : RoomDatabase() {
 
         override fun onOpen(db: SupportSQLiteDatabase) {
             super.onOpen(db)
-            // Enable WAL mode for better concurrent read performance
-            db.execSQL("PRAGMA journal_mode=WAL")
+            // WAL 由 Room 默认启用（JournalMode.AUTOMATIC），不要在这里用
+            // execSQL 跑 "PRAGMA journal_mode=WAL"——该 PRAGMA 会返回结果行，
+            // execSQL 会抛 "Queries can be performed using SQLiteDatabase query
+            // or rawQuery methods only"，导致数据库每次打开失败、所有 DAO 操作不可用。
             db.execSQL("PRAGMA synchronous=NORMAL")
             db.execSQL("PRAGMA foreign_keys=ON")
         }

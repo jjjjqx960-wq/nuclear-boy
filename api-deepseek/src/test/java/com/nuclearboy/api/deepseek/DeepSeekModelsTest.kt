@@ -128,6 +128,25 @@ class DeepSeekModelsTest {
     }
 
     @Test
+    fun `official provider also strips reasoningContent to avoid DeepSeek 400`() {
+        val messages = listOf(
+            MessageDto(role = "user", content = "Hi"),
+            MessageDto(role = "assistant", content = "Hello", reasoningContent = "hidden reasoning"),
+            MessageDto(role = "user", content = "Continue"),
+        )
+
+        val sanitized = sanitizeChatMessagesForProvider(
+            messages = messages,
+            isCustomProvider = false,
+            omitToolProtocol = false,
+        )
+
+        assertEquals(3, sanitized.size)
+        assertNull(sanitized[1].reasoningContent)
+        assertEquals("Hello", sanitized[1].content)
+    }
+
+    @Test
     fun `custom provider compatibility retry includes gateway route not found`() {
         assertTrue(CUSTOM_PROVIDER_COMPATIBILITY_HTTP_CODES.containsAll(listOf(400, 404, 422)))
     }

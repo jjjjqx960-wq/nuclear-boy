@@ -261,10 +261,14 @@ fun ChatScreen(
                         )
                     }
                 }
-                TokenHudBar(
-                    selectedMode = selectedMode,
-                    onModeChange = { selectedMode = it; viewModel.setMode(it) },
-                )
+                // 聊天/思考/专家是 DeepSeek 官方的模型档位路由（Flash/Pro + thinking），
+                // 第三方模型的请求会覆盖模型名并剥离 thinking 参数，模式完全不生效——不展示以免误导。
+                if (!apiKeyState.customProviderEnabled) {
+                    TokenHudBar(
+                        selectedMode = selectedMode,
+                        onModeChange = { selectedMode = it; viewModel.setMode(it) },
+                    )
+                }
             }
         },
         bottomBar = {
@@ -563,7 +567,8 @@ private fun ProjectFilePanel(
             .padding(bottom = 80.dp),  // avoid input bar overlap
         tonalElevation = 8.dp,
         shadowElevation = 12.dp,
-        color = nc.material.surface.copy(alpha = 0.98f),
+        // 必须完全不透明：半透明背景会让底下的聊天文字透出来形成鬼影（OLED 暗色下尤其明显）
+        color = nc.material.surface,
         shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
         border = BorderStroke(1.dp, nc.material.primary.copy(alpha = 0.3f)),
     ) {
@@ -1214,7 +1219,8 @@ private fun ChatInputBar(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shadowElevation = 0.dp,
-        color = nc.material.surface.copy(alpha = 0.95f),
+        // 完全不透明：消息列表从输入栏底下滚过时，半透明背景会透出文字鬼影
+        color = nc.material.surface,
         shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
         border = BorderStroke(2.dp, nc.material.outline.copy(alpha = 0.3f)),
     ) {

@@ -931,9 +931,9 @@ class DeepSeekApiClient(
     }
 
     /**
-     * DeepSeek API now REQUIRES reasoning_content to be passed back
-     * in thinking mode (policy changed ~2026).
-     * We keep it intact.
+     * Strip reasoning_content and normalize tool fields before sending.
+     * Official docs: "if the reasoning_content field is included in the
+     * sequence of input messages, the API will return a 400 error."
      */
     private fun sanitizeMessages(
         messages: List<MessageDto>,
@@ -1270,15 +1270,15 @@ internal fun sanitizeChatMessagesForProvider(
     isCustomProvider: Boolean,
     omitToolProtocol: Boolean,
 ): List<MessageDto> {
-    if (!isCustomProvider && !omitToolProtocol) return messages
-
     return messages.mapNotNull { message ->
         if (omitToolProtocol && message.role == "tool") {
             return@mapNotNull null
         }
 
         val sanitized = message.copy(
-            reasoningContent = if (isCustomProvider) null else message.reasoningContent,
+            // DeepSeek 官方规则：输入 messages 含 reasoning_content 会返回 400，
+            // 所有协议（含官方 DeepSeek）一律剥离后再发送。
+            reasoningContent = null,
             toolCalls = if (omitToolProtocol) null else message.toolCalls,
             toolCallId = if (omitToolProtocol) null else message.toolCallId,
             name = if (omitToolProtocol) null else message.name,

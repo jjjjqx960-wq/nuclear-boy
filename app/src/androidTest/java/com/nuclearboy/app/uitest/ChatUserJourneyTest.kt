@@ -19,6 +19,8 @@ class ChatUserJourneyTest {
 
     @Test
     fun userCanSendFormalChatFromFrontend() {
+        resetConversationHistory()
+        configureProviderFromInstrumentationArgs()
         launchApp()
         dismissCommonSystemPrompts()
 
@@ -58,8 +60,35 @@ class ChatUserJourneyTest {
         )
     }
 
+    /**
+     * 允许通过 instrumentation 参数预置 OpenAI 兼容网关，让全新安装也能跑通正式聊天：
+     * -Pandroid.testInstrumentationRunnerArguments.nbBaseUrl=https://网关/v1
+     * -Pandroid.testInstrumentationRunnerArguments.nbModel=模型名
+     * -Pandroid.testInstrumentationRunnerArguments.nbApiKey=可选Key
+     * 测试与 App 同进程，ApiKeyManager 读写同一份加密 prefs，配置立即生效。
+     */
+    private fun configureProviderFromInstrumentationArgs() {
+        val args = InstrumentationRegistry.getArguments()
+        val baseUrl = args.getString("nbBaseUrl")?.trim().orEmpty()
+        val model = args.getString("nbModel")?.trim().orEmpty()
+        if (baseUrl.isBlank() || model.isBlank()) return
+        val apiKey = args.getString("nbApiKey")?.trim().orEmpty()
+        val manager = com.nuclearboy.api.deepseek.ApiKeyManager(instrumentation.targetContext)
+        manager.setCustomProviderConfig(baseUrl = baseUrl, modelName = model, apiKey = apiKey)
+    }
+
+    /**
+     * 清掉残留会话，保证每次都从空对话开始单轮测试——
+     * 否则历史越积越多，prompt 变大、正式聊天变慢，超时阈值会误判失败。
+     */
+    private fun resetConversationHistory() {
+        device.executeShellCommand(
+            "su -c rm -f /storage/emulated/0/Android/data/$appPackageName/files/NuclearBoy/__general__/.agent/conversation.json",
+        )
+    }
+
     private fun launchApp() {
-        runCatching { device.wakeUp() }
+        wakeAndUnlockScreen()
         val activityName = "$appPackageName/com.nuclearboy.app.MainActivity"
         val launchResult = device.executeShellCommand("am start -W -n $activityName")
         assertFalse(
@@ -71,6 +100,16 @@ class ChatUserJourneyTest {
         assertTrue("启动后目标 App 应处于前台：${focusedWindowSummary()}", waitUntil(10_000) {
             isAppInForeground()
         })
+    }
+
+    private fun wakeAndUnlockScreen() {
+        // 设备可能息屏锁屏：UIAutomator 看不到任何 UI，必须先亮屏解锁。
+        // 本 ROM 禁止 shell 注入，亮屏走 root；再解锁 keyguard 并保持测试期间常亮。
+        runCatching { device.wakeUp() }
+        executeRootInput("input keyevent KEYCODE_WAKEUP")
+        device.executeShellCommand("su -c wm dismiss-keyguard")
+        device.executeShellCommand("su -c svc power stayon true")
+        device.waitForIdle(2_000)
     }
 
     private fun dismissCommonSystemPrompts() {

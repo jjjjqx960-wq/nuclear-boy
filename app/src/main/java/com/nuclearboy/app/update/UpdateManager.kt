@@ -153,6 +153,7 @@ class UpdateManager(private val context: Context) {
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
                 Log.e(TAG, "$TAG_U 服务器返回: ${response.code}")
+                response.close()
             } else {
                 val body = response.body?.string()
                 if (body != null) {
