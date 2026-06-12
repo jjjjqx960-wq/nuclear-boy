@@ -131,10 +131,10 @@ class ChatViewModel @Inject constructor(
             _browseDir.value = path
             val result = fileOperations.listDirectory(path)
             if (result is AppResult.Success) {
-                // 文件面板只展示用户文件：隐藏内部状态目录（.agent、__general__），
-                // 它们既不该被引用为附件，也不该计入附件角标数量。
+                // 文件面板只展示用户文件：隐藏内部状态目录和开发缓存/VCS 噪音，
+                // 它们既不该被引用为附件（缓存喂回模型无意义），也不该计入附件角标数量。
                 _projectFiles.value = result.data.filterNot { entry ->
-                    entry.name == ".agent" || entry.name == "__general__"
+                    entry.name in HIDDEN_FILE_ENTRIES
                 }
                 android.util.Log.e("NuclearBoy", "[ChatVM] refreshProjectFiles() filesFound=${_projectFiles.value.size} path=$path")
             }
@@ -985,5 +985,16 @@ class ChatViewModel @Inject constructor(
         /** /compact 压缩时单条消息和整体文本的截断长度 */
         private const val COMPACT_PER_MESSAGE_CHARS = 2_000
         private const val COMPACT_TRANSCRIPT_CHARS = 60_000
+
+        /**
+         * 文件面板/附件角标不展示的内部状态目录与开发缓存/VCS 噪音。
+         * .agent/__general__ 是 App 内部状态；其余为构建工具生成物，
+         * 引用为附件无意义，列出来只会干扰用户。
+         */
+        private val HIDDEN_FILE_ENTRIES = setOf(
+            ".agent", "__general__", "__pycache__",
+            ".git", ".gradle", ".idea", ".vscode",
+            "node_modules", ".pytest_cache", ".DS_Store",
+        )
     }
 }
