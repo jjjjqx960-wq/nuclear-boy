@@ -413,6 +413,12 @@ class ChatViewModel @Inject constructor(
         return result.content
     }
 
+    /** 删除单条消息（处理中不允许，避免与流式写入冲突）。 */
+    fun deleteMessage(messageId: String) {
+        if (_isProcessing.value) return
+        _messages.value = com.nuclearboy.common.ChatEditing.removeMessage(_messages.value, messageId)
+    }
+
     fun retryLastMessage() {
         android.util.Log.e("NuclearBoy", "[ChatVM] retryLastMessage() entry isProcessing=${_isProcessing.value}")
         if (_isProcessing.value) return

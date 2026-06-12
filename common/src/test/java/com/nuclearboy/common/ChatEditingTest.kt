@@ -46,4 +46,15 @@ class ChatEditingTest {
         ChatEditing.prepareEdit(convo, "u2")
         assertEquals(4, convo.size)
     }
+
+    @Test
+    fun `removeMessage drops only the target`() {
+        val r = ChatEditing.removeMessage(convo, "a1")
+        assertEquals(listOf("u1", "u2", "a2"), r.map { it.id })
+    }
+
+    @Test
+    fun `removeMessage unknown id keeps list`() {
+        assertEquals(4, ChatEditing.removeMessage(convo, "nope").size)
+    }
 }

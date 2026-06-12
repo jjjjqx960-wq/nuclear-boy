@@ -202,6 +202,13 @@ fun MessageBubble(
                         leadingIcon = { Icon(Icons.Default.Edit, null, Modifier.size(16.dp)) },
                     )
                 }
+                if (onDelete != null) {
+                    DropdownMenuItem(
+                        text = { Text("删除") },
+                        onClick = { showMenu = false; onDelete() },
+                        leadingIcon = { Icon(Icons.Default.Delete, null, Modifier.size(16.dp)) },
+                    )
+                }
             }
 
             if (!isUser) Spacer(Modifier.weight(1f))

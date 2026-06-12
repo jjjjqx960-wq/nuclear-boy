@@ -433,6 +433,7 @@ fun ChatScreen(
                                 }
                             },
                             searchHighlighted = showSearch && message.id == currentMatchId,
+                            onDelete = { viewModel.deleteMessage(message.id) },
                         )
                     }
                     item { Spacer(Modifier.height(4.dp)) }

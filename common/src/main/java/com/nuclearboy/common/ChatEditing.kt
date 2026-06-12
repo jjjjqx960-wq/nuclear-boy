@@ -21,4 +21,8 @@ object ChatEditing {
         if (target.role != MessageRole.USER) return null
         return EditResult(content = target.content, remaining = messages.subList(0, index).toList())
     }
+
+    /** 删除指定 id 的单条消息，返回新列表（原列表不变）。id 不存在则原样返回。 */
+    fun removeMessage(messages: List<ChatMessage>, messageId: String): List<ChatMessage> =
+        messages.filterNot { it.id == messageId }
 }
