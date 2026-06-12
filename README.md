@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.78
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.0.79
 
 ---
 
@@ -32,6 +32,12 @@ Nuclear Boy 是一个基于 Android 的移动端 AI 编程助手，内置 Agent 
 1. 安装 Android Studio + SDK 35
 2. 设置 `ANDROID_HOME` 环境变量
 3. `./gradlew assembleDebug`
+
+## 1.0.79 重点
+
+- 接入 OpenCode（1.17.4）：pc_cli_run 现支持 claude / codex / opencode 三大主流编程 CLI，opencode 走 run --format json 事件流，-s 会话续传。
+- bridge 配置非破坏性迁移：默认配置新增的 CLI 自动合并进旧 config.json。
+- 实测：opencode 建会话 6s、续传答出暗号 5.7s（三者中最快）；真机远程任务 6.9s 回传。
 
 ## 1.0.78 重点
 

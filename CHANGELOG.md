@@ -1,3 +1,4 @@
+2026-06-12 1.0.79 接入 OpenCode CLI：主流编程 CLI 三件套（Claude Code / Codex / OpenCode）齐全，opencode 支持 JSON 事件流解析和 -s 会话续传，旧配置自动合并新增 CLI。
 2026-06-12 1.0.78 易用性与安全：session 参数支持 "last" 自动续传最近会话（AI 不用记会话 ID）；全量自检新增远程电脑桥接检查项；bridge 鉴权失败 5 次封禁来源 5 分钟防 token 爆破；README 新增远程电脑使用指南。
 2026-06-12 1.0.77 远程任务支持 git worktree 隔离执行：pc_cli_run 传 isolate=true 在仓库旁建独立 worktree，改动不碰主工作区（实验性修改和并行多任务安全）；设置页新增"查看电脑任务"；bridge 新增 clean-worktrees 清理命令；3 并发任务压测通过。
 2026-06-12 1.0.76 远程电脑管理能力补全：取消对话时自动终止电脑端任务（不再白跑）；新增 pc_task_list 工具查看电脑上正在执行的任务；bridge 新增 install-autostart 登录自启和日志文件。

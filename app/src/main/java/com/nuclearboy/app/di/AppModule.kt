@@ -596,9 +596,9 @@ else:
     ) = listOf(
         ToolDefinition(
             name = "pc_cli_run",
-            description = "把编程任务下发给用户电脑上的 AI 编程 CLI（Claude Code 或 Codex）执行，返回执行结果。使用场景：1) 用户明确要求\"让电脑上的 claude/codex 做某事\"；2) 任务需要电脑上的完整开发环境（大型项目构建、桌面端工具链）；3) 用户想远程操作电脑里的代码仓库。前提是用户已在设置页开启并配置\"远程电脑\"。任务可能耗时数分钟，耐心等待结果。结果会返回会话 ID，对同一件事继续追问或迭代时把它传入 session 参数（仅 claude），CLI 就能记住之前的上下文。示例：pc_cli_run(cli=\"claude\", prompt=\"修复 D:/myproject 里的编译错误\", cwd=\"D:/myproject\")",
+            description = "把编程任务下发给用户电脑上的 AI 编程 CLI（Claude Code / Codex / OpenCode）执行，返回执行结果。使用场景：1) 用户明确要求\"让电脑上的 claude/codex 做某事\"；2) 任务需要电脑上的完整开发环境（大型项目构建、桌面端工具链）；3) 用户想远程操作电脑里的代码仓库。前提是用户已在设置页开启并配置\"远程电脑\"。任务可能耗时数分钟，耐心等待结果。结果会返回会话 ID，对同一件事继续追问或迭代时把它传入 session 参数（仅 claude），CLI 就能记住之前的上下文。示例：pc_cli_run(cli=\"claude\", prompt=\"修复 D:/myproject 里的编译错误\", cwd=\"D:/myproject\")",
             parameters = listOf(
-                ToolParameter("cli", "string", "用哪个编程 CLI。claude=Claude Code，codex=Codex", required = true, enum = listOf("claude", "codex")),
+                ToolParameter("cli", "string", "用哪个编程 CLI。claude=Claude Code，codex=Codex，opencode=OpenCode", required = true, enum = listOf("claude", "codex", "opencode")),
                 ToolParameter("prompt", "string", "下发给 CLI 的任务描述，要完整、自包含（CLI 在电脑上独立执行，看不到当前对话）", required = true),
                 ToolParameter("cwd", "string", "电脑上的工作目录，如 D:/myproject。不传用电脑端默认目录", required = false),
                 ToolParameter("timeout", "integer", "任务超时秒数（默认 600）", required = false, default = "600"),
