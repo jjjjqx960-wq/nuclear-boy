@@ -74,6 +74,16 @@ b-pc-bridge
 
 特性：任务输出实时流到聊天工具卡片；手机断线任务不丢（重连自动取回）；取消对话自动终止电脑任务；鉴权失败 5 次封禁 5 分钟防爆破。
 
+### 外网控制（自建公网中继）
+
+不在同一网络时，用一台有公网 IP 的服务器做中继，电脑主动反连、手机经中继接入：
+
+1. **公网服务器**：`python relay/relay_server.py --port 8970 --key 你的口令`（中继只做 room 内透传，不解析业务，token 仍端到端校验）。
+2. **电脑端**：`python bridge.py serve --relay ws://服务器IP:8970 --relay-key 你的口令`——启动后日志会打印 `room=...` 和「手机填地址」。
+3. **手机端**：远程电脑地址填中继 client URL（如 `ws://服务器IP:8970/client/<room>?key=你的口令`），token 照常填。
+
+中继按 cid 给每台手机分流，多手机并发互不串台；room 默认取 token 指纹保证唯一不可猜。
+
 ## 1.0.77 重点
 
 - worktree 隔离执行（借鉴 ccpocket）：pc_cli_run 传 isolate=true 时在 git 仓库旁创建独立 worktree + nb/ 分支执行，改动不碰主工作区，结果返回 worktree 路径；适合实验性修改和并行多任务。

@@ -181,6 +181,14 @@ fun RemotePcSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 18.sp,
                 )
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "外网控制：在公网服务器跑 python relay/relay_server.py --port 8970 --key 口令，电脑端加 --relay ws://服务器IP:8970 --relay-key 口令 反连，手机这里填 ws://服务器IP:8970/client/<room>?key=口令（room 即电脑端 serve 显示的 room）。token 仍端到端校验，中继看不到明文。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp,
+                )
             }
         }
     }
