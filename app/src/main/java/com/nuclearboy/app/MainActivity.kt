@@ -1,10 +1,14 @@
 package com.nuclearboy.app
 
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.DrawerValue
@@ -26,9 +30,16 @@ import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* 用户拒绝也不阻塞，只是收不到任务完成提醒 */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         android.util.Log.e("NuclearBoy", "[MainActivity] onCreate")
+
+        // Android 13+ 通知需运行时授权，否则前台服务和远程任务完成提醒都不显示
+        maybeRequestNotificationPermission()
 
         // Check API key status
         val apiKeyManager = com.nuclearboy.api.deepseek.ApiKeyManager(this)
@@ -37,6 +48,16 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent { NuclearBoyTheme(darkTheme = true) { NuclearBoyMainScreen() } }
+    }
+
+    private fun maybeRequestNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 }
 

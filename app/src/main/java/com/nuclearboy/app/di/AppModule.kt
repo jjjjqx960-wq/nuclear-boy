@@ -10,6 +10,7 @@ import com.nuclearboy.agent.ToolResult
 import com.nuclearboy.api.deepseek.*
 import com.nuclearboy.common.*
 import com.nuclearboy.app.python.ChaquopyPythonExecutor
+import com.nuclearboy.app.service.PcTaskNotifier
 import com.nuclearboy.memory.MemoryStore
 import com.nuclearboy.python.PythonExecutor
 import com.nuclearboy.python.PythonSandbox
@@ -176,6 +177,7 @@ object AppModule {
     @Provides
     @Singleton
     fun provideToolRegistry(
+        @ApplicationContext appContext: Context,
         pythonSandbox: PythonSandbox,
         fileOperations: FileOperations,
         skillManager: SkillManager,
@@ -202,7 +204,7 @@ object AppModule {
             android.util.Log.e("NuclearBoy", "[DI] buildMemoryTools — ${memTools.size} tools: ${memTools.joinToString { it.name }}")
             registry.registerAll(memTools)
 
-            val pcTools = buildRemotePcTools(pcBridgeClient, pcBridgeConfigStore)
+            val pcTools = buildRemotePcTools(appContext, pcBridgeClient, pcBridgeConfigStore)
             android.util.Log.e("NuclearBoy", "[DI] buildRemotePcTools — ${pcTools.size} tools: ${pcTools.joinToString { it.name }}")
             registry.registerAll(pcTools)
 
@@ -591,6 +593,7 @@ else:
     )
 
     private fun buildRemotePcTools(
+        appContext: Context,
         client: PcBridgeClient,
         configStore: PcBridgeConfigStore,
     ) = listOf(
@@ -643,6 +646,10 @@ else:
                             val worktreeHint = if (r.worktreePath.isBlank()) "" else
                                 "\n隔离执行：改动在 ${r.worktreePath}（分支 ${r.worktreeBranch}），确认满意后需要合并回主分支"
                             android.util.Log.e("NuclearBoy", "[DI] pc_cli_run done cli=$cli exit=${r.exitCode} ${r.durationMs}ms session=${r.sessionId.take(8)}")
+                            // 后台也能知道好了没：任务结束发系统通知（借鉴 claudecodeui run-completed 推送）
+                            PcTaskNotifier.notifyComplete(
+                                appContext, cli, r.exitCode == 0, r.result, r.durationMs,
+                            )
                             ToolResult(
                                 success = r.exitCode == 0,
                                 output = "电脑端 $cli 执行完成（${r.durationMs / 1000}s）:\n${r.result}$process$sessionHint$worktreeHint",
@@ -651,6 +658,10 @@ else:
                         }
                         is AppResult.Failure -> {
                             android.util.Log.e("NuclearBoy", "[DI] pc_cli_run failed cli=$cli code=${result.error.code}")
+                            PcTaskNotifier.notifyComplete(
+                                appContext, cli, false,
+                                result.technicalDetail ?: result.error.humanMessage, 0L,
+                            )
                             ToolResult.failure(result.technicalDetail ?: result.error.humanMessage)
                         }
                     }
