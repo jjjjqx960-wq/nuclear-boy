@@ -6,6 +6,7 @@ import com.nuclearboy.remotepc.PcBridgeConfigStore
 import com.nuclearboy.remotepc.PcTerminalSession
 import com.nuclearboy.remotepc.TerminalAnsi
 import com.nuclearboy.remotepc.TerminalEmulator
+import com.nuclearboy.remotepc.TerminalKeys
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +38,9 @@ class TerminalViewModel @Inject constructor(
 
     private var session: PcTerminalSession? = null
     private var collectJob: Job? = null
-    private var emulator = TerminalEmulator(COLS, ROWS)
+    private var cols = COLS
+    private var rows = ROWS
+    private var emulator = TerminalEmulator(cols, rows)
 
     val isConfigured: Boolean get() = configStore.isConfigured()
 
@@ -49,11 +52,11 @@ class TerminalViewModel @Inject constructor(
             _state.value = UiState(status = Status.FAILED, message = "还没配置远程电脑，去设置页填地址和 token")
             return
         }
-        emulator = TerminalEmulator(COLS, ROWS)
+        emulator = TerminalEmulator(cols, rows)
         _state.value = UiState(status = Status.CONNECTING, message = "正在连接电脑…")
         val newSession = PcTerminalSession(
             url = url, token = token, cwd = cwd?.takeIf { it.isNotBlank() },
-            cols = COLS, rows = ROWS,
+            cols = cols, rows = rows,
         )
         session = newSession
         collectJob = viewModelScope.launch {
@@ -81,6 +84,21 @@ class TerminalViewModel @Inject constructor(
     /** 发送原始键入（控制字符等，如 Ctrl-C）。 */
     fun sendRaw(data: String) {
         session?.input(data)
+    }
+
+    /** 发送特殊键（方向键/翻页/Ctrl 组合等，名字见 TerminalKeys）。 */
+    fun sendKey(name: String) {
+        TerminalKeys.sequenceOf(name)?.let { session?.input(it) }
+    }
+
+    /** 终端可视区尺寸变化：调整网格并通知电脑端 ConPTY 重排。 */
+    fun onResize(newCols: Int, newRows: Int) {
+        if (newCols == cols && newRows == rows) return
+        cols = newCols
+        rows = newRows
+        emulator.resize(newCols, newRows)
+        session?.resize(newCols, newRows)
+        _state.value = _state.value.copy(lines = emulator.renderWithScrollback())
     }
 
     fun restart(cwd: String? = null) {

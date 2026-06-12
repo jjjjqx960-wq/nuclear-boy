@@ -1,3 +1,4 @@
+2026-06-12 1.0.88 特殊键 + 尺寸自适应：TerminalKeys（方向/翻页/Home-End/Ctrl 组合/Esc-Tab-Del → xterm 序列，借鉴 ReTerminal）、TerminalGeometry（像素+字符尺寸算 cols/rows，带钳制与回退）；ViewModel 新增 sendKey/onResize（resize emulator+session）。TerminalKeysGeometryTest 7 例。
 2026-06-12 1.0.87 屏幕缓冲模拟器：新增 TerminalEmulator（rows×cols 网格 + 光标，处理 CUP/CUU-D/ED/EL/IL/DL/ICH/DCH/ECH/滚动区 DECSTBM/SU-SD/DECSC-RC/备用屏 ?1049/47），renderWithScrollback 普通缓冲带 2000 行回滚、备用屏只显当前屏；ViewModel 改用 emulator.feed + 渲染按行 span。TerminalEmulatorTest 15 例。
 2026-06-12 1.0.86 终端颜色解析：TerminalAnsi.parseSpans 解析 SGR（30-37/90-97/38;5;n/38;2;r;g;b/加粗/复位）产出带 ARGB 的 Span 列表，背景与光标/OSC 序列忽略；ViewModel 改存原始流由界面渲染。TerminalAnsiTest 新增 6 个颜色用例。
 2026-06-12 1.0.85 远程终端协议+会话：PcBridgeProtocol 新增 term_open/term_input/term_resize/term_close 出站与 TermOutput/TermExit 入站；PcTerminalSession 用 callbackFlow 管理长连接（auth→term_open→流式 TermOutput，input/resize/close）；TerminalAnsi.strip 剥 CSI/OSC/退格得可读文本。三个新测试类覆盖协议、ANSI 清洗。

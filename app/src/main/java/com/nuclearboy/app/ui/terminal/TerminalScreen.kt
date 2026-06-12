@@ -3,6 +3,7 @@ package com.nuclearboy.app.ui.terminal
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,18 +36,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuclearboy.remotepc.TerminalAnsi
+import com.nuclearboy.remotepc.TerminalGeometry
+import com.nuclearboy.remotepc.TerminalKeys
 
 /**
  * 远程终端界面：手机上直接操作电脑的 ConPTY 终端。
@@ -123,41 +128,67 @@ fun TerminalScreen(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             )
 
-            // 输出区（黑底等宽，自动滚到底，80 列宽允许横向滚动）
+            // 输出区（黑底等宽，自动滚到底，按可视区测量并上报终端尺寸）
             val scroll = rememberScrollState()
             val hScroll = rememberScrollState()
             LaunchedEffect(state.lines) { scroll.scrollTo(scroll.maxValue) }
-            Box(
+            val textMeasurer = rememberTextMeasurer()
+            val cellStyle = androidx.compose.ui.text.TextStyle(
+                fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 16.sp,
+            )
+            BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .background(Color(0xFF0C0C0C))
-                    .verticalScroll(scroll)
-                    .horizontalScroll(hScroll)
-                    .padding(8.dp),
+                    .background(Color(0xFF0C0C0C)),
             ) {
-                val rendered = remember(state.lines) { screenToAnnotated(state.lines) }
-                Text(
-                    text = rendered,
-                    color = Color(0xFFD0D0D0),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    softWrap = false,
-                )
+                val density = LocalDensity.current
+                LaunchedEffect(maxWidth, maxHeight) {
+                    val cell = textMeasurer.measure(AnnotatedString("M"), cellStyle)
+                    val (cols, rows) = TerminalGeometry.compute(
+                        with(density) { (maxWidth - 16.dp).toPx() },
+                        with(density) { (maxHeight - 16.dp).toPx() },
+                        cell.size.width.toFloat(),
+                        cell.size.height.toFloat(),
+                    )
+                    viewModel.onResize(cols, rows)
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scroll)
+                        .horizontalScroll(hScroll)
+                        .padding(8.dp),
+                ) {
+                    val rendered = remember(state.lines) { screenToAnnotated(state.lines) }
+                    Text(
+                        text = rendered,
+                        color = Color(0xFFD0D0D0),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        softWrap = false,
+                    )
+                }
             }
 
-            // 快捷键行
+            // 特殊键行（方向键/翻页/Ctrl 组合，横向滚动）
+            val keyScroll = rememberScrollState()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(keyScroll)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                OutlinedButton(onClick = { viewModel.sendRaw("\u0003") }) { Text("Ctrl-C", fontSize = 12.sp) }
-                OutlinedButton(onClick = { viewModel.sendRaw("\t") }) { Text("Tab", fontSize = 12.sp) }
-                OutlinedButton(onClick = { viewModel.sendRaw("\r") }) { Text("Enter", fontSize = 12.sp) }
-                OutlinedButton(onClick = { viewModel.sendRaw("\u001B") }) { Text("Esc", fontSize = 12.sp) }
+                TerminalKeys.displayOrder.forEach { key ->
+                    OutlinedButton(
+                        onClick = { viewModel.sendKey(key) },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = 10.dp, vertical = 4.dp
+                        ),
+                    ) { Text(key, fontSize = 12.sp) }
+                }
             }
 
             // 输入行
