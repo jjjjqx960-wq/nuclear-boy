@@ -53,6 +53,7 @@ fun RemotePcSection(
     onSave: (url: String, token: String?) -> Unit,
     onTest: (url: String, token: String?) -> Unit,
     onLoadTasks: () -> Unit,
+    onOpenTerminal: () -> Unit = {},
 ) {
     Text(
         "🖥️ 远程电脑",
@@ -196,7 +197,10 @@ fun RemotePcSection(
 
                 if (config.hasToken && config.url.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = onLoadTasks) { Text("查看电脑任务") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onLoadTasks) { Text("查看电脑任务") }
+                        OutlinedButton(onClick = onOpenTerminal) { Text("🖥️ 远程终端") }
+                    }
                     if (runningTasks != null) {
                         Spacer(Modifier.height(4.dp))
                         if (runningTasks.isEmpty()) {

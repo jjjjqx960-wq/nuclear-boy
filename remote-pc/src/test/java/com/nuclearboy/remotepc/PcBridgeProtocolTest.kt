@@ -177,6 +177,47 @@ class PcBridgeProtocolTest {
     }
 
     @Test
+    fun `encodeTermOpen carries size and optional cwd`() {
+        val raw = PcBridgeProtocol.encodeTermOpen("tm1", cols = 100, rows = 30, cwd = "D:/proj", cmd = null)
+        assertTrue(raw.contains("\"type\":\"term_open\""))
+        assertTrue(raw.contains("\"cols\":100"))
+        assertTrue(raw.contains("\"rows\":30"))
+        assertTrue(raw.contains("\"cwd\":\"D:/proj\""))
+        assertTrue(!raw.contains("\"cmd\""))
+    }
+
+    @Test
+    fun `encodeTermInput preserves control characters`() {
+        val raw = PcBridgeProtocol.encodeTermInput("tm1", "ls\r\n")
+        assertTrue(raw.contains("\"type\":\"term_input\""))
+        assertTrue(raw.contains("\\r\\n"))
+    }
+
+    @Test
+    fun `encodeTermResize and termClose`() {
+        assertTrue(PcBridgeProtocol.encodeTermResize("tm1", 120, 40).contains("\"type\":\"term_resize\""))
+        assertTrue(PcBridgeProtocol.encodeTermClose("tm1").contains("\"type\":\"term_close\""))
+    }
+
+    @Test
+    fun `parse term_output carries raw data`() {
+        val msg = PcBridgeProtocol.parseInbound(
+            """{"type":"term_output","id":"tm1","data":"[32mhello[0m"}"""
+        )
+        val out = msg as PcBridgeProtocol.Inbound.TermOutput
+        assertEquals("tm1", out.id)
+        assertTrue(out.data.contains("hello"))
+    }
+
+    @Test
+    fun `parse term_exit with code`() {
+        val msg = PcBridgeProtocol.parseInbound("""{"type":"term_exit","id":"tm1","code":0}""")
+        val exit = msg as PcBridgeProtocol.Inbound.TermExit
+        assertEquals("tm1", exit.id)
+        assertEquals(0, exit.code)
+    }
+
+    @Test
     fun `parse done with missing fields falls back to defaults`() {
         val done = PcBridgeProtocol.parseInbound("""{"type":"done","id":"t1"}""")
             as PcBridgeProtocol.Inbound.Done

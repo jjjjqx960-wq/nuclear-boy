@@ -29,6 +29,7 @@ object NavRoutes {
     const val ONBOARDING = "onboarding"
     const val TUTORIAL = "tutorial"
     const val SKILL_MANAGER = "skill_manager"
+    const val TERMINAL = "terminal"
 
     fun chatRoute(projectId: String, initialMessage: String = "") =
         "chat/$projectId" + if (initialMessage.isNotEmpty()) "?initialMessage=$initialMessage" else ""
@@ -95,6 +96,15 @@ fun NuclearBoyNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onMenuClick = onMenuClick,
                 onNavigateToTutorial = { navController.navigate(NavRoutes.TUTORIAL) },
+                onNavigateToTerminal = { navController.navigate(NavRoutes.TERMINAL) },
+            )
+        }
+
+        // ── 远程终端 ──────────────────────────────────────
+        composable(NavRoutes.TERMINAL) {
+            android.util.Log.e("NuclearBoy", "[NavHost] route=TERMINAL")
+            com.nuclearboy.app.ui.terminal.TerminalScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 

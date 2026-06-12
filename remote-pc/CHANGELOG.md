@@ -1,3 +1,4 @@
+2026-06-12 1.0.85 远程终端协议+会话：PcBridgeProtocol 新增 term_open/term_input/term_resize/term_close 出站与 TermOutput/TermExit 入站；PcTerminalSession 用 callbackFlow 管理长连接（auth→term_open→流式 TermOutput，input/resize/close）；TerminalAnsi.strip 剥 CSI/OSC/退格得可读文本。三个新测试类覆盖协议、ANSI 清洗。
 2026-06-12 1.0.83 关闭码翻译：PcBridgeClient.friendlyCloseMessage 把中继/鉴权关闭码（4003/4004/4009/4000/4029）映射成可操作中文，onClosed 用它替换原英文 reason；PcBridgeCloseMessageTest 覆盖各码与回退。
 2026-06-12 1.0.82 配对载荷：新增 PcPairingPayload.parse 解析 nbpair://pair?u=&t= 二维码（纯 JVM 不依赖 android.net.Uri，URLDecoder 还原内嵌 query），扫码后回填 url+token；PcPairingPayloadTest 覆盖局域网/中继/非法/空白用例。
 2026-06-12 1.0.81 公网中继接入：手机地址直接填中继 client URL（ws://服务器:8970/client/<room>?key=口令）即走中继，toHttpWsUrl 透传 path+query 复用既有连接逻辑无需改协议；设置页新增外网控制说明。

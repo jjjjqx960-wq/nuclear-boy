@@ -65,6 +65,25 @@ object PcBridgeProtocol {
     @Serializable
     data class PingMessage(val type: String = "ping")
 
+    @Serializable
+    data class TermOpenMessage(
+        val type: String = "term_open",
+        val id: String,
+        val cols: Int,
+        val rows: Int,
+        val cwd: String? = null,
+        val cmd: String? = null,
+    )
+
+    @Serializable
+    data class TermInputMessage(val type: String = "term_input", val id: String, val data: String)
+
+    @Serializable
+    data class TermResizeMessage(val type: String = "term_resize", val id: String, val cols: Int, val rows: Int)
+
+    @Serializable
+    data class TermCloseMessage(val type: String = "term_close", val id: String)
+
     fun encodeAuth(token: String): String = json.encodeToString(AuthMessage(token = token))
     fun encodeRun(msg: RunMessage): String = json.encodeToString(msg)
     fun encodeCancel(id: String): String = json.encodeToString(CancelMessage(id = id))
@@ -73,6 +92,13 @@ object PcBridgeProtocol {
     fun encodePermissionResponse(id: String, approved: Boolean, message: String = ""): String =
         json.encodeToString(PermissionResponseMessage(id = id, approved = approved, message = message))
     fun encodePing(): String = json.encodeToString(PingMessage())
+    fun encodeTermOpen(id: String, cols: Int, rows: Int, cwd: String? = null, cmd: String? = null): String =
+        json.encodeToString(TermOpenMessage(id = id, cols = cols, rows = rows, cwd = cwd, cmd = cmd))
+    fun encodeTermInput(id: String, data: String): String =
+        json.encodeToString(TermInputMessage(id = id, data = data))
+    fun encodeTermResize(id: String, cols: Int, rows: Int): String =
+        json.encodeToString(TermResizeMessage(id = id, cols = cols, rows = rows))
+    fun encodeTermClose(id: String): String = json.encodeToString(TermCloseMessage(id = id))
 
     // ── 入站消息 ─────────────────────────────────────
 
@@ -99,6 +125,8 @@ object PcBridgeProtocol {
             val toolName: String,
             val inputSummary: String,
         ) : Inbound
+        data class TermOutput(val id: String, val data: String) : Inbound
+        data class TermExit(val id: String, val code: Int) : Inbound
         data class Unknown(val type: String) : Inbound
     }
 
@@ -148,6 +176,14 @@ object PcBridgeProtocol {
             )
             "pong" -> Inbound.Pong
             "cancelled" -> Inbound.Cancelled(obj.stringOrEmpty("id"))
+            "term_output" -> Inbound.TermOutput(
+                id = obj.stringOrEmpty("id"),
+                data = obj.stringOrEmpty("data"),
+            )
+            "term_exit" -> Inbound.TermExit(
+                id = obj.stringOrEmpty("id"),
+                code = obj["code"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
+            )
             "permission_request" -> Inbound.PermissionRequest(
                 id = obj.stringOrEmpty("id"),
                 toolName = obj.stringOrEmpty("toolName"),

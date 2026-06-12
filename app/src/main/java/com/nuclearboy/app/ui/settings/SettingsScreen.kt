@@ -501,6 +501,7 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onMenuClick: () -> Unit = {},
     onNavigateToTutorial: () -> Unit = {},
+    onNavigateToTerminal: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -1371,6 +1372,7 @@ fun SettingsScreen(
                 onSave = { url, token -> viewModel.savePcBridgeConnection(url, token) },
                 onTest = { url, token -> viewModel.testPcBridgeConnection(url, token) },
                 onLoadTasks = { viewModel.loadPcTasks() },
+                onOpenTerminal = onNavigateToTerminal,
             )
 
             // ── Sponsor Section ──────────────────────────
