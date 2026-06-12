@@ -45,11 +45,15 @@ object PcBridgeProtocol {
     data class CancelMessage(val type: String = "cancel", val id: String)
 
     @Serializable
+    data class GetResultMessage(val type: String = "get_result", val id: String)
+
+    @Serializable
     data class PingMessage(val type: String = "ping")
 
     fun encodeAuth(token: String): String = json.encodeToString(AuthMessage(token = token))
     fun encodeRun(msg: RunMessage): String = json.encodeToString(msg)
     fun encodeCancel(id: String): String = json.encodeToString(CancelMessage(id = id))
+    fun encodeGetResult(id: String): String = json.encodeToString(GetResultMessage(id = id))
     fun encodePing(): String = json.encodeToString(PingMessage())
 
     // ── 入站消息 ─────────────────────────────────────

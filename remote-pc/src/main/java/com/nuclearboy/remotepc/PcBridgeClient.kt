@@ -74,44 +74,69 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         }
         val taskId = UUID.randomUUID().toString().replace("-", "")
         // 任务超时之外额外留出连接和收尾的余量
-        val sessionTimeoutMs = (timeoutSec + SESSION_GRACE_SEC) * 1000L
+        val deadline = System.currentTimeMillis() + (timeoutSec + SESSION_GRACE_SEC) * 1000L
+        val outputLog = mutableListOf<String>()
+        // 任务是否已被电脑接受：决定断线重连后是补发 run 还是用 get_result 取回
+        var taskAccepted = false
+        var lastFailure: AppResult<CliTaskResult> =
+            AppResult.failure(AppError.NetworkUnavailable, "没能连上电脑")
 
-        return withSession(configStore.currentUrl(), configStore.currentToken(), sessionTimeoutMs) { session ->
-            session.ws.send(
-                PcBridgeProtocol.encodeRun(
-                    PcBridgeProtocol.RunMessage(
-                        id = taskId, cli = cli, prompt = prompt,
-                        cwd = cwd?.takeIf { it.isNotBlank() }, timeoutSec = timeoutSec,
-                        sessionId = sessionId?.takeIf { it.isNotBlank() },
-                    )
-                )
-            )
-            val outputLog = mutableListOf<String>()
-            while (true) {
-                when (val msg = session.receive()) {
-                    is PcBridgeProtocol.Inbound.Accepted -> Unit
-                    is PcBridgeProtocol.Inbound.Output -> {
-                        if (msg.id == taskId && msg.text.isNotBlank()) {
-                            if (outputLog.size < MAX_OUTPUT_LOG_LINES) {
-                                outputLog.add("[${msg.kind}] ${msg.text}")
-                            }
-                            onOutput(msg.kind, msg.text)
-                        }
-                    }
-                    is PcBridgeProtocol.Inbound.Done -> if (msg.id == taskId) {
-                        return@withSession AppResult.success(
-                            CliTaskResult(msg.exitCode, msg.result, msg.durationMs, outputLog, msg.sessionId)
-                        )
-                    }
-                    is PcBridgeProtocol.Inbound.Error -> if (msg.id == taskId || msg.id.isBlank()) {
-                        return@withSession AppResult.failure(AppError.ServerError, msg.message)
-                    }
-                    else -> Unit // pong / unknown 忽略
-                }
+        repeat(MAX_TASK_ATTEMPTS) { attempt ->
+            val remainingMs = deadline - System.currentTimeMillis()
+            if (remainingMs <= 0) {
+                return AppResult.failure(AppError.NetworkTimeout, "任务等待超时（断线重连后仍未拿到结果）")
             }
-            @Suppress("UNREACHABLE_CODE")
-            AppResult.failure(AppError.Unknown, "任务意外结束")
+            val result = withSession(configStore.currentUrl(), configStore.currentToken(), remainingMs) { session ->
+                val request = if (!taskAccepted) {
+                    PcBridgeProtocol.encodeRun(
+                        PcBridgeProtocol.RunMessage(
+                            id = taskId, cli = cli, prompt = prompt,
+                            cwd = cwd?.takeIf { it.isNotBlank() }, timeoutSec = timeoutSec,
+                            sessionId = sessionId?.takeIf { it.isNotBlank() },
+                        )
+                    )
+                } else {
+                    // 断线前任务已开始：取回结果或重新挂上输出流，避免重复执行
+                    PcBridgeProtocol.encodeGetResult(taskId)
+                }
+                session.ws.send(request)
+                while (true) {
+                    when (val msg = session.receive()) {
+                        is PcBridgeProtocol.Inbound.Accepted -> if (msg.id == taskId) taskAccepted = true
+                        is PcBridgeProtocol.Inbound.Output -> {
+                            if (msg.id == taskId && msg.text.isNotBlank()) {
+                                taskAccepted = true
+                                if (outputLog.size < MAX_OUTPUT_LOG_LINES) {
+                                    outputLog.add("[${msg.kind}] ${msg.text}")
+                                }
+                                onOutput(msg.kind, msg.text)
+                            }
+                        }
+                        is PcBridgeProtocol.Inbound.Done -> if (msg.id == taskId) {
+                            return@withSession AppResult.success(
+                                CliTaskResult(msg.exitCode, msg.result, msg.durationMs, outputLog, msg.sessionId)
+                            )
+                        }
+                        is PcBridgeProtocol.Inbound.Error -> if (msg.id == taskId || msg.id.isBlank()) {
+                            return@withSession AppResult.failure(AppError.ServerError, msg.message)
+                        }
+                        else -> Unit // pong / unknown 忽略
+                    }
+                }
+                @Suppress("UNREACHABLE_CODE")
+                AppResult.failure(AppError.Unknown, "任务意外结束")
+            }
+            when {
+                result is AppResult.Success -> return result
+                // 网络波动断线：稍候重连取回，不让任务白跑
+                result is AppResult.Failure && result.error in RETRYABLE_ERRORS && attempt < MAX_TASK_ATTEMPTS - 1 -> {
+                    lastFailure = result
+                    kotlinx.coroutines.delay(RECONNECT_DELAY_MS)
+                }
+                else -> return result
+            }
         }
+        return lastFailure
     }
 
     // ── 会话管理 ─────────────────────────────────────
@@ -212,5 +237,8 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         private const val SESSION_GRACE_SEC = 30
         private const val CONNECT_TEST_TIMEOUT_MS = 15_000L
         private const val MAX_OUTPUT_LOG_LINES = 200
+        private const val MAX_TASK_ATTEMPTS = 5
+        private const val RECONNECT_DELAY_MS = 2_000L
+        private val RETRYABLE_ERRORS = setOf(AppError.NetworkUnavailable, AppError.NetworkTimeout)
     }
 }

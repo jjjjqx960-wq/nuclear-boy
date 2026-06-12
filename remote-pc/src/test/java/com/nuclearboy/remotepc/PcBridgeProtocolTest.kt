@@ -68,6 +68,13 @@ class PcBridgeProtocolTest {
     }
 
     @Test
+    fun `encodeGetResult produces get_result message`() {
+        val raw = PcBridgeProtocol.encodeGetResult("task-1")
+        assertTrue(raw.contains("\"type\":\"get_result\""))
+        assertTrue(raw.contains("\"id\":\"task-1\""))
+    }
+
+    @Test
     fun `encodeRun includes session id when resuming`() {
         val raw = PcBridgeProtocol.encodeRun(
             PcBridgeProtocol.RunMessage(id = "t2", cli = "claude", prompt = "继续", sessionId = "abc-123")
