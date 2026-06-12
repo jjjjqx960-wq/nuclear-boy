@@ -34,12 +34,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuclearboy.remotepc.TerminalAnsi
 
 /**
  * 远程终端界面：手机上直接操作电脑的 ConPTY 终端。
@@ -47,6 +53,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  * MVP：输出剥 ANSI 后以等宽文本展示，输入栏发整行命令，并提供 Ctrl-C/Tab/Enter
  * 等常用键。完整 xterm 渲染（颜色、全屏 TUI）后续增强。
  */
+/** 把含 ANSI 的终端输出转成带颜色/加粗的 AnnotatedString（颜色解析在 :remote-pc 纯逻辑层）。 */
+private fun ansiToAnnotated(raw: String): AnnotatedString {
+    if (raw.isEmpty()) return AnnotatedString("(暂无输出)")
+    return buildAnnotatedString {
+        for (span in TerminalAnsi.parseSpans(raw)) {
+            val style = SpanStyle(
+                color = span.fgArgb?.let { Color(it) } ?: Color.Unspecified,
+                fontWeight = if (span.bold) FontWeight.Bold else null,
+            )
+            withStyle(style) { append(span.text) }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TerminalScreen(
@@ -110,8 +130,9 @@ fun TerminalScreen(
                     .verticalScroll(scroll)
                     .padding(8.dp),
             ) {
+                val rendered = remember(state.output) { ansiToAnnotated(state.output) }
                 Text(
-                    text = state.output.ifEmpty { "(暂无输出)" },
+                    text = rendered,
                     color = Color(0xFFD0D0D0),
                     fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp,

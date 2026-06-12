@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nuclearboy.remotepc.PcBridgeConfigStore
 import com.nuclearboy.remotepc.PcTerminalSession
-import com.nuclearboy.remotepc.TerminalAnsi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -84,7 +83,8 @@ class TerminalViewModel @Inject constructor(
     }
 
     private fun appendOutput(data: String) {
-        buffer.append(TerminalAnsi.strip(data))
+        // 保留原始（含 ANSI）流，由界面用 TerminalAnsi.parseSpans 渲染颜色
+        buffer.append(data)
         if (buffer.length > MAX_BUFFER) {
             buffer.delete(0, buffer.length - MAX_BUFFER)
         }
