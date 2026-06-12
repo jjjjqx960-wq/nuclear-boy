@@ -95,6 +95,15 @@ object PcBridgeProtocol {
         val maxBytes: Int? = null,
     )
 
+    @Serializable
+    data class WriteFileMessage(
+        val type: String = "write_file",
+        val id: String,
+        val path: String,
+        val content: String,
+        val append: Boolean? = null,
+    )
+
     fun encodeAuth(token: String): String = json.encodeToString(AuthMessage(token = token))
     fun encodeRun(msg: RunMessage): String = json.encodeToString(msg)
     fun encodeCancel(id: String): String = json.encodeToString(CancelMessage(id = id))
@@ -114,6 +123,8 @@ object PcBridgeProtocol {
         json.encodeToString(ListDirMessage(id = id, path = path))
     fun encodeReadFile(id: String, path: String, maxBytes: Int? = null): String =
         json.encodeToString(ReadFileMessage(id = id, path = path, maxBytes = maxBytes))
+    fun encodeWriteFile(id: String, path: String, content: String, append: Boolean? = null): String =
+        json.encodeToString(WriteFileMessage(id = id, path = path, content = content, append = append))
 
     // ── 入站消息 ─────────────────────────────────────
 
@@ -155,6 +166,7 @@ object PcBridgeProtocol {
             val size: Long,
             val truncated: Boolean,
         ) : Inbound
+        data class FileWritten(val id: String, val path: String, val bytes: Long) : Inbound
         data class Unknown(val type: String) : Inbound
     }
 
@@ -235,6 +247,11 @@ object PcBridgeProtocol {
                 content = obj.stringOrEmpty("content"),
                 size = obj["size"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
                 truncated = obj["truncated"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false,
+            )
+            "file_written" -> Inbound.FileWritten(
+                id = obj.stringOrEmpty("id"),
+                path = obj.stringOrEmpty("path"),
+                bytes = obj["bytes"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
             )
             "permission_request" -> Inbound.PermissionRequest(
                 id = obj.stringOrEmpty("id"),

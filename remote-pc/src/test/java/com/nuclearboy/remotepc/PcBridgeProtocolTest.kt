@@ -251,6 +251,24 @@ class PcBridgeProtocolTest {
     }
 
     @Test
+    fun `encodeWriteFile carries content and optional append`() {
+        val raw = PcBridgeProtocol.encodeWriteFile("w1", "D:/p/a.kt", "代码", append = true)
+        assertTrue(raw.contains("\"type\":\"write_file\""))
+        assertTrue(raw.contains("\"content\":\"代码\""))
+        assertTrue(raw.contains("\"append\":true"))
+        // 不追加时省略 append
+        assertTrue(!PcBridgeProtocol.encodeWriteFile("w2", "x", "y").contains("append"))
+    }
+
+    @Test
+    fun `parse file_written`() {
+        val msg = PcBridgeProtocol.parseInbound("""{"type":"file_written","id":"w1","path":"D:/p/a.kt","bytes":42}""")
+        val fw = msg as PcBridgeProtocol.Inbound.FileWritten
+        assertEquals("D:/p/a.kt", fw.path)
+        assertEquals(42L, fw.bytes)
+    }
+
+    @Test
     fun `parse done with missing fields falls back to defaults`() {
         val done = PcBridgeProtocol.parseInbound("""{"type":"done","id":"t1"}""")
             as PcBridgeProtocol.Inbound.Done

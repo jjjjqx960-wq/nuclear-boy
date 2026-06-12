@@ -734,6 +734,38 @@ else:
             },
         ),
         ToolDefinition(
+            name = "pc_write_file",
+            description = "把文本内容写入电脑上的文件（覆盖或追加），用于直接落地小改动而不必起 CLI。这是会改动电脑文件的危险操作，每次都会弹到手机让用户确认后才执行。使用场景：1) 用户要你\"把这段代码写到电脑上的某文件\"；2) 创建/更新配置或脚本文件。父目录必须已存在（不自动创建）。复杂的多文件改动仍建议用 pc_cli_run 交给 claude/codex。",
+            parameters = listOf(
+                ToolParameter("path", "string", "电脑上的目标文件路径，如 D:/myproject/note.txt", required = true),
+                ToolParameter("content", "string", "要写入的完整文本内容", required = true),
+                ToolParameter("append", "string", "传 \"true\" 时追加到文件末尾，否则覆盖整个文件", required = false, enum = listOf("true", "false")),
+            ),
+            executor = { params ->
+                val path = params["path"] ?: ""
+                val content = params["content"] ?: ""
+                val append = params["append"] == "true"
+                if (path.isBlank()) {
+                    ToolResult.failure("缺少 path 参数，告诉我要写到电脑上哪个文件")
+                } else {
+                    val action = if (append) "追加写入" else "覆盖写入"
+                    val approved = PermissionPromptBus.requestApproval(
+                        taskId = "pc_write_file",
+                        toolName = "电脑写文件",
+                        inputSummary = "$action $path（${content.toByteArray().size} 字节）",
+                    )
+                    if (!approved) {
+                        ToolResult.failure("用户拒绝了写入电脑文件 $path")
+                    } else when (val result = client.writeFile(path, content, append)) {
+                        is AppResult.Success ->
+                            ToolResult.success("已写入 ${result.data.path}（${result.data.bytes} 字节）✨")
+                        is AppResult.Failure ->
+                            ToolResult.failure(result.technicalDetail ?: result.error.humanMessage)
+                    }
+                }
+            },
+        ),
+        ToolDefinition(
             name = "pc_bridge_status",
             description = "检查和电脑的连接状态，返回电脑主机名和可用的编程 CLI 版本。使用场景：1) 用户问\"电脑连上了吗\"；2) pc_cli_run 失败时排查连接。",
             parameters = emptyList(),

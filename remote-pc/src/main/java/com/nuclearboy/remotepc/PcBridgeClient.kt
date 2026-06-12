@@ -271,6 +271,29 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
         }
     }
 
+    data class FileWritten(val path: String, val bytes: Long)
+
+    /** 写电脑上某文件（覆盖或追加）。危险操作，调用方应先经用户审批。 */
+    suspend fun writeFile(path: String, content: String, append: Boolean = false): AppResult<FileWritten> {
+        if (!configStore.isConfigured()) {
+            return AppResult.failure(AppError.InvalidRequest, "远程电脑还没配置好，去设置页填写地址和 token")
+        }
+        return withSession(configStore.currentUrl(), configStore.currentToken(), CONNECT_TEST_TIMEOUT_MS) { session ->
+            session.ws.send(PcBridgeProtocol.encodeWriteFile("wf", path, content, if (append) true else null))
+            while (true) {
+                when (val msg = session.receive()) {
+                    is PcBridgeProtocol.Inbound.FileWritten ->
+                        return@withSession AppResult.success(FileWritten(msg.path, msg.bytes))
+                    is PcBridgeProtocol.Inbound.Error ->
+                        return@withSession AppResult.failure(AppError.ServerError, msg.message)
+                    else -> Unit
+                }
+            }
+            @Suppress("UNREACHABLE_CODE")
+            AppResult.failure(AppError.Unknown, "写文件意外结束")
+        }
+    }
+
     // ── 会话管理 ─────────────────────────────────────
 
     private class Session(

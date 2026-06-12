@@ -1,3 +1,4 @@
+2026-06-12 1.0.91 写电脑文件（带手机审批，借鉴 claudecodeui PUT file）：新增 pc_write_file 工具，AI 可直接把小改动落地到电脑文件（覆盖/追加），不必为一个小改动起 CLI。这是改动电脑的危险操作，每次都弹到手机让用户确认后才执行（复用任务审批的 PermissionPromptBus）；父目录必须已存在不自动创建、内容有上限。电脑端 fileops.write_file 单元 + 经 WebSocket 端到端实测通过。
 2026-06-12 1.0.90 直接读电脑文件（借鉴 claudecodeui 文件 API）：新增 pc_list_dir / pc_read_file 两个只读工具，AI 不必为看一眼文件就起 CLI——下发任务前可先浏览电脑上的项目结构、读代码/配置内容来理解和规划。只读不改不删，读取有 64KB 默认上限和大小回传，非法字节安全替换。电脑端 fileops 单元 + 经 WebSocket 端到端实测通过，手机端协议单测通过。
 2026-06-12 1.0.89 远程终端中文不再错位（借鉴 wcwidth/East Asian Width）：终端网格此前把每个字符当 1 格，中文/日文/한글等宽字符在真终端占 2 格，导致中文输出排版错位——现在 CharWidth 按东亚宽度判定宽字符占 2 格、组合记号 0 格，光标据此推进，中文 TUI/命令输出对齐正确（对中文产品尤其关键）。CharWidth +6 单测、模拟器 +2 CJK 用例。
 2026-06-12 1.0.88 远程终端方向键 + 自适应尺寸（借鉴 ReTerminal 虚拟键）：补上 TUI 必需的方向键/翻页/Home-End/Ctrl-C-D-Z-L/Esc/Tab/Del 特殊键栏（横向滚动），现在能在手机上正常操作 vim/菜单/claude 交互界面；终端尺寸不再固定 80×24，而是按手机屏幕实测列行数上报电脑端 ConPTY，TUI 排版正好铺满不溢出。TerminalKeys/TerminalGeometry 纯逻辑层 +7 单测。
