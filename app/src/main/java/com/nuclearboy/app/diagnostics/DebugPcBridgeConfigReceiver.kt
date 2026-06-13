@@ -73,6 +73,26 @@ class DebugPcBridgeConfigReceiver : BroadcastReceiver() {
                             Log.e(TAG, "task list FAILED ${list.technicalDetail}")
                     }
                 }
+                if (intent.getBooleanExtra(EXTRA_TEST_FILEOPS, false)) {
+                    // 真机验证只读/写文件 + 会话列表（经加密通道）
+                    when (val ld = bridgeClient.listDir("")) {
+                        is AppResult.Success -> Log.e(TAG, "fileops list_dir OK path=${ld.data.path} entries=${ld.data.entries.size}")
+                        is AppResult.Failure -> Log.e(TAG, "fileops list_dir FAILED ${ld.technicalDetail}")
+                    }
+                    val wp = "D:/nbtest-fileops.txt"
+                    when (val w = bridgeClient.writeFile(wp, "核弹男孩真机写测试 nbcontent")) {
+                        is AppResult.Success -> Log.e(TAG, "fileops write OK ${w.data.path} ${w.data.bytes}B")
+                        is AppResult.Failure -> Log.e(TAG, "fileops write FAILED ${w.technicalDetail}")
+                    }
+                    when (val r = bridgeClient.readFile(wp)) {
+                        is AppResult.Success -> Log.e(TAG, "fileops read OK content=${r.data.content.take(60)}")
+                        is AppResult.Failure -> Log.e(TAG, "fileops read FAILED ${r.technicalDetail}")
+                    }
+                    when (val s = bridgeClient.listSessions(3, null)) {
+                        is AppResult.Success -> Log.e(TAG, "fileops list_sessions OK count=${s.data.size} first=${s.data.firstOrNull()?.preview?.take(30)}")
+                        is AppResult.Failure -> Log.e(TAG, "fileops list_sessions FAILED ${s.technicalDetail}")
+                    }
+                }
                 if (runCli.isNotBlank() && runPrompt.isNotBlank()) {
                     val runSession = intent.getStringExtra(EXTRA_RUN_SESSION)?.trim().orEmpty()
                     Log.e(TAG, "test run start cli=$runCli promptLen=${runPrompt.length} resume=${runSession.take(8)}")
@@ -99,6 +119,7 @@ class DebugPcBridgeConfigReceiver : BroadcastReceiver() {
         const val EXTRA_TOKEN = "token"
         const val EXTRA_ENABLED = "enabled"
         const val EXTRA_ENCRYPT = "encrypt"
+        const val EXTRA_TEST_FILEOPS = "test_fileops"
         const val EXTRA_RUN_CLI = "run_cli"
         const val EXTRA_RUN_PROMPT = "run_prompt"
         const val EXTRA_RUN_SESSION = "run_session"
