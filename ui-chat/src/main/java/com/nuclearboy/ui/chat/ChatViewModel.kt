@@ -76,6 +76,9 @@ class ChatViewModel @Inject constructor(
     private val _streamingState = MutableStateFlow<StreamingState?>(null)
     private val _scrollToBottom = MutableStateFlow(0L)
 
+    /** 复用的 JSON 解析器（读记忆文件等），避免每轮 executeTurn 重建 Json 配置 */
+    private val memoryJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
     @Volatile private var agentJob: Job? = null
     private var lastUserMessage: ChatMessage? = null
     private var currentProjectId: String? = null
@@ -328,8 +331,7 @@ class ChatViewModel @Inject constructor(
         val memFile = java.io.File(fileOperations.getWorkspaceRoot(), "__general__/.agent/memory.json")
         val memoryCtx = if (memFile.exists()) {
             try {
-                val json = Json { ignoreUnknownKeys = true; isLenient = true }
-                val memories = json.decodeFromString<List<Map<String, String>>>(memFile.readText())
+                val memories = memoryJson.decodeFromString<List<Map<String, String>>>(memFile.readText())
                 memories.takeLast(10).joinToString("\n") { "- ${it["value"]} [${it["category"]}]" }
             } catch (_: Exception) { "" }
         } else ""

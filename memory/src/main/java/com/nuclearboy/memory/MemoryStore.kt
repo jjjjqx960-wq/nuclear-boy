@@ -678,13 +678,8 @@ class MemoryStore(context: Context) {
         AppResult.runCatching {
             var extracted = 0
 
-            // Detect build/run commands
-            val commandPatterns = listOf(
-                Regex("""\./(gradlew|mvnw|npm|yarn|pnpm|cargo|go|make)\s+\S+"""),
-                Regex("""(gradle|maven|npm|yarn|pnpm|cargo|go|make)\s+\S+"""),
-                Regex("""(python|python3|pip|pip3)\s+\S+"""),
-            )
-            for (pattern in commandPatterns) {
+            // Detect build/run commands（正则在 companion 编译一次，避免每轮抽取重复编译）
+            for (pattern in COMMAND_PATTERNS) {
                 val matches = pattern.findAll(assistantResponse)
                 for (match in matches) {
                     rememberProjectDetail(
@@ -698,15 +693,7 @@ class MemoryStore(context: Context) {
             }
 
             // Detect code style mentions
-            val styleHints = listOf(
-                "缩进" to "code_style",
-                "indent" to "code_style",
-                "单引号" to "code_style",
-                "双引号" to "code_style",
-                "分号" to "code_style",
-                "semicolon" to "code_style",
-            )
-            for ((keyword, category) in styleHints) {
+            for ((keyword, category) in STYLE_HINTS) {
                 if (keyword in userMessage.lowercase() || keyword in assistantResponse.lowercase()) {
                     // Extract the specific preference (simplified)
                     rememberProjectDetail(
@@ -720,11 +707,7 @@ class MemoryStore(context: Context) {
             }
 
             // Detect user preferences from explicit statements
-            val preferencePatterns = listOf(
-                Regex("""我(喜欢|习惯|常用|偏好|爱用)(\S+)"""),
-                Regex("""(不要|别|不想|讨厌|不喜欢)(\S+)"""),
-            )
-            for (pattern in preferencePatterns) {
+            for (pattern in PREFERENCE_PATTERNS) {
                 pattern.find(userMessage)?.let { match ->
                     updateUserProfile(
                         key = "explicit_preference_${match.value.take(20)}",
@@ -738,6 +721,27 @@ class MemoryStore(context: Context) {
 
             extracted
         }
+    }
+
+    private companion object {
+        // 记忆自动抽取的正则/关键词只编译一次（autoExtractMemories 每轮对话都会调用）
+        val COMMAND_PATTERNS = listOf(
+            Regex("""\./(gradlew|mvnw|npm|yarn|pnpm|cargo|go|make)\s+\S+"""),
+            Regex("""(gradle|maven|npm|yarn|pnpm|cargo|go|make)\s+\S+"""),
+            Regex("""(python|python3|pip|pip3)\s+\S+"""),
+        )
+        val STYLE_HINTS = listOf(
+            "缩进" to "code_style",
+            "indent" to "code_style",
+            "单引号" to "code_style",
+            "双引号" to "code_style",
+            "分号" to "code_style",
+            "semicolon" to "code_style",
+        )
+        val PREFERENCE_PATTERNS = listOf(
+            Regex("""我(喜欢|习惯|常用|偏好|爱用)(\S+)"""),
+            Regex("""(不要|别|不想|讨厌|不喜欢)(\S+)"""),
+        )
     }
 
     // ── Maintenance ──────────────────────────────────────

@@ -184,6 +184,12 @@ class ProjectViewModel @Inject constructor(
         }
     }
 
+    // 项目元数据读写复用一个 Json（编码带默认值、解码忽略未知字段），避免每次项目操作重建
+    private val metaJson = kotlinx.serialization.json.Json {
+        encodeDefaults = true
+        ignoreUnknownKeys = true
+    }
+
     private fun persistProjectMeta(project: Project) {
         try {
             val metaDir = java.io.File(fileOperations.projectRoot(), ".agent")
@@ -192,8 +198,7 @@ class ProjectViewModel @Inject constructor(
             val agentDir = java.io.File(projectDir, ".agent")
             agentDir.mkdirs()
             val metaFile = java.io.File(agentDir, "project.json")
-            val json = kotlinx.serialization.json.Json { encodeDefaults = true }
-            metaFile.writeText(json.encodeToString(Project.serializer(), project))
+            metaFile.writeText(metaJson.encodeToString(Project.serializer(), project))
             android.util.Log.e("NuclearBoy", "[ProjectVM] persistProjectMeta — name=${project.name}, id=${project.id}, path=${metaFile.absolutePath}")
         } catch (e: Exception) {
             android.util.Log.e("NuclearBoy", "[ProjectVM] persistProjectMeta FAILED — ${e.message}")
@@ -206,8 +211,7 @@ class ProjectViewModel @Inject constructor(
             val projectDir = java.io.File(fileOperations.getWorkspaceRoot(), dirName)
             val metaFile = java.io.File(projectDir, ".agent/project.json")
             if (metaFile.exists()) {
-                val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                val project = json.decodeFromString(Project.serializer(), metaFile.readText())
+                val project = metaJson.decodeFromString(Project.serializer(), metaFile.readText())
                 android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjectMeta — found meta file for '$dirName', id=${project.id}")
                 project
             } else {
