@@ -131,6 +131,7 @@ fun ChatScreen(
     var inputDraft by rememberSaveable(projectId) { mutableStateOf("") }
     var inputFocusRequest by remember { mutableLongStateOf(0L) }
     var forceNextScrollToBottom by remember { mutableStateOf(true) }
+    var showClearConfirm by remember { mutableStateOf(false) }
     // 会话内搜索
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -263,6 +264,18 @@ fun ChatScreen(
                         }
                     }
                     Spacer(Modifier.weight(1f))
+                    // 新对话（清空当前对话，带确认）
+                    IconButton(
+                        onClick = { if (uiState.messages.isNotEmpty()) showClearConfirm = true },
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            "新对话",
+                            tint = NuclearBoyTheme.colorScheme.material.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
                     // 会话内搜索开关
                     IconButton(
                         onClick = {
@@ -543,6 +556,24 @@ fun ChatScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { viewModel.respondPermission(false) }) { Text("拒绝") }
+                },
+            )
+        }
+
+        // 新对话确认
+        if (showClearConfirm) {
+            AlertDialog(
+                onDismissRequest = { showClearConfirm = false },
+                title = { Text("开始新对话？", fontWeight = FontWeight.Bold) },
+                text = { Text("会清空当前对话内容，重新开始。") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.clearConversation()
+                        showClearConfirm = false
+                    }) { Text("新对话") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearConfirm = false }) { Text("取消") }
                 },
             )
         }
