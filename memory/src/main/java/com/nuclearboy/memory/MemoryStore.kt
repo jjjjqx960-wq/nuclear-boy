@@ -1,6 +1,7 @@
 package com.nuclearboy.memory
 
 import android.content.Context
+import androidx.sqlite.db.SimpleSQLiteQuery
 import com.nuclearboy.common.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
@@ -494,6 +495,32 @@ class MemoryStore(context: Context) {
      *
      * Results are combined and returned as [MemorySearchResult].
      */
+    /**
+     * 语义记忆搜索：先做中文感知分词（[extractSearchTerms]：CJK 按 2-gram、ASCII 整词），
+     * 再用动态 OR-LIKE（参数化 [SimpleSQLiteQuery]）查询。任何异常或无命中都安全回退到
+     * 原整句子串搜索，保证不弱于改造前。无 schema 改动、全 API 通用。
+     */
+    private suspend fun searchSemanticByTerms(rawQuery: String, limit: Int): List<SemanticMemoryEntity> {
+        val terms = extractSearchTerms(rawQuery)
+        if (terms.isEmpty()) return dao.searchSemanticMemories(rawQuery, limit)
+        return try {
+            val where = terms.joinToString(" OR ") {
+                "(content LIKE '%' || ? || '%' OR summary LIKE '%' || ? || '%' OR category LIKE '%' || ? || '%')"
+            }
+            val args = ArrayList<Any>(terms.size * 3 + 1)
+            terms.forEach { t -> args.add(t); args.add(t); args.add(t) }
+            args.add(limit)
+            val sql = "SELECT * FROM semantic_memories WHERE $where " +
+                "ORDER BY recallCount DESC, lastRecalledAt DESC LIMIT ?"
+            val res = dao.searchSemanticMemoriesRaw(SimpleSQLiteQuery(sql, args.toArray()))
+            res.ifEmpty { dao.searchSemanticMemories(rawQuery, limit) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            dao.searchSemanticMemories(rawQuery, limit)
+        }
+    }
+
     suspend fun searchRelevantMemories(
         query: String,
         projectId: String? = null,
@@ -507,7 +534,7 @@ class MemoryStore(context: Context) {
             }
 
             val profileEntries = dao.searchUserProfiles(query, maxResultsPerLayer)
-            val semanticMemories = dao.searchSemanticMemories(query, maxResultsPerLayer)
+            val semanticMemories = searchSemanticByTerms(query, maxResultsPerLayer)
 
             MemorySearchResult(
                 projectMemories = projectMemories,
@@ -526,13 +553,6 @@ class MemoryStore(context: Context) {
         projectId: String? = null,
     ): AppResult<MemorySearchResult> = withContext(Dispatchers.IO) {
         AppResult.runCatching {
-            // Extract search terms (simple whitespace split + Chinese segmentation hint)
-            val terms = query
-                .split(Regex("""[\s，。！？、；：“”"''【】（）\(\)\[\]{}]+"""))
-                .filter { it.length >= 2 }
-                .take(5)
-                .padTo(5)
-
             val projectMemories = if (projectId != null) {
                 dao.searchProjectMemories(projectId, query, 5)
             } else {
@@ -545,14 +565,7 @@ class MemoryStore(context: Context) {
                 emptyList()
             }
 
-            val semanticMemories = dao.searchSemanticMemoriesMultiTerm(
-                term0 = terms[0],
-                term1 = terms[1],
-                term2 = terms[2],
-                term3 = terms[3],
-                term4 = terms[4],
-                limit = 10,
-            )
+            val semanticMemories = searchSemanticByTerms(query, 10)
 
             // Boost recall count for returned memories (they were just accessed)
             semanticMemories.take(5).forEach { mem ->
@@ -816,13 +829,48 @@ class MemoryStore(context: Context) {
         return jsonArray
     }
 
-    /**
-     * Pad a list to at least [size] elements, filling with empty strings.
-     */
-    private fun List<String>.padTo(size: Int): List<String> {
-        if (this.size >= size) return this
-        return this + List(size - this.size) { "" }
+}
+
+// ── 中文感知的搜索分词 ───────────────────────────────────
+
+/**
+ * 把查询切成检索词：CJK 连续片段按 2-gram（"上下文管理"→上下/下文/文管/管理），
+ * ASCII/数字按整词（长度≥2，小写）。中文无空格，bigram 能在 LIKE 子串搜索上大幅提升召回，
+ * 且全 API 通用、无需 FTS（FTS 默认分词器不切中文、trigram 需 API31+）。
+ *
+ * 顶层 internal 以便单测；纯函数、可独立验证。
+ */
+internal fun extractSearchTerms(query: String, maxTerms: Int = 16): List<String> {
+    val terms = LinkedHashSet<String>()
+    val ascii = StringBuilder()
+    val cjk = StringBuilder()
+    fun flushAscii() {
+        if (ascii.length >= 2) terms.add(ascii.toString().lowercase())
+        ascii.setLength(0)
     }
+    fun flushCjk() {
+        val s = cjk.toString(); cjk.setLength(0)
+        if (s.length >= 2) for (i in 0..s.length - 2) terms.add(s.substring(i, i + 2))
+    }
+    for (ch in query) {
+        when {
+            isCjkChar(ch) -> { flushAscii(); cjk.append(ch) }
+            ch.isLetterOrDigit() -> { flushCjk(); ascii.append(ch) }
+            else -> { flushAscii(); flushCjk() }
+        }
+    }
+    flushAscii(); flushCjk()
+    return terms.take(maxTerms)
+}
+
+internal fun isCjkChar(ch: Char): Boolean {
+    val b = Character.UnicodeBlock.of(ch) ?: return false
+    return b == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
+        b == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS ||
+        b == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A ||
+        b == Character.UnicodeBlock.HIRAGANA ||
+        b == Character.UnicodeBlock.KATAKANA ||
+        b == Character.UnicodeBlock.HANGUL_SYLLABLES
 }
 
 // ── Memory Stats ────────────────────────────────────────

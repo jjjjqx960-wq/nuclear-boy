@@ -1,6 +1,7 @@
 package com.nuclearboy.memory
 
 import androidx.room.*
+import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -166,6 +167,13 @@ interface MemoryDao {
         term0: String, term1: String, term2: String,
         term3: String, term4: String, limit: Int = 20,
     ): List<SemanticMemoryEntity>
+
+    /**
+     * 动态多词 OR-LIKE 语义搜索：词条数量不定（中文 bigram 扩展会产生多词），
+     * 由 [MemoryStore] 构建参数化 SQL（SimpleSQLiteQuery）。无 schema 改动、全 API 通用。
+     */
+    @RawQuery
+    suspend fun searchSemanticMemoriesRaw(query: SupportSQLiteQuery): List<SemanticMemoryEntity>
 
     @Query("UPDATE semantic_memories SET recallCount = recallCount + 1, lastRecalledAt = :now WHERE id = :id")
     suspend fun incrementRecallCount(id: String, now: Long = System.currentTimeMillis())
