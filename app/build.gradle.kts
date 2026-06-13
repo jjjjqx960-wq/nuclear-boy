@@ -16,8 +16,8 @@ android {
         applicationId = "com.nuclearboy.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 121
-        versionName = "1.1.11"
+        versionCode = 122
+        versionName = "1.1.12"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -54,6 +54,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // 用内置 debug 签名给正式包签名，便于直接安装/分发（个人/镜像项目，非 Play 上架）
+            signingConfig = signingConfigs.getByName("debug")
         }
         debug {
             isMinifyEnabled = false
