@@ -528,6 +528,17 @@ class AgentEngine(
             }
         }
 
+        // 工具循环耗尽（达到 maxToolIterations 仍没拿到最终回复）→ 给用户一个解释，
+        // 不要静默无回复
+        if (finalResponse == null && iteration >= maxToolIterations) {
+            android.util.Log.e("NuclearBoy", "[AgentEngine] run() tool loop exhausted at $iteration iterations, no final response")
+            finalResponse = ChatMessage(
+                role = MessageRole.ASSISTANT,
+                content = "这个任务连续调用了 $maxToolIterations 次工具还没完成，先停一下～ 可以把需求拆小一点、或告诉我下一步重点，我接着干。",
+                status = MessageStatus.COMPLETE,
+            )
+        }
+
         // Emit the final response if we have one
         finalResponse?.let { response ->
             android.util.Log.e("NuclearBoy", "[AgentEngine] run() emitting final response status=${response.status} contentLen=${response.content.length} reasoningLen=${response.reasoningContent?.length ?: 0}")

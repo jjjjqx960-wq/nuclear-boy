@@ -311,7 +311,7 @@ class DeepSeekApiClient(
                     .get()
                     .build()
 
-                val response = client.newCall(httpRequest).execute()
+                client.newCall(httpRequest).execute().use { response ->
                 val body = response.body?.string() ?: ""
                 android.util.Log.e("NuclearBoy", "[ApiClient] checkBalance() httpCode=${response.code} bodyLen=${body.length}")
 
@@ -327,6 +327,7 @@ class DeepSeekApiClient(
                         error = AppError.fromHttpCode(response.code),
                         detail = errorBody?.error?.message ?: body
                     )
+                }
                 }
             } catch (e: CancellationException) {
                 throw e
