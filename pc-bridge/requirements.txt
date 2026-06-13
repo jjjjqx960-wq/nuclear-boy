@@ -1,0 +1,6 @@
+# nb-pc-bridge 依赖
+websockets>=12.0
+# 远程终端（ConPTY 真伪终端）；Windows 专用，缺失则远程终端功能不可用，其余功能正常
+pywinpty>=2.0
+# 配对二维码（bridge.py pair 终端打印）
+qrcode>=7.0
