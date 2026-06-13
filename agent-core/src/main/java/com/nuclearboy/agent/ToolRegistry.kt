@@ -78,6 +78,11 @@ class ToolRegistry {
         encodeDefaults = false
     }
 
+    // 工具集运行期基本不变：缓存 DeepSeek schema 转换结果，仅在增删工具时失效，
+    // 避免每条消息(每次 run)都持锁重建所有工具的 JSON schema。
+    private var cachedDefs: List<ToolDefinitionDto>? = null
+    private var cachedDefsMaxTokens: Long = -1L
+
     // ── External module references (set after construction) ──
 
     /** Optional reference to the Skills module for skill-based tool execution. */
@@ -95,6 +100,7 @@ class ToolRegistry {
         android.util.Log.e("NuclearBoy", "[ToolReg] register() toolName=${tool.name}")
         mutex.withLock {
             tools[tool.name] = tool
+            cachedDefs = null // 工具集变了，缓存失效
         }
         return AppResult.success(true)
     }
@@ -108,6 +114,7 @@ class ToolRegistry {
             newTools.forEach { tool ->
                 tools[tool.name] = tool
             }
+            cachedDefs = null // 工具集变了，缓存失效
         }
         return AppResult.success(true)
     }
@@ -119,6 +126,7 @@ class ToolRegistry {
         android.util.Log.e("NuclearBoy", "[ToolReg] unregister() toolName=$name")
         return mutex.withLock {
             if (tools.remove(name) != null) {
+                cachedDefs = null // 工具集变了，缓存失效
                 AppResult.success(true)
             } else {
                 AppResult.failure(
@@ -167,6 +175,7 @@ class ToolRegistry {
      */
     suspend fun toDeepSeekToolDefinitions(maxTokens: Long = 5000): List<ToolDefinitionDto> {
         mutex.withLock {
+            cachedDefs?.let { if (cachedDefsMaxTokens == maxTokens) return it }
             val totalTools = tools.size
             val result = mutableListOf<ToolDefinitionDto>()
             var estimatedTokens = 0L
@@ -191,6 +200,8 @@ class ToolRegistry {
 
             val excluded = totalTools - result.size
             android.util.Log.e("NuclearBoy", "[ToolReg] toDeepSeekToolDefinitions() total=$totalTools included=${result.size} excluded=$excluded budget=$maxTokens tokensUsed=$estimatedTokens")
+            cachedDefs = result
+            cachedDefsMaxTokens = maxTokens
             return result
         }
     }

@@ -596,7 +596,8 @@ class AgentEngine(
             return emptyList()
         }
 
-        val result = mutableListOf<MessageDto>()
+        // ArrayDeque.addFirst 是 O(1)；原先用 ArrayList.add(0,…) 头插每次 O(n)、整段 O(n²)
+        val result = ArrayDeque<MessageDto>()
         var tokenBudget = AppConstants.BUDGET_CONVERSATION_HISTORY
         var tokensUsed = 0L
         var historyCallIdx = 0
@@ -642,7 +643,7 @@ class AgentEngine(
                     continue
                 }
                 for (tc in completedCalls.reversed()) {
-                    result.add(0, MessageDto(
+                    result.addFirst(MessageDto(
                         role = "tool",
                         content = tc.output,
                         toolCallId = tc.toolCallId,
@@ -667,7 +668,7 @@ class AgentEngine(
                     } else null,
                     name = null,
                 )
-                result.add(0, dto)
+                result.addFirst(dto)
             } else {
                 val dto = MessageDto(
                     role = when (msg.role) {
@@ -681,13 +682,13 @@ class AgentEngine(
                     toolCalls = null,
                     name = null,
                 )
-                result.add(0, dto)
+                result.addFirst(dto)
             }
             tokensUsed += contentTokens
         }
 
         android.util.Log.e("NuclearBoy", "[AgentEngine] buildHistoryMessages() EXIT resultCount=${result.size} tokensUsed=$tokensUsed tokenBudgetLeft=${tokenBudget - tokensUsed}")
-        return result
+        return result.toList()
     }
 
     // ── File Context ─────────────────────────────────────
