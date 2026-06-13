@@ -58,12 +58,15 @@ class MainActivity : ComponentActivity() {
         handleShareIntent(intent)
     }
 
-    /** 外部 App 通过分享菜单把文本发进来 → 投递到聊天输入框。 */
+    /** 外部 App 通过分享菜单把文本发进来 → 投递到聊天输入框；桌面快捷方式 → 导航指令。 */
     private fun handleShareIntent(intent: android.content.Intent?) {
         if (intent?.action == android.content.Intent.ACTION_SEND && intent.type == "text/plain") {
             intent.getStringExtra(android.content.Intent.EXTRA_TEXT)?.let {
                 com.nuclearboy.common.SharedIntentBus.emit(it)
             }
+        }
+        if (intent?.action == "com.nuclearboy.app.SHORTCUT_TERMINAL") {
+            com.nuclearboy.common.NavCommandBus.emit(com.nuclearboy.common.NavCommandBus.TARGET_TERMINAL)
         }
     }
 
@@ -91,6 +94,16 @@ private fun NuclearBoyMainScreen() {
     val currentEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentEntry?.destination?.route
     val currentProjectId = currentEntry?.arguments?.getString("projectId")
+
+    // 桌面快捷方式等外部导航指令 → 跳到对应页面
+    LaunchedEffect(Unit) {
+        com.nuclearboy.common.NavCommandBus.commands.collect { target ->
+            when (target) {
+                com.nuclearboy.common.NavCommandBus.TARGET_TERMINAL ->
+                    navController.navigate(NavRoutes.TERMINAL) { launchSingleTop = true }
+            }
+        }
+    }
 
     // Log drawer state changes
     LaunchedEffect(drawerState.isOpen) {

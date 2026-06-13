@@ -142,6 +142,14 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <!-- 桌面长按图标快捷方式：远程终端 -->
+            <intent-filter>
+                <action android:name="com.nuclearboy.app.SHORTCUT_TERMINAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <service

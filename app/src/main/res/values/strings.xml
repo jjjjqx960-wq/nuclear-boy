@@ -67,4 +67,6 @@
     <string name="share">分享</string>
     <string name="night_mode_notice">夜深了，我切换到了夜间模式 🌙</string>
     <string name="break_reminder">你已经连续写了 %d 分钟了，要不要休息一下？☕</string>
+    <string name="shortcut_terminal_short">远程终端</string>
+    <string name="shortcut_terminal_long">打开电脑远程终端</string>
 </resources>

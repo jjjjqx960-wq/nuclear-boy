@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 用自定义 action（非显式包名）以兼容 debug 的 .debug 后缀变体 -->
+    <shortcut
+        android:shortcutId="remote_terminal"
+        android:enabled="true"
+        android:shortcutShortLabel="@string/shortcut_terminal_short"
+        android:shortcutLongLabel="@string/shortcut_terminal_long">
+        <intent android:action="com.nuclearboy.app.SHORTCUT_TERMINAL" />
+    </shortcut>
+</shortcuts>
