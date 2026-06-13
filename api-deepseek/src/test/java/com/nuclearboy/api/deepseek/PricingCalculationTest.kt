@@ -127,15 +127,16 @@ class PricingCalculationTest {
     @Test
     fun `context remaining is accurate`() {
         val tracker = TokenTracker()
+        // 真实窗口 128K：用掉一半(64K)，剩 64K、占比 50%
         val usage = UsageDto(
-            promptTokens = 500_000,
+            promptTokens = 64_000,
             completionTokens = 10_000,
-            totalTokens = 510_000,
+            totalTokens = 74_000,
         )
-        tracker.startRequest(ModelTier.V4_PRO, "disabled", 500_000)
+        tracker.startRequest(ModelTier.V4_PRO, "disabled", 64_000)
         tracker.onRequestComplete(usage)
 
-        assertEquals(500_000, tracker.snapshot.value.contextRemaining)
+        assertEquals(64_000, tracker.snapshot.value.contextRemaining)
         assertEquals(0.5, tracker.snapshot.value.contextUsagePercent, 0.01)
     }
 }

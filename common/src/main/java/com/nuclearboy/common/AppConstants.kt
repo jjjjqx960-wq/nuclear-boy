@@ -11,28 +11,29 @@ object AppConstants {
     /** DeepSeek API base URL */
     const val DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
-    /** DeepSeek V4 context window size */
-    const val DEEPSEEK_CONTEXT_WINDOW = 1_000_000L
+    /** DeepSeek 真实上下文窗口（deepseek-chat/reasoner 约 128K）。
+     *  之前误设为 1_000_000 导致 UI 上下文% 与黄/红警告完全失真、几乎永不触发。 */
+    const val DEEPSEEK_CONTEXT_WINDOW = 128_000L
 
-    /** DeepSeek V4 max output tokens */
-    const val DEEPSEEK_MAX_OUTPUT = 384_000L
+    /** DeepSeek 单次最大输出 tokens */
+    const val DEEPSEEK_MAX_OUTPUT = 8_192L
 
-    /** Context budget allocations (in tokens) */
+    /** Context budget allocations (in tokens) — 按真实 128K 窗口分配 */
     const val BUDGET_SYSTEM_PROMPT = 6_000L
     const val BUDGET_USER_PROFILE = 2_000L
-    const val BUDGET_PROJECT_CONTEXT = 50_000L
-    const val BUDGET_CONVERSATION_HISTORY = 100_000L
+    const val BUDGET_PROJECT_CONTEXT = 16_000L
+    const val BUDGET_CONVERSATION_HISTORY = 60_000L
     const val BUDGET_TOOL_DEFINITIONS = 5_000L
-    const val BUDGET_ATTACHED_FILES = 200_000L
+    const val BUDGET_ATTACHED_FILES = 32_000L
 
     /** Context warning thresholds */
-    const val CONTEXT_WARNING_YELLOW = 800_000L  // 80%
-    const val CONTEXT_WARNING_RED = 950_000L     // 95%
-    const val CONTEXT_FORCE_COMPRESS = 980_000L  // 98%
+    const val CONTEXT_WARNING_YELLOW = 100_000L  // ~78%
+    const val CONTEXT_WARNING_RED = 120_000L     // ~94%
+    const val CONTEXT_FORCE_COMPRESS = 125_000L  // ~98%
 
     /** Conversation limits before compression */
-    const val CONVERSATION_COMPRESS_THRESHOLD = 200_000L
-    const val FILE_CONTENT_TRUNCATE_THRESHOLD = 300_000L
+    const val CONVERSATION_COMPRESS_THRESHOLD = 50_000L
+    const val FILE_CONTENT_TRUNCATE_THRESHOLD = 48_000L
     const val CRITICAL_REMAINING_TOKENS = 100_000L
     const val EMERGENCY_REMAINING_TOKENS = 50_000L
 

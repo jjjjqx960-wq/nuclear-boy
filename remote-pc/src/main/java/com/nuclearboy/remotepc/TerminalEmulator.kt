@@ -23,7 +23,9 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     private var grid = newGrid(this.rows, this.cols)
     private var altGrid: Array<Array<Cell>>? = null
     // 普通缓冲的回滚历史（滚出顶部的行）；备用屏（TUI 全屏）不计入
-    private val scrollback = ArrayDeque<Array<Cell>>()
+    // 回滚历史存「已渲染的行」而非原始 Cell 数组：① 避免每帧把上千行重新渲染一遍
+    // ② 历史行渲染后即定格，不必保留宽 Cell 数组（resize 变窄时也不再常驻大内存）
+    private val scrollback = ArrayDeque<List<TerminalAnsi.Span>>()
 
     private var row = 0
     private var col = 0
@@ -38,7 +40,7 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     private val bel = 7.toChar()
 
     private companion object {
-        const val MAX_SCROLLBACK = 2000
+        const val MAX_SCROLLBACK = 1000
     }
 
     private fun newGrid(r: Int, c: Int) = Array(r) { Array(c) { Cell() } }
@@ -182,7 +184,7 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
     private fun scrollUp() {
         // 普通缓冲、整屏滚动时把顶行存进回滚历史，保留命令输出的可追溯性
         if (altGrid == null && scrollTop == 0) {
-            scrollback.addLast(grid[0])
+            scrollback.addLast(renderLine(grid[0]))
             while (scrollback.size > MAX_SCROLLBACK) scrollback.removeFirst()
         }
         for (r in scrollTop until scrollBottom) grid[r] = grid[r + 1]
@@ -263,9 +265,9 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
 
     /** 包含回滚历史的完整渲染（普通缓冲时 = 历史 + 当前屏；备用屏时只当前屏）。 */
     fun renderWithScrollback(): List<List<TerminalAnsi.Span>> {
-        val lines = if (altGrid == null && scrollback.isNotEmpty())
-            (scrollback + grid.toList()) else grid.toList()
-        return lines.map { renderLine(it) }
+        // 历史行已是渲染结果，直接拼上当前屏（只需重渲染当前屏的几十行）
+        val screen = grid.map { renderLine(it) }
+        return if (altGrid == null && scrollback.isNotEmpty()) scrollback + screen else screen
     }
 
     /** 渲染当前屏幕为按行的彩色 span（行尾空白裁掉，便于显示）。 */

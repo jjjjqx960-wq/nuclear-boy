@@ -31,7 +31,8 @@ class ContextWindowManagerTest {
 
     @Test
     fun `canFit returns correct answer`() {
-        manager.updateAllocation(conversationHistory = 900_000)
+        // 真实窗口 128K：用掉 60K 后剩 ~68K
+        manager.updateAllocation(conversationHistory = 60_000)
         assertTrue(manager.canFit(50_000))
         assertFalse(manager.canFit(200_000))
     }
@@ -62,11 +63,11 @@ class ContextWindowManagerTest {
 
     @Test
     fun `compress does nothing if under threshold`() {
-        manager.updateAllocation(conversationHistory = 50_000)
+        manager.updateAllocation(conversationHistory = 30_000) // 低于压缩阈值(50K)
         val result = manager.compressConversation(10)
 
         assertEquals(0, result.tokensSaved)
-        assertEquals(50_000, manager.budget.value.conversationHistory)
+        assertEquals(30_000, manager.budget.value.conversationHistory)
     }
 
     @Test

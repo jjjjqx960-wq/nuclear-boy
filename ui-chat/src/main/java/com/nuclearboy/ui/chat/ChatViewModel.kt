@@ -992,9 +992,11 @@ class ChatViewModel @Inject constructor(
             if (msg.status == MessageStatus.THINKING) msg.copy(status = MessageStatus.COMPLETE)
             else msg
         }
-        // Finalize assistant message if one was created
+        // Finalize assistant message。用传入的 thinkingId（本轮 assistant 消息 id，稳定不变），
+        // 不读 currentAssistantMsgId 类字段——它可能被 cancelCurrentOperation 并发置空，
+        // 导致这里 ?.let 被跳过、消息永久卡在 STREAMING/THINKING 状态。
         val streamState = _streamingState.value
-        currentAssistantMsgId?.let { id ->
+        thinkingId.let { id ->
             val finalStatus = if (streamState?.responseText?.isEmpty() != false) "ERROR" else "COMPLETE"
             android.util.Log.e("NuclearBoy", "[ChatVM] finalizeProcessing() assistantId=$id finalStatus=$finalStatus responseTextLen=${streamState?.responseText?.length ?: 0}")
             updateAssistantMessage(id) { msg ->

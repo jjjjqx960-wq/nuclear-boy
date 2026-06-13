@@ -1117,12 +1117,6 @@ private fun EmptyChatView(modifier: Modifier = Modifier, onSuggestionClick: (Str
     val nc = NuclearBoyTheme.colorScheme
     val greeting = LocalTime.now().toGreeting()
 
-    // Animated scanline effect
-    val scanlineOffset by rememberInfiniteTransition().animateFloat(
-        initialValue = -1f, targetValue = 2f,
-        animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Restart),
-    )
-
     Column(
         modifier = modifier.padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
