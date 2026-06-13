@@ -41,14 +41,11 @@ class PcTerminalSession(
         return runCatching { PcCrypto.decrypt(key, enc) }.getOrNull()
     }
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.MILLISECONDS)
-        .pingInterval(20, TimeUnit.SECONDS)
-        .build()
-
     @Volatile
     private var webSocket: WebSocket? = null
+
+    @Volatile
+    private var closed = false
 
     sealed interface TerminalEvent {
         /** 终端已就绪可以接收键入 */
@@ -107,13 +104,9 @@ class PcTerminalSession(
                 close()
             }
         }
-        webSocket = httpClient.newWebSocket(request, listener)
+        webSocket = sharedClient.newWebSocket(request, listener)
 
-        awaitClose {
-            runCatching { webSocket?.let { send(it, PcBridgeProtocol.encodeTermClose(termId)) } }
-            webSocket?.close(1000, "done")
-            webSocket = null
-        }
+        awaitClose { teardown() }
     }
 
     /** 发送键入（含控制字符，如回车 \r、Ctrl-C ）。 */
@@ -126,7 +119,12 @@ class PcTerminalSession(
         webSocket?.let { send(it, PcBridgeProtocol.encodeTermResize(termId, cols, rows)) }
     }
 
-    fun close() {
+    fun close() = teardown()
+
+    /** 幂等关闭：发 term_close、关连接。共享 client 不在此 shutdown（其它会话还在用）。 */
+    private fun teardown() {
+        if (closed) return
+        closed = true
         runCatching { webSocket?.let { send(it, PcBridgeProtocol.encodeTermClose(termId)) } }
         webSocket?.close(1000, "done")
         webSocket = null
@@ -138,5 +136,15 @@ class PcTerminalSession(
         startsWith("wss://") -> "https://" + removePrefix("wss://")
         startsWith("http://") || startsWith("https://") -> this
         else -> "http://$this"
+    }
+
+    companion object {
+        // 所有终端会话共享一个 OkHttpClient：OkHttp 设计为可共享，避免每会话各自
+        // 持有线程池/连接池/ping 调度器导致反复开关终端时线程泄漏。
+        private val sharedClient: OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.MILLISECONDS)
+            .pingInterval(20, TimeUnit.SECONDS)
+            .build()
     }
 }

@@ -30,8 +30,8 @@ import javax.inject.Inject
 
 data class StreamingState(
     val messageId: String,
-    val thinkingText: StringBuilder = StringBuilder(),
-    val responseText: StringBuilder = StringBuilder(),
+    val thinkingText: String = "",
+    val responseText: String = "",
     val activeToolCalls: List<ToolCallRecord> = emptyList(),
     val isThinking: Boolean = false,
     val isStreaming: Boolean = false,
@@ -76,7 +76,7 @@ class ChatViewModel @Inject constructor(
     private val _streamingState = MutableStateFlow<StreamingState?>(null)
     private val _scrollToBottom = MutableStateFlow(0L)
 
-    private var agentJob: Job? = null
+    @Volatile private var agentJob: Job? = null
     private var lastUserMessage: ChatMessage? = null
     private var currentProjectId: String? = null
     private var currentThinkingId: String? = null
@@ -780,13 +780,13 @@ class ChatViewModel @Inject constructor(
                 _streamingState.update { current ->
                     (current ?: StreamingState(thinkingId)).copy(
                         isThinking = true,
-                        thinkingText = (current?.thinkingText ?: StringBuilder()).append(event.message),
+                        thinkingText = (current?.thinkingText ?: "") + event.message,
                     )
                 }
                 updateAssistantMessage(thinkingId) { msg ->
                     msg.copy(
                         status = MessageStatus.THINKING,
-                        reasoningContent = _streamingState.value?.thinkingText?.toString(),
+                        reasoningContent = _streamingState.value?.thinkingText,
                     )
                 }
             }
@@ -797,10 +797,10 @@ class ChatViewModel @Inject constructor(
                     (current ?: StreamingState(thinkingId)).copy(
                         isThinking = false,
                         isStreaming = true,
-                        responseText = (current?.responseText ?: StringBuilder()).append(event.text),
+                        responseText = (current?.responseText ?: "") + event.text,
                     )
                 }
-                val streamedContent = _streamingState.value?.responseText?.toString() ?: event.text
+                val streamedContent = _streamingState.value?.responseText ?: event.text
                 updateAssistantMessage(thinkingId) { msg ->
                     msg.copy(
                         content = streamedContent,
@@ -854,8 +854,15 @@ class ChatViewModel @Inject constructor(
             is AgentEvent.ToolResultEvent -> {
                 android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() ToolResultEvent toolName=${event.toolName} success=${event.result.success} outputLen=${event.result.output.length}")
                 updateAssistantMessage(thinkingId) { msg ->
+                    // 优先按 toolCallId 精确匹配，避免同名工具被多次调用时结果贴错卡片；
+                    // 无 id 时回退到"同名且尚无结果"的旧逻辑。
                     val updatedCalls = msg.toolCalls.map { call ->
-                        if (call.toolName == event.toolName && call.output == null) {
+                        val matches = if (event.toolCallId.isNotEmpty() && call.toolCallId != null) {
+                            call.toolCallId == event.toolCallId && call.output == null
+                        } else {
+                            call.toolName == event.toolName && call.output == null
+                        }
+                        if (matches) {
                             call.copy(
                                 output = event.result.output,
                                 status = if (event.result.success) ToolCallStatus.COMPLETED
@@ -924,7 +931,7 @@ class ChatViewModel @Inject constructor(
                     }
                     _streamingState.update { state ->
                         if (state?.messageId == activeAssistantId && state.responseText.isEmpty()) {
-                            state.copy(responseText = StringBuilder(content))
+                            state.copy(responseText = content)
                         } else {
                             state
                         }

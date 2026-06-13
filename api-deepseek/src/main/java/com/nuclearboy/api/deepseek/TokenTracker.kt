@@ -23,6 +23,7 @@ data class TokenSnapshot(
     val promptTokensThisRequest: Long = 0,
     val completionTokensThisRequest: Long = 0,
     val cachedTokensThisRequest: Long = 0,
+    val reasoningTokensThisRequest: Long = 0,
     val cacheHitRate: Double = 0.0,          // 0.0 - 1.0
     val contextUsed: Long = 0,
     val contextRemaining: Long = AppConstants.DEEPSEEK_CONTEXT_WINDOW,
@@ -71,6 +72,7 @@ class TokenTracker {
                 promptTokensThisRequest = promptTokens,
                 completionTokensThisRequest = 0,
                 cachedTokensThisRequest = 0,
+                reasoningTokensThisRequest = 0,
                 tokensPerSecond = 0.0,
                 reasoningTokensPerSecond = 0.0,
             )
@@ -87,19 +89,21 @@ class TokenTracker {
         val elapsed = (now - lastUpdateTimeMs).coerceAtLeast(1)
 
         _snapshot.update { current ->
+            // reasoning token 只计入推理计数，不能混进 completion，否则思考模式 HUD 数字虚高
             val newCompletion = if (isReasoning) {
                 current.completionTokensThisRequest
             } else {
                 current.completionTokensThisRequest + 1
             }
             val newReasoning = if (isReasoning) {
-                current.reasoningTokensThisRequest() + 1
+                current.reasoningTokensThisRequest + 1
             } else {
-                current.reasoningTokensThisRequest()
+                current.reasoningTokensThisRequest
             }
 
             current.copy(
-                completionTokensThisRequest = current.completionTokensThisRequest + 1,
+                completionTokensThisRequest = newCompletion,
+                reasoningTokensThisRequest = newReasoning,
                 tokensPerSecond = if (isReasoning) current.tokensPerSecond
                     else (1000.0 * tokensInCurrentStream / (now - startTimeMs + 1)),
                 reasoningTokensPerSecond = if (isReasoning)
@@ -169,6 +173,7 @@ class TokenTracker {
                     .coerceAtLeast(0) / (current.requestCount + 1),
                 completionTokensThisRequest = usage.completionTokens,
                 cachedTokensThisRequest = cachedTokens,
+                reasoningTokensThisRequest = reasoningTokens, // 以服务端权威用量为准
             )
         }
     }
@@ -214,10 +219,5 @@ class TokenTracker {
                         (outputTokens / 1_000_000.0) * AppConstants.Pricing.FLASH_OUTPUT
             }
         }
-    }
-
-    private fun TokenSnapshot.reasoningTokensThisRequest(): Long {
-        // Tracked via stream callback — simple count for now
-        return this.reasoningTokensTotal
     }
 }

@@ -361,6 +361,7 @@ class DeepSeekApiClient(
             return@withContext AppResult.failure(AppError.InvalidRequest, "服务地址不能为空")
         }
         val startedAt = System.currentTimeMillis()
+        var responseToClose: okhttp3.Response? = null
         try {
             if (resolvedProtocol == ProviderProtocol.ANTHROPIC) {
                 return@withContext testAnthropicProvider(
@@ -393,12 +394,14 @@ class DeepSeekApiClient(
 
             var attempts = 1
             var response = diagnosticClient.newCall(requestBuilder.build()).execute()
+            responseToClose = response
             var responseBody = response.body?.string().orEmpty()
             if (response.code == 404 && isInactiveProviderCredentialError(responseBody)) {
                 delay(800)
                 attempts += 1
-                response.close() // 关闭被丢弃的首个响应，避免连接句柄泄漏
+                response.close() // 关闭被丢弃的首个响应
                 response = diagnosticClient.newCall(requestBuilder.build()).execute()
+                responseToClose = response
                 responseBody = response.body?.string().orEmpty()
             }
             val elapsedMs = System.currentTimeMillis() - startedAt
@@ -1114,9 +1117,9 @@ class DeepSeekApiClient(
 
     private fun sanitizeProviderBody(body: String): String {
         return body
-            .replace(Regex("Bearer\\s+[A-Za-z0-9._~+/=-]+", RegexOption.IGNORE_CASE), "Bearer <REDACTED_TOKEN>")
-            .replace(Regex("sk-[A-Za-z0-9_-]+"), "sk-<REDACTED_TOKEN>")
-            .replace(Regex("\\s+"), " ")
+            .replace(bearerTokenRegex, "Bearer <REDACTED_TOKEN>")
+            .replace(skKeyRegex, "sk-<REDACTED_TOKEN>")
+            .replace(whitespaceRegex, " ")
             .trim()
             .take(500)
     }
@@ -1142,14 +1145,16 @@ class DeepSeekApiClient(
     }
 
     private fun estimatePromptTokens(messages: List<MessageDto>): Long {
-        val result = messages.sumOf { msg ->
-            ((msg.content?.length ?: 0) + (msg.reasoningContent?.length ?: 0)) / 3L
-        }
-        android.util.Log.e("NuclearBoy", "[ApiClient] estimatePromptTokens() totalChars=${
-            messages.sumOf { (it.content?.length ?: 0) + (it.reasoningContent?.length ?: 0) }
-        } estimatedTokens=$result messages=${messages.size}")
+        val totalChars = messages.sumOf { (it.content?.length ?: 0) + (it.reasoningContent?.length ?: 0) }
+        val result = totalChars / 3L
+        android.util.Log.e("NuclearBoy", "[ApiClient] estimatePromptTokens() totalChars=$totalChars estimatedTokens=$result messages=${messages.size}")
         return result
     }
+
+    // 脱敏正则只编译一次（错误上报路径可能高频触发）
+    private val bearerTokenRegex = Regex("Bearer\\s+[A-Za-z0-9._~+/=-]+", RegexOption.IGNORE_CASE)
+    private val skKeyRegex = Regex("sk-[A-Za-z0-9_-]+")
+    private val whitespaceRegex = Regex("\\s+")
 
     fun close() {
         client.dispatcher.executorService.shutdown()

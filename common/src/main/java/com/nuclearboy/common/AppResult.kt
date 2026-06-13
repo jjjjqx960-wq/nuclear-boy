@@ -44,6 +44,9 @@ sealed class AppResult<out T> {
         inline fun <T> runCatching(block: () -> T): AppResult<T> {
             return try {
                 Success(block())
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                // 协程取消必须向上传播，绝不能吞掉，否则用户"停止"后任务仍跑完
+                throw e
             } catch (e: Exception) {
                 Failure(
                     error = AppError.Unknown,

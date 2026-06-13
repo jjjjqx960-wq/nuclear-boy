@@ -169,6 +169,15 @@ class AgentEngine(
     /** Maximum number of tool-call -> execute -> feedback iterations per turn. */
     private val maxToolIterations = 20
 
+    /** 单个工具结果注入对话的最大字符数；超出截断（读大文件/长目录列表的主要膨胀源）。 */
+    private val maxToolOutputChars = 12_000
+
+    /**
+     * 发送前对话负载的真实 token 上限（保守值，给回复留余量）。
+     * 注意：这是面向真实模型窗口的硬保护，与 ContextWindowManager 的 UI 计数无关。
+     */
+    private val maxPayloadTokens = 96_000L
+
     // ── Public API ───────────────────────────────────────
 
     /** Callback invoked when the agent run is cancelled — e.g. to interrupt Python. */
@@ -268,47 +277,33 @@ class AgentEngine(
         android.util.Log.e("NuclearBoy", "[AgentEngine] run() messagesAssembled total=${messages.size} system=1 history=${historyDtos.size} user=1 historyTokens=$historyTokens userTokens=$userTokens contextUsed=${contextManager.budget.value.totalUsed}")
 
         // ── Main Tool-Use Loop ───────────────────────────
+        // 工具定义在单次 run 内不变，循环外取一次即可（原先每轮都持锁重建 JSON schema，浪费）
+        val toolDefs = toolRegistry.toDeepSeekToolDefinitions()
+        android.util.Log.e("NuclearBoy", "[AgentEngine] run() toolDefs count=${toolDefs.size} names=${toolDefs.map { it.function.name }}")
+
         var iteration = 0
         var finalResponse: ChatMessage? = null
+        var contextTrimNotified = false
 
         while (iteration < maxToolIterations && finalResponse == null) {
             iteration++
             val iterStartMs = System.currentTimeMillis()
-            android.util.Log.e("NuclearBoy", "[AgentEngine] run() iteration=$iteration/$maxToolIterations contextWarning=${contextManager.budget.value.warningLevel} contextUsed=${contextManager.budget.value.totalUsed}")
+            android.util.Log.e("NuclearBoy", "[AgentEngine] run() iteration=$iteration/$maxToolIterations contextUsed=${contextManager.budget.value.totalUsed}")
 
-            // Check context window before each API call
-            when {
-                contextManager.budget.value.warningLevel >= ContextWarningLevel.RED -> {
-                    android.util.Log.e("NuclearBoy", "[AgentEngine] run() emergencyCompress triggered, pre-compression used=${contextManager.budget.value.totalUsed}")
-                    val compression = contextManager.emergencyCompress()
-                    android.util.Log.e("NuclearBoy", "[AgentEngine] run() emergencyCompress done, saved=${compression.tokensSaved} msg=${compression.message}")
-                    emit(
-                        AgentEvent.ContextWarning(
-                            level = ContextWarningLevel.RED,
-                            message = compression.message,
-                        )
+            // 发送前把对话负载真实裁剪到模型窗口内。
+            // 旧实现只改 ContextWindowManager 的计数器、却谎报"已压缩 ✨"而不动真实 payload；
+            // 这里整组丢弃最早的工具往返（保 system / 所有 user / 最近一组），保证 tool_call 配对不破。
+            val trimmed = trimMessagesForPayload(messages)
+            if (trimmed > 0 && !contextTrimNotified) {
+                contextTrimNotified = true
+                android.util.Log.e("NuclearBoy", "[AgentEngine] run() trimMessagesForPayload removed=$trimmed msgs")
+                emit(
+                    AgentEvent.ContextWarning(
+                        level = ContextWarningLevel.YELLOW,
+                        message = "对话有点长了，我把较早的几轮工具记录精简掉了，保留最近的上下文继续帮你 ✨",
                     )
-                }
-                contextManager.budget.value.warningLevel >= ContextWarningLevel.YELLOW -> {
-                    android.util.Log.e("NuclearBoy", "[AgentEngine] run() compressConversation triggered, turns=${conversationHistory.size + iteration}")
-                    val compression = contextManager.compressConversation(
-                        turnCount = conversationHistory.size + iteration
-                    )
-                    android.util.Log.e("NuclearBoy", "[AgentEngine] run() compressConversation saved=${compression.tokensSaved} msg=${compression.message}")
-                    if (compression.tokensSaved > 0) {
-                        emit(
-                            AgentEvent.ContextWarning(
-                                level = ContextWarningLevel.YELLOW,
-                                message = compression.message,
-                            )
-                        )
-                    }
-                }
+                )
             }
-
-            // Get tool definitions for this turn
-            val toolDefs = toolRegistry.toDeepSeekToolDefinitions()
-            android.util.Log.e("NuclearBoy", "[AgentEngine] run() toolDefs count=${toolDefs.size} names=${toolDefs.map { it.function.name }}")
 
             // Call the API
             val responseContent = StringBuilder()
@@ -444,12 +439,14 @@ class AgentEngine(
                                 emit(AgentEvent.FileChanged(result.fileChanges))
                             }
 
-                            // Add tool result message
+                            // Add tool result message（超长输出截断，单个工具结果不撑爆 payload）
                             messages.add(
                                 MessageDto(
                                     role = "tool",
-                                    content = if (result.success) result.output
-                                    else "错误: ${result.error ?: "未知错误"}",
+                                    content = capToolOutput(
+                                        if (result.success) result.output
+                                        else "错误: ${result.error ?: "未知错误"}"
+                                    ),
                                     toolCallId = toolCall.id,
                                     name = toolName,
                                 )
@@ -476,7 +473,7 @@ class AgentEngine(
                         totalTokens = tokenTracker.snapshot.value.promptTokensThisRequest +
                                 tokenTracker.snapshot.value.completionTokensThisRequest,
                         cachedPromptTokens = tokenTracker.snapshot.value.cachedTokensThisRequest,
-                        reasoningTokens = tokenTracker.snapshot.value.reasoningTokensThisRequest(),
+                        reasoningTokens = tokenTracker.snapshot.value.reasoningTokensThisRequest,
                         estimatedCostUsd = tokenTracker.snapshot.value.estimatedCostUsd,
                     ),
                 )
@@ -491,19 +488,11 @@ class AgentEngine(
                 )
 
             } catch (e: CancellationException) {
-                android.util.Log.e("NuclearBoy", "[AgentEngine] run() CancellationException caught, iteration=$iteration")
-                emit(
-                    AgentEvent.Error(
-                        error = AppError.UserCancelled,
-                        detail = "用户取消了操作",
-                    )
-                )
-                finalResponse = ChatMessage(
-                    role = MessageRole.ASSISTANT,
-                    content = "",
-                    status = MessageStatus.CANCELLED,
-                )
-                break
+                // 取消必须向上传播（绝不吞）：否则结构化并发被破坏，用户"停止"后任务仍跑完。
+                // 友好的 CANCELLED 状态由收集方 ChatViewModel.executeTurn 的 catch 负责展示。
+                android.util.Log.e("NuclearBoy", "[AgentEngine] run() CancellationException — propagating, iteration=$iteration")
+                onCancel?.invoke() // 即使仅 flow 被取消也确保中断 Python 等长任务
+                throw e
 
             } catch (e: Exception) {
                 val appError = classifyException(e)
@@ -551,6 +540,45 @@ class AgentEngine(
         android.util.Log.e("NuclearBoy", "[AgentEngine] run() EXIT requests=${stats.requestCount} prompt=${stats.totalPromptTokens} completion=${stats.totalCompletionTokens} cost=${stats.totalCostUsd} elapsedMs=$totalElapsedMs")
         emit(AgentEvent.Complete(stats))
     }.flowOn(Dispatchers.IO)
+
+    /** 工具输出超长则截断，保留首部并标注被截字符数，避免单条结果撑爆 payload。 */
+    private fun capToolOutput(text: String): String {
+        if (text.length <= maxToolOutputChars) return text
+        val dropped = text.length - maxToolOutputChars
+        return text.take(maxToolOutputChars) + "\n…（输出过长，已截断 $dropped 字符。如需完整内容请缩小范围或分页查看）"
+    }
+
+    /**
+     * 发送前把 [messages] 真实裁剪到 [maxPayloadTokens] 以内：从最早开始**整组**丢弃
+     * assistant(带 tool_calls) + 其后连续 tool 结果。保留 system、所有 user 消息，以及
+     * 最近一组工具往返；整组丢弃保证 tool_call/tool 配对不被破坏（否则 API 400）。
+     * reasoning_content 不计入（出站本就被 sanitize 剥离）。返回被丢弃的消息条数。
+     */
+    private fun trimMessagesForPayload(messages: MutableList<MessageDto>): Int {
+        fun estimate(): Long = messages.sumOf {
+            ((it.content?.length ?: 0) +
+                (it.toolCalls?.sumOf { tc -> tc.function.arguments.length } ?: 0)) / 3L
+        }
+        if (estimate() <= maxPayloadTokens) return 0
+
+        var removed = 0
+        while (estimate() > maxPayloadTokens) {
+            val startIdx = messages.indexOfFirst {
+                it.role == "assistant" && !it.toolCalls.isNullOrEmpty()
+            }
+            if (startIdx <= 0) break // 只剩 system/user，无可丢弃的工具往返
+            var endIdx = startIdx
+            while (endIdx + 1 <= messages.lastIndex && messages[endIdx + 1].role == "tool") endIdx++
+            // 若这已是最后一组工具往返，保留它（模型需要最近上下文继续），停止
+            val hasLaterGroup = (endIdx + 1..messages.lastIndex).any {
+                messages[it].role == "assistant" && !messages[it].toolCalls.isNullOrEmpty()
+            }
+            if (!hasLaterGroup) break
+            repeat(endIdx - startIdx + 1) { messages.removeAt(startIdx) }
+            removed += endIdx - startIdx + 1
+        }
+        return removed
+    }
 
     // ── Conversation History ─────────────────────────────
 
@@ -608,6 +636,11 @@ class AgentEngine(
                     .groupBy { it.toolCallId ?: it.toolName }
                     .map { (_, calls) -> calls.last() }
                 val completedCalls = uniqueCalls.filter { it.output != null && it.toolCallId != null }
+                // 工具调用全部未完成（如取消中断遗留）且无文本 → 会变成空 assistant，跳过避免 API 400
+                if (completedCalls.isEmpty() && msg.content.isBlank()) {
+                    android.util.Log.e("NuclearBoy", "[AgentEngine] buildHistoryMessages() skipping assistant with only pending tool calls")
+                    continue
+                }
                 for (tc in completedCalls.reversed()) {
                     result.add(0, MessageDto(
                         role = "tool",
@@ -899,7 +932,4 @@ class AgentEngine(
         }
     }
 
-    private fun TokenSnapshot.reasoningTokensThisRequest(): Long {
-        return this.reasoningTokensTotal
-    }
 }
