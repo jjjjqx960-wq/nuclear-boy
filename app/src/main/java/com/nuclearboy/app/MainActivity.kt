@@ -46,8 +46,25 @@ class MainActivity : ComponentActivity() {
         val keyStatus = if (apiKeyManager.getActiveKey() != null) "configured" else "missing"
         android.util.Log.e("NuclearBoy", "[MainActivity] API key status: $keyStatus")
 
+        handleShareIntent(intent)
+
         enableEdgeToEdge()
         setContent { NuclearBoyTheme(darkTheme = true) { NuclearBoyMainScreen() } }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShareIntent(intent)
+    }
+
+    /** 外部 App 通过分享菜单把文本发进来 → 投递到聊天输入框。 */
+    private fun handleShareIntent(intent: android.content.Intent?) {
+        if (intent?.action == android.content.Intent.ACTION_SEND && intent.type == "text/plain") {
+            intent.getStringExtra(android.content.Intent.EXTRA_TEXT)?.let {
+                com.nuclearboy.common.SharedIntentBus.emit(it)
+            }
+        }
     }
 
     private fun maybeRequestNotificationPermission() {

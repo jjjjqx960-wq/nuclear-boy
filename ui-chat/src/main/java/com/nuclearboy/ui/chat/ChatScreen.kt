@@ -143,6 +143,13 @@ fun ChatScreen(
     LaunchedEffect(matchPointer, searchMatches) {
         searchMatches.getOrNull(matchPointer)?.let { listState.animateScrollToItem(it) }
     }
+    // 外部分享进来的文本：填入输入框（不自动发送，让用户补充指令再发）
+    LaunchedEffect(Unit) {
+        com.nuclearboy.common.SharedIntentBus.shared.collect { shared ->
+            inputDraft = if (inputDraft.isBlank()) shared else "$inputDraft\n$shared"
+            inputFocusRequest++
+        }
+    }
     val totalListItems by remember {
         derivedStateOf { listState.layoutInfo.totalItemsCount }
     }
