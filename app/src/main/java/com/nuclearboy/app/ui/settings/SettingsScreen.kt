@@ -120,7 +120,15 @@ class SettingsViewModel @Inject constructor(
     private val appDiagnostics: AppDiagnostics,
     private val pcBridgeConfigStore: PcBridgeConfigStore,
     private val pcBridgeClient: PcBridgeClient,
+    private val appSettings: com.nuclearboy.common.AppSettingsStore,
 ) : androidx.lifecycle.ViewModel() {
+
+    private val _customInstructions = MutableStateFlow(appSettings.customInstructions())
+    val customInstructions: StateFlow<String> = _customInstructions.asStateFlow()
+    fun saveCustomInstructions(text: String) {
+        appSettings.setCustomInstructions(text)
+        _customInstructions.value = text.trim()
+    }
 
     val apiKeyState = apiKeyManager.state
     private val _modelTestState = MutableStateFlow(ModelTestUiState())
@@ -1363,6 +1371,46 @@ fun SettingsScreen(
                         Spacer(Modifier.width(6.dp))
                         Text("查看图文教程", fontWeight = FontWeight.Bold)
                     }
+                }
+            }
+
+            // ── 自定义指令 ────────────────────────────────
+            Text(
+                "🧭 自定义指令",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+            )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("给核弹男孩定规矩", fontWeight = FontWeight.Bold)
+                    Text(
+                        "你写的要求会加进每次对话的系统提示，让它按你的习惯回复。例如：「只用中文，回答尽量简短」「我是后端工程师，默认 Kotlin」。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    val savedCi by viewModel.customInstructions.collectAsState()
+                    var ciInput by remember(savedCi) { mutableStateOf(savedCi) }
+                    OutlinedTextField(
+                        value = ciInput,
+                        onValueChange = { ciInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 6,
+                        placeholder = { Text("写下你的偏好/人设/规则（可留空）") },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { viewModel.saveCustomInstructions(ciInput) },
+                        enabled = ciInput != savedCi,
+                    ) { Text("保存指令") }
                 }
             }
 

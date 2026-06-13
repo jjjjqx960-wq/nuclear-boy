@@ -72,6 +72,8 @@ data class ProjectContext(
     val userProfile: UserProfile,
     val activeSkills: List<SkillInfo>,
     val memoryContext: String = "",
+    /** 用户在设置里自定义的附加指令（自定义人设/规则），追加进系统提示 */
+    val customInstructions: String = "",
 )
 
 // ── Tool Call Accumulator ───────────────────────────────
@@ -203,6 +205,7 @@ class AgentEngine(
             currentFiles = projectContext.currentFiles,
             activeSkills = projectContext.activeSkills,
             memoryContext = memoryContext,
+            customInstructions = projectContext.customInstructions,
         )
         android.util.Log.e("NuclearBoy", "[AgentEngine] run() systemPrompt built, length=${systemPrompt.length} tokens~=${systemPrompt.length / 3}")
 

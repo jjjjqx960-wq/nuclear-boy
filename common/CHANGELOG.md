@@ -1,3 +1,4 @@
+2026-06-12 1.1.6 新增 AppSettingsStore（SharedPreferences），承载自定义指令。
 2026-06-12 1.1.5 新增 SharedIntentBus（replay=1 SharedFlow，分享文本投递），3 单测。
 2026-06-12 1.1.0 新增 TokenUsageFormat.inline：↑输入↓输出+缓存命中，无拆分回退总量，纯函数 5 单测。
 2026-06-12 1.0.98 ChatEditing.removeMessage：按 id 删单条消息，纯函数 2 单测。

@@ -167,6 +167,11 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideAppSettingsStore(@ApplicationContext context: Context): com.nuclearboy.common.AppSettingsStore =
+        com.nuclearboy.common.AppSettingsStore(context)
+
+    @Provides
+    @Singleton
     fun providePcBridgeClient(configStore: PcBridgeConfigStore): PcBridgeClient {
         android.util.Log.e("NuclearBoy", "[DI] providePcBridgeClient")
         return PcBridgeClient(configStore)

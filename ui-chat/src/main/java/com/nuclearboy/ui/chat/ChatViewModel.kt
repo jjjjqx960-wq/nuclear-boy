@@ -56,6 +56,7 @@ class ChatViewModel @Inject constructor(
     private val fileOperations: com.nuclearboy.tools.docgen.FileOperations,
     private val skillManager: com.nuclearboy.skills.SkillManager,
     private val memoryStore: MemoryStore,
+    private val appSettings: com.nuclearboy.common.AppSettingsStore,
 ) : ViewModel() {
 
     // 从记忆加载用户画像
@@ -352,6 +353,7 @@ class ChatViewModel @Inject constructor(
             userProfile = UserProfile(),
             activeSkills = skillManager.activeSkills.value,
             memoryContext = memoryCtxWithGoal,
+            customInstructions = appSettings.customInstructions(),
         )
         android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() projectContext built: project=${projectContext.project?.name} files=${projectContext.currentFiles.size} skills=${projectContext.activeSkills.size}")
 

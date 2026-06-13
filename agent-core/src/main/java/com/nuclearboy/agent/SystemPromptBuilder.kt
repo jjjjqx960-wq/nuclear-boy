@@ -11,6 +11,7 @@ object SystemPromptBuilder {
         currentFiles: List<FileInfo> = emptyList(),
         activeSkills: List<SkillInfo> = emptyList(),
         memoryContext: String = "",
+        customInstructions: String = "",
     ): String {
         android.util.Log.e("NuclearBoy", "[SysPrompt] build() entry hasProject=${project != null} fileCount=${currentFiles.size} skillCount=${activeSkills.size} memoryLen=${memoryContext.length}")
         return buildString {
@@ -190,6 +191,16 @@ object SystemPromptBuilder {
             appendLine("- 用户不知道怎么安装新技能 → 告诉他左侧菜单能看到已激活的 Skills")
             appendLine("- 用户问你做不到的事 → 诚实说做不到，然后给替代方案")
             appendLine()
+
+            // ═══════════════════════════════════════════════
+            // USER CUSTOM INSTRUCTIONS — 用户自定义指令（最高优先级，仅次于安全）
+            // ═══════════════════════════════════════════════
+            val ci = customInstructions.trim()
+            if (ci.isNotEmpty()) {
+                appendLine("【用户自定义指令——请优先遵循以下要求】")
+                appendLine(ci.take(2000))
+                appendLine()
+            }
 
             // ═══════════════════════════════════════════════
             // DYNAMIC SECTIONS
