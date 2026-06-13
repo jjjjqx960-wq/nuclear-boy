@@ -435,7 +435,8 @@ private fun StreamingText(text: String, textColor: Color) {
 @Composable
 private fun RichContentText(content: String, defaultColor: Color) {
     val nuclearColors = NuclearBoyTheme.colorScheme
-    val segments = parseContentForHighlighting(content)
+    // 按内容记忆化：历史消息在列表重组时不再重复解析整段（仅内容变化的流式消息才重算）
+    val segments = remember(content) { parseContentForHighlighting(content) }
 
     Column {
         segments.forEach { segment ->

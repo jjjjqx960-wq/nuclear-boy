@@ -432,8 +432,9 @@ fun ChatScreen(
                             }
                         }
                     }
+                    val lastMessageId = uiState.messages.lastOrNull()?.id
                     items(items = uiState.messages, key = { it.id }) { message ->
-                        val isLast = message.id == uiState.messages.lastOrNull()?.id
+                        val isLast = message.id == lastMessageId
                         val isStreaming = isLast && uiState.streamingState?.isStreaming == true
 
                         MessageBubble(

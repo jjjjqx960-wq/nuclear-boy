@@ -46,12 +46,19 @@ class DeepSeekApiClient(
 
     private val internalProtocolHeader = "X-NuclearBoy-Provider-Protocol"
 
-    private val client: OkHttpClient by lazy {
+    // 底座 client：主 client 与诊断 client 都从它 newBuilder() 派生，
+    // 从而共享同一个 Dispatcher(线程池) 和 ConnectionPool，避免两套独立线程/连接池。
+    private val baseClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
+            .retryOnConnectionFailure(true)
+            .build()
+    }
+
+    private val client: OkHttpClient by lazy {
+        baseClient.newBuilder()
             .connectTimeout(AppConstants.REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(AppConstants.REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(AppConstants.REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
             .addInterceptor { chain ->
                 val apiKey = apiKeyProvider() ?: run {
                     throw IOException("API Key not configured")
@@ -85,11 +92,12 @@ class DeepSeekApiClient(
     }
 
     private val diagnosticClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
+        // 从 baseClient 派生：共享线程池/连接池，但用更短超时、且不带主 client 的鉴权/日志拦截器
+        // （诊断要测任意第三方网关，绝不能自动注入全局 key）
+        baseClient.newBuilder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
             .build()
     }
 
