@@ -46,7 +46,11 @@ class DebugPcBridgeConfigReceiver : BroadcastReceiver() {
         }
         configStore.saveConnection(url, token.takeIf { it.isNotBlank() })
         configStore.setEnabled(enabled)
-        Log.e(TAG, "saved pc bridge url=$url enabled=$enabled hasToken=${token.isNotBlank()} tokenLength=${token.length}")
+        // 可选：开关端到端加密（用于真机验证加密连接）
+        if (intent.hasExtra(EXTRA_ENCRYPT)) {
+            configStore.setEncryptionEnabled(intent.getBooleanExtra(EXTRA_ENCRYPT, false))
+        }
+        Log.e(TAG, "saved pc bridge url=$url enabled=$enabled hasToken=${token.isNotBlank()} tokenLength=${token.length} encrypt=${configStore.isEncryptionEnabled()}")
 
         // 保存后立即测试连接；传了 run_cli/run_prompt 时再实跑一条任务。
         // 结果打到 logcat，便于 ADB 端到端验证
@@ -94,6 +98,7 @@ class DebugPcBridgeConfigReceiver : BroadcastReceiver() {
         const val EXTRA_URL = "url"
         const val EXTRA_TOKEN = "token"
         const val EXTRA_ENABLED = "enabled"
+        const val EXTRA_ENCRYPT = "encrypt"
         const val EXTRA_RUN_CLI = "run_cli"
         const val EXTRA_RUN_PROMPT = "run_prompt"
         const val EXTRA_RUN_SESSION = "run_session"
