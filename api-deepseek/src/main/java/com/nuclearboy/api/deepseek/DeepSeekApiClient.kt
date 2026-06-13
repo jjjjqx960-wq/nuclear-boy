@@ -397,6 +397,7 @@ class DeepSeekApiClient(
             if (response.code == 404 && isInactiveProviderCredentialError(responseBody)) {
                 delay(800)
                 attempts += 1
+                response.close() // 关闭被丢弃的首个响应，避免连接句柄泄漏
                 response = diagnosticClient.newCall(requestBuilder.build()).execute()
                 responseBody = response.body?.string().orEmpty()
             }
@@ -734,7 +735,8 @@ class DeepSeekApiClient(
             requestBuilder.addHeader("x-api-key", key)
         }
 
-        val response = diagnosticClient.newCall(requestBuilder.build()).execute()
+        // .use 关闭响应（多处 return 为内联非局部返回，退出前仍会关闭）
+        return diagnosticClient.newCall(requestBuilder.build()).execute().use { response ->
         val responseBody = response.body?.string().orEmpty()
         val elapsedMs = System.currentTimeMillis() - startedAt
         if (!response.isSuccessful) {
@@ -764,7 +766,7 @@ class DeepSeekApiClient(
             ?.jsonPrimitive
             ?.contentOrNull
             .orEmpty()
-        return AppResult.success(
+        AppResult.success(
             ProviderTestResult(
                 endpoint = endpoint,
                 modelName = parsed["model"]?.jsonPrimitive?.contentOrNull?.ifBlank { modelName } ?: modelName,
@@ -774,6 +776,7 @@ class DeepSeekApiClient(
                 replyPreview = content.take(120),
             )
         )
+        }
     }
 
     // ── Private ────────────────────────────────────────
