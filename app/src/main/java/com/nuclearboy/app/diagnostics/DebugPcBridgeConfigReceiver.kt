@@ -93,6 +93,42 @@ class DebugPcBridgeConfigReceiver : BroadcastReceiver() {
                         is AppResult.Failure -> Log.e(TAG, "fileops list_sessions FAILED ${s.technicalDetail}")
                     }
                 }
+                if (intent.getBooleanExtra(EXTRA_TEST_TERMINAL, false)) {
+                    // 真机验证远程终端（ConPTY）：开终端→等就绪→键入 echo→收输出
+                    val term = com.nuclearboy.remotepc.PcTerminalSession(
+                        url = url, token = token, cmd = "cmd.exe",
+                        encrypted = configStore.isEncryptionEnabled(),
+                    )
+                    val buf = StringBuilder()
+                    val failed = java.util.concurrent.atomic.AtomicReference<String?>(null)
+                    Log.e(TAG, "test terminal start")
+                    kotlinx.coroutines.withTimeoutOrNull(20000) {
+                        kotlinx.coroutines.coroutineScope {
+                            val collector = launch {
+                                var sent = false
+                                term.connect().collect { ev ->
+                                    when (ev) {
+                                        is com.nuclearboy.remotepc.PcTerminalSession.TerminalEvent.Ready -> {
+                                            term.input("echo NBTERM_OK\r"); sent = true
+                                        }
+                                        is com.nuclearboy.remotepc.PcTerminalSession.TerminalEvent.Output ->
+                                            synchronized(buf) { buf.append(ev.data) }
+                                        is com.nuclearboy.remotepc.PcTerminalSession.TerminalEvent.Failed ->
+                                            failed.set(ev.message)
+                                        else -> Unit
+                                    }
+                                }
+                            }
+                            while (failed.get() == null && !synchronized(buf) { buf.contains("NBTERM_OK") }) {
+                                kotlinx.coroutines.delay(150)
+                            }
+                            collector.cancel()
+                        }
+                    }
+                    val got = synchronized(buf) { buf.contains("NBTERM_OK") }
+                    Log.e(TAG, "test terminal ${if (got) "OK" else "FAILED"} sawEcho=$got failed=${failed.get()} outputLen=${buf.length}")
+                    term.close()
+                }
                 if (runCli.isNotBlank() && runPrompt.isNotBlank()) {
                     val runSession = intent.getStringExtra(EXTRA_RUN_SESSION)?.trim().orEmpty()
                     Log.e(TAG, "test run start cli=$runCli promptLen=${runPrompt.length} resume=${runSession.take(8)}")
@@ -120,6 +156,7 @@ class DebugPcBridgeConfigReceiver : BroadcastReceiver() {
         const val EXTRA_ENABLED = "enabled"
         const val EXTRA_ENCRYPT = "encrypt"
         const val EXTRA_TEST_FILEOPS = "test_fileops"
+        const val EXTRA_TEST_TERMINAL = "test_terminal"
         const val EXTRA_RUN_CLI = "run_cli"
         const val EXTRA_RUN_PROMPT = "run_prompt"
         const val EXTRA_RUN_SESSION = "run_session"
