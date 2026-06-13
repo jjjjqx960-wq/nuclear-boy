@@ -136,7 +136,8 @@ class DeepSeekApiClient(
                 )
                 val httpRequest = buildHttpRequest(request)
                 android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() HTTP request sent url=${httpRequest.url} bodySize=${httpRequest.body?.contentLength() ?: -1}")
-                val response = client.newCall(httpRequest).execute()
+                // .use 保证取消/异常/正常返回时都关闭响应体，避免用户按"停止"后 OkHttp 连接泄漏
+                client.newCall(httpRequest).execute().use { response ->
 
                 android.util.Log.e("NuclearBoy", "[ApiClient] HTTP ${response.code} contentLen=${response.body?.contentLength()}")
                 if (!response.isSuccessful) {
@@ -216,6 +217,7 @@ class DeepSeekApiClient(
                 tokenTracker.onRequestComplete(usage)
                 emit(StreamEvent.Complete(usage))
                 return@flow
+                } // end response.use
 
             } catch (e: CancellationException) {
                 throw e
@@ -583,7 +585,8 @@ class DeepSeekApiClient(
                     .build()
                 android.util.Log.e("NuclearBoy", "[ApiClient] streamAnthropicChat() HTTP request sent url=${httpRequest.url} bodySize=${body.length}")
 
-                val response = client.newCall(httpRequest).execute()
+                // .use 保证取消/异常/正常返回时都关闭响应体，避免连接泄漏
+                client.newCall(httpRequest).execute().use { response ->
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string().orEmpty()
                     throw DeepSeekHttpException(
@@ -685,6 +688,7 @@ class DeepSeekApiClient(
                 tokenTracker.onRequestComplete(usage)
                 emit(StreamEvent.Complete(usage))
                 return@flow
+                } // end response.use
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
