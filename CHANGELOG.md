@@ -1,1 +1,1 @@
-2026-06-13 1.1.10 引擎健壮性收尾：① 工具调用连续 20 次仍没完成时，不再静默无回复，给一句友好提示（任务太长先停、拆小再来），用户不会以为卡死；② 余额查询的网络响应补 .use{} 关闭，避免连接句柄泄漏。复核确认上下文裁剪本就在 buildHistoryMessages 按预算生效（之前怀疑的发送超长 payload 是误报）。
+2026-06-13 1.1.11 修好正式（release）构建：之前开启 R8 压缩的正式包根本编译不过（Tink/EncryptedSharedPreferences 引用的 errorprone 注解、KeysDownloader 的可选 Google-http/joda 依赖缺类报错），补全 proguard 规则（dontwarn + keep Tink/zxing/序列化跨模块）后正式包可构建：46M（比 debug 66M 小一截，R8 压缩+资源裁剪生效），真机安装启动无崩溃、能进聊天页（Hilt/序列化/导航在混淆下均正常）。从此可发真正的精简正式版。

@@ -53,3 +53,26 @@
 -keep public class * extends android.app.Activity
 -keep public class * extends android.app.Application
 -keep public class * extends android.app.Service
+
+# ── Tink / EncryptedSharedPreferences（errorprone 是编译期注解，运行期不存在）──
+-dontwarn com.google.errorprone.annotations.**
+-keep class com.google.crypto.tink.** { *; }
+
+# ── ZXing 扫码（远程电脑配对）──
+-keep class com.journeyapps.barcodescanner.** { *; }
+-keep class com.google.zxing.** { *; }
+-dontwarn com.google.zxing.**
+
+# ── kotlinx.serialization：保留所有 @Serializable 的 $$serializer（跨模块）──
+-keepclassmembers @kotlinx.serialization.Serializable class ** {
+    *** Companion;
+    *** INSTANCE;
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep class com.nuclearboy.agent.** { *; }
+-keep class com.nuclearboy.memory.** { *; }
+-keep class com.nuclearboy.remotepc.** { *; }
+
+# Tink KeysDownloader 的可选依赖（EncryptedSharedPreferences 不用，运行期不存在）
+-dontwarn com.google.api.client.**
+-dontwarn org.joda.time.**
