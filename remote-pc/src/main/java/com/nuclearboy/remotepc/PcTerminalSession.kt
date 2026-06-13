@@ -37,9 +37,8 @@ class PcTerminalSession(
 
     private fun plainOf(text: String): String? {
         val key = cryptoKey ?: return text
-        return runCatching {
-            PcCrypto.decrypt(key, text.substringAfter(""""enc":"""").substringBeforeLast("\""))
-        }.getOrNull()
+        val enc = PcBridgeProtocol.extractEnc(text) ?: return null
+        return runCatching { PcCrypto.decrypt(key, enc) }.getOrNull()
     }
 
     private val httpClient = OkHttpClient.Builder()

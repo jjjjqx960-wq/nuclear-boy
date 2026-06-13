@@ -151,12 +151,24 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
         val w = CharWidth.of(ch)
         if (w == 0) return // 组合记号：MVP 暂不并入前一格，直接丢弃避免错位
         if (col + w > cols) { col = 0; lineFeed() } // 宽字符放不下则换行
+        clearWideCharAt(col)                // 覆盖宽字符的首格 → 清掉它的续格
+        if (w == 2 && col + 1 < cols) clearWideCharAt(col + 1) // 占用的续格位若是别的宽字符 → 清其首格
         grid[row][col] = Cell(ch, curFg, curBold)
         if (w == 2) {
             if (col + 1 < cols) grid[row][col + 1] = Cell(' ', curFg, curBold, continuation = true)
         }
         col += w
         if (col > cols) col = cols
+    }
+
+    /** 写入前清理被破坏的宽字符残影：若目标是续格则清其首格，反之清其续格，避免错位。 */
+    private fun clearWideCharAt(c: Int) {
+        val line = grid[row]
+        val cell = line[c]
+        if (cell.continuation && c - 1 >= 0) line[c - 1] = Cell()         // 落在续格上 → 清掉首格
+        if (!cell.continuation && cell.ch != ' ' && c + 1 < cols && line[c + 1].continuation) {
+            line[c + 1] = Cell()                                          // 是某宽字符首格 → 清掉续格
+        }
     }
 
     private fun lineFeed() {
@@ -236,12 +248,17 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24) {
 
     fun resize(newCols: Int, newRows: Int) {
         val c = newCols.coerceAtLeast(1); val r = newRows.coerceAtLeast(1)
-        val ng = newGrid(r, c)
-        for (rr in 0 until minOf(r, rows)) for (cc in 0 until minOf(c, cols)) ng[rr][cc] = grid[rr][cc]
-        grid = ng; cols = c; rows = r
+        fun resized(old: Array<Array<Cell>>): Array<Array<Cell>> {
+            val ng = newGrid(r, c)
+            for (rr in 0 until minOf(r, old.size)) for (cc in 0 until minOf(c, old[rr].size)) ng[rr][cc] = old[rr][cc]
+            return ng
+        }
+        grid = resized(grid)
+        // 在备用屏(TUI 全屏)中改大小时，保存的主屏缓冲也要一并 resize，退出 TUI 才能正确还原
+        altGrid = altGrid?.let { resized(it) }
+        cols = c; rows = r
         scrollTop = 0; scrollBottom = r - 1
         row = row.coerceAtMost(r - 1); col = col.coerceAtMost(c - 1)
-        altGrid = null
     }
 
     /** 包含回滚历史的完整渲染（普通缓冲时 = 历史 + 当前屏；备用屏时只当前屏）。 */

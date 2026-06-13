@@ -165,6 +165,25 @@ class TerminalEmulatorTest {
     }
 
     @Test
+    fun `resize during alt buffer preserves main screen for restore`() {
+        val e = TerminalEmulator(20, 3)
+        e.feed("main content")
+        e.feed("${esc}[?1049h${esc}[2JTUI")  // 进备用屏
+        e.resize(40, 6)                       // 在 TUI 里改大小
+        e.feed("${esc}[?1049l")               // 退出 → 应还原主屏
+        assertEquals("main content", line(e, 0))
+    }
+
+    @Test
+    fun `narrow char overwriting wide char clears its continuation`() {
+        val e = TerminalEmulator(20, 2)
+        e.feed("${0x4E2D.toChar()}${0x6587.toChar()}") // "中文"
+        e.feed("${esc}[1;1HAB")  // 用 AB 覆盖"中"(占2格)
+        // 不应残留续格导致错位：第一行应是 "AB文"
+        assertEquals("AB${0x6587.toChar()}", e.renderText().split("\n")[0])
+    }
+
+    @Test
     fun `ignores OSC title sequence`() {
         val e = TerminalEmulator(20, 2)
         e.feed("${esc}]0;my title${7.toChar()}done")

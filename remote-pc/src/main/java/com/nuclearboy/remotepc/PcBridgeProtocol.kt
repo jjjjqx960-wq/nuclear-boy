@@ -322,4 +322,11 @@ object PcBridgeProtocol {
 
     private fun JsonObject.stringOrEmpty(key: String): String =
         this[key]?.jsonPrimitive?.content ?: ""
+
+    /** 从加密信封 {"enc":"<base64>"} 里用 JSON 解析取出密文；非信封/非法返回 null。 */
+    fun extractEnc(raw: String): String? = try {
+        json.parseToJsonElement(raw).jsonObject["enc"]?.jsonPrimitive?.content
+    } catch (e: Exception) {
+        null
+    }
 }

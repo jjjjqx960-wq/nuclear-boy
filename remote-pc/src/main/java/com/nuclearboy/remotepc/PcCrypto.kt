@@ -17,6 +17,7 @@ object PcCrypto {
 
     private const val NONCE_BYTES = 12
     private const val TAG_BITS = 128
+    private val secureRandom = java.security.SecureRandom()
 
     /** token → 32 字节 AES-256 密钥。 */
     fun deriveKey(token: String): ByteArray =
@@ -46,7 +47,7 @@ object PcCrypto {
 
     private fun randomNonce(): ByteArray {
         val n = ByteArray(NONCE_BYTES)
-        java.security.SecureRandom().nextBytes(n)
+        secureRandom.nextBytes(n)
         return n
     }
 }

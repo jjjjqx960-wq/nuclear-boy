@@ -1,3 +1,4 @@
+2026-06-12 1.1.1 质量加固：TerminalEmulator.resize 同步 resize altGrid（修 TUI 改大小退出花屏）+ putChar.clearWideCharAt 清宽字符残留续格；server.py _EncryptedWs.recv 非法帧转 ConnectionClosed；PcBridgeProtocol.extractEnc 正规 JSON 解析替换 substring（PcBridgeClient/PcTerminalSession 共用）；PcCrypto SecureRandom 单例。TerminalEmulatorTest +2。
 2026-06-12 1.0.94 会话列表：协议加 list_sessions 出站与 SessionsList 入站（SessionInfo）；PcBridgeClient.listSessions。PcBridgeProtocolTest +2 例。
 2026-06-12 1.0.93 增量同步：Output 加 seq、get_result 加 sinceSeq；runCliTask 跟踪 maxSeq、重连请求 sinceSeq=maxSeq+1 并按 seq 去重。PcBridgeProtocolTest +3 例（seq 解析、缺省回退、sinceSeq 编码）。
 2026-06-12 1.0.92 通道加密：新增 PcCrypto（SHA-256 派生密钥 + AES-256-GCM，java.util.Base64）；PcBridgeClient/PcTerminalSession 开启加密时握手发 {"type":"auth"} 信封、收发走 envelope/解密；配置加 isEncryptionEnabled/setEncryptionEnabled + PcBridgeConfig.encrypted。PcCryptoTest 6 例（含与 Python 字节级一致的固定向量）。

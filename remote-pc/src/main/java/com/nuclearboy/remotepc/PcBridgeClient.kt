@@ -389,10 +389,6 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
 
     private class BridgeClosedException(message: String) : Exception(message)
 
-    /** 从 {"enc":"<base64>"} 信封里取出密文 base64。 */
-    private fun extractEnc(raw: String): String =
-        raw.substringAfter(""""enc":"""").substringBeforeLast("\"")
-
     private suspend fun openWebSocket(
         url: String,
         inbox: Channel<PcBridgeProtocol.Inbound>,
@@ -405,9 +401,10 @@ class PcBridgeClient(private val configStore: PcBridgeConfigStore) {
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                // 加密会话：先解出明文再解析；解密失败（密钥不符/篡改）丢弃
+                // 加密会话：JSON 取出密文再解密；非信封/解密失败（密钥不符/篡改）丢弃
                 val plain = if (cryptoKey != null) {
-                    runCatching { PcCrypto.decrypt(cryptoKey, extractEnc(text)) }.getOrNull() ?: return
+                    val enc = PcBridgeProtocol.extractEnc(text) ?: return
+                    runCatching { PcCrypto.decrypt(cryptoKey, enc) }.getOrNull() ?: return
                 } else text
                 PcBridgeProtocol.parseInbound(plain)?.let { inbox.trySend(it) }
             }
