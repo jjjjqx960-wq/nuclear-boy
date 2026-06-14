@@ -308,6 +308,7 @@ class AgentEngine(
             val responseContent = StringBuilder()
             val reasoningContent = StringBuilder()
             var toolCallsDetected = false
+            var toolProtocolUnavailable = false
 
             emit(AgentEvent.Thinking(if (iteration == 1) "正在思考…" else "继续处理…"))
 
@@ -329,6 +330,9 @@ class AgentEngine(
                 streamResult.collect { streamEvent ->
                     when (streamEvent) {
                         is StreamEvent.Thinking -> {
+                            if (streamEvent.message.contains("兼容聊天模式")) {
+                                toolProtocolUnavailable = true
+                            }
                             emit(AgentEvent.Thinking(streamEvent.message))
                         }
                         is StreamEvent.Content -> {
@@ -474,10 +478,15 @@ class AgentEngine(
                 }
 
                 // No tool calls detected → this is the final response
-                android.util.Log.e("NuclearBoy", "[AgentEngine] run() final response reached, responseLen=${responseContent.length} reasoningLen=${reasoningContent.length}")
+                val finalContent = buildFinalContent(
+                    userMessage = userMessage,
+                    responseContent = responseContent.toString(),
+                    toolProtocolUnavailable = toolProtocolUnavailable,
+                )
+                android.util.Log.e("NuclearBoy", "[AgentEngine] run() final response reached, responseLen=${responseContent.length} finalLen=${finalContent.length} reasoningLen=${reasoningContent.length} toolProtocolUnavailable=$toolProtocolUnavailable")
                 finalResponse = ChatMessage(
                     role = MessageRole.ASSISTANT,
-                    content = responseContent.toString(),
+                    content = finalContent,
                     reasoningContent = reasoningContent.toString().ifEmpty { null },
                     status = MessageStatus.COMPLETE,
                     tokenUsage = TokenUsage(
@@ -544,6 +553,40 @@ class AgentEngine(
         android.util.Log.e("NuclearBoy", "[AgentEngine] run() EXIT requests=${stats.requestCount} prompt=${stats.totalPromptTokens} completion=${stats.totalCompletionTokens} cost=${stats.totalCostUsd} elapsedMs=$totalElapsedMs")
         emit(AgentEvent.Complete(stats))
     }.flowOn(Dispatchers.IO)
+
+    private fun buildFinalContent(
+        userMessage: String,
+        responseContent: String,
+        toolProtocolUnavailable: Boolean,
+    ): String {
+        if (!toolProtocolUnavailable) return responseContent
+        if (!shouldBlockCompatibilityToolClaim(userMessage, responseContent)) return responseContent
+        return "工具受限，未真实执行。当前第三方网关不支持工具调用协议，本轮不能读取、写入、运行或测试；请切换支持工具调用的模型/网关后重试。"
+    }
+
+    private fun shouldBlockCompatibilityToolClaim(
+        userMessage: String,
+        responseContent: String,
+    ): Boolean {
+        if (responseContent.contains("[TOOL_CALL]", ignoreCase = true)) return true
+        val lowerUser = userMessage.lowercase()
+        return listOf(
+            "read_file",
+            "write_file",
+            "list_directory",
+            "run_python",
+            "工具",
+            "读取",
+            "写入",
+            "创建",
+            "文件",
+            "执行",
+            "运行",
+            "测试",
+            "验证",
+            "真实调用",
+        ).any { lowerUser.contains(it) }
+    }
 
     /** 工具输出超长则截断，保留首部并标注被截字符数，避免单条结果撑爆 payload。 */
     private fun capToolOutput(text: String): String {

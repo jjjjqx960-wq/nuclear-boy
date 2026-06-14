@@ -1,3 +1,5 @@
+2026-06-14 1.1.26 自定义网关兼容降级时追加最后一条工具受限提醒，禁止模型输出 `[TOOL_CALL]` 文本模拟工具调用。
+2026-06-14 1.1.26 自定义网关兼容降级时注入工具不可用限制，保留历史工具结果但禁止模型伪造新的读写、执行或测试成功。
 2026-06-14 1.1.23 DeepSeekApiClient 新增 testCustomProviderFormalChat，支持 OpenAI/Anthropic 正式 stream 探测、工具定义兼容检查和脱敏错误详情。
 2026-06-14 1.1.23 目录规则补充第三方 SSE/JSON 可选块必须空安全解析，避免诊断解析器假设字段存在。
 2026-06-12 1.0.70 sanitizeChatMessagesForProvider 对官方 DeepSeek 也剥离 reasoning_content，多轮思考模式不再触发 400。

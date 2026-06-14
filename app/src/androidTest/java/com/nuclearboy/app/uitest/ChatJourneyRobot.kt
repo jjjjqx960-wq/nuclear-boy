@@ -314,7 +314,9 @@ class ChatJourneyRobot {
             "空回复",
         )
         private val selfReportedProblems = listOf(
-            "有问题",
+            "上下文有问题",
+            "工具结果有问题",
+            "存在问题",
             "误报",
             "存在不一致",
             "自相矛盾",

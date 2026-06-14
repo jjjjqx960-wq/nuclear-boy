@@ -1708,7 +1708,7 @@ internal fun sanitizeChatMessagesForProvider(
     isCustomProvider: Boolean,
     omitToolProtocol: Boolean,
 ): List<MessageDto> {
-    return messages.mapNotNull { message ->
+    val sanitizedMessages = messages.mapNotNull { message ->
         if (omitToolProtocol && message.role == "tool") {
             val toolName = message.name?.takeIf { it.isNotBlank() } ?: "unknown_tool"
             return@mapNotNull MessageDto(
@@ -1732,6 +1732,41 @@ internal fun sanitizeChatMessagesForProvider(
             sanitized.toolCalls.isNullOrEmpty()
         if (becameEmptyAssistant) null else sanitized
     }
+    return if (omitToolProtocol) {
+        sanitizedMessages.withCompatibilityToolLimitNotice()
+    } else {
+        sanitizedMessages
+    }
+}
+
+internal const val COMPATIBILITY_TOOL_LIMIT_NOTICE =
+    "【兼容聊天模式限制】当前第三方网关本轮没有可用工具调用协议，不能调用 read_file、write_file、list_directory、run_python 等工具。" +
+        "只能基于用户输入和此前明确标为“工具结果”的文本继续回答；不得编造工具输出，不得声称已经读取、写入、执行、安装、测试或验证文件。" +
+        "如果用户要求新的读写、执行或测试，必须明确说明当前网关不支持工具调用，尚未真实执行，并建议切换支持工具调用的模型/网关或让用户提供文件内容。"
+
+internal const val COMPATIBILITY_TOOL_FINAL_NOTICE =
+    "工具兼容降级提醒：你现在没有真实工具调用能力。不要输出 [TOOL_CALL]、伪代码块或模拟工具结果；" +
+        "如果当前用户要求读取、写入、执行、测试或验证，只能回答工具受限且尚未真实执行。"
+
+private fun List<MessageDto>.withCompatibilityToolLimitNotice(): List<MessageDto> {
+    val firstSystemIndex = indexOfFirst { it.role == "system" }
+    if (firstSystemIndex >= 0) {
+        return mapIndexed { index, message ->
+            if (index == firstSystemIndex) {
+                message.copy(
+                    content = listOfNotNull(
+                        message.content?.takeIf { it.isNotBlank() },
+                        COMPATIBILITY_TOOL_LIMIT_NOTICE,
+                    ).joinToString("\n\n"),
+                )
+            } else {
+                message
+            }
+        } + MessageDto(role = "user", content = COMPATIBILITY_TOOL_FINAL_NOTICE)
+    }
+    return listOf(MessageDto(role = "system", content = COMPATIBILITY_TOOL_LIMIT_NOTICE)) +
+        this +
+        MessageDto(role = "user", content = COMPATIBILITY_TOOL_FINAL_NOTICE)
 }
 
 data class ProviderTestResult(

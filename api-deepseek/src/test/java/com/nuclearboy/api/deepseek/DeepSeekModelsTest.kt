@@ -120,15 +120,39 @@ class DeepSeekModelsTest {
             omitToolProtocol = true,
         )
 
+        assertEquals(5, sanitized.size)
+        assertEquals(listOf("system", "user", "assistant", "user", "user"), sanitized.map { it.role })
+        assertTrue(sanitized[0].content.orEmpty().contains("不能调用 read_file"))
+        assertTrue(sanitized[0].content.orEmpty().contains("不得编造工具输出"))
+        assertEquals("Visible", sanitized[2].content)
+        assertNull(sanitized[2].reasoningContent)
+        assertNull(sanitized[2].toolCalls)
+        assertTrue(sanitized[3].content.orEmpty().contains("read_file"))
+        assertTrue(sanitized[3].content.orEmpty().contains("file content"))
+        assertNull(sanitized[3].toolCallId)
+        assertNull(sanitized[3].name)
+        assertTrue(sanitized[4].content.orEmpty().contains("不要输出 [TOOL_CALL]"))
+        assertTrue(sanitized[4].content.orEmpty().contains("工具受限"))
+    }
+
+    @Test
+    fun `custom provider compatibility mode appends tool limit notice to existing system prompt`() {
+        val sanitized = sanitizeChatMessagesForProvider(
+            messages = listOf(
+                MessageDto(role = "system", content = "base prompt"),
+                MessageDto(role = "user", content = "write a file"),
+            ),
+            isCustomProvider = true,
+            omitToolProtocol = true,
+        )
+
         assertEquals(3, sanitized.size)
-        assertEquals(listOf("user", "assistant", "user"), sanitized.map { it.role })
-        assertEquals("Visible", sanitized[1].content)
-        assertNull(sanitized[1].reasoningContent)
-        assertNull(sanitized[1].toolCalls)
-        assertTrue(sanitized[2].content.orEmpty().contains("read_file"))
-        assertTrue(sanitized[2].content.orEmpty().contains("file content"))
-        assertNull(sanitized[2].toolCallId)
-        assertNull(sanitized[2].name)
+        assertEquals("system", sanitized[0].role)
+        assertTrue(sanitized[0].content.orEmpty().startsWith("base prompt"))
+        assertTrue(sanitized[0].content.orEmpty().contains("当前第三方网关本轮没有可用工具调用协议"))
+        assertTrue(sanitized[0].content.orEmpty().contains("尚未真实执行"))
+        assertEquals("user", sanitized[2].role)
+        assertTrue(sanitized[2].content.orEmpty().contains("尚未真实执行"))
     }
 
     @Test

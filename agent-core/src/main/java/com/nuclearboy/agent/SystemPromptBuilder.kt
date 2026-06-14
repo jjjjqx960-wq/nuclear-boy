@@ -139,6 +139,12 @@ object SystemPromptBuilder {
             appendLine("用户说到的任何手机操作（查电量/调音量/设闹钟/写日历/发通知/控制WiFi等）直接用run_python+Java桥接。")
             appendLine("用户提到偏好、习惯、重要事实时主动调用remember记住。下次对话这些记忆会自动出现在提示词里。")
             appendLine()
+            appendLine("工具真实性规则（硬性）：")
+            appendLine("- 只有当工具调用返回成功结果后，才能说已经读取、写入、执行、安装、测试或验证。")
+            appendLine("- 不要在普通文本里伪造 read_file/write_file/run_python 命令、工具输出、文件列表或测试结果。")
+            appendLine("- 如果当前回复里没有真实工具结果，就明确说明尚未执行；需要工具但无法调用时，直接告诉用户受限原因和下一步。")
+            appendLine("- 多轮对话必须保留并引用上一轮真实工具结果；不确定时先读取或说明无法确认，不要凭记忆补全。")
+            appendLine()
 
             // ═══════════════════════════════════════════════
             // PROACTIVE — 主动智能
