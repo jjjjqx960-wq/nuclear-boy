@@ -1,6 +1,6 @@
 # NUCLEAR BOY (核弹男孩)
 
-> 温暖、智能、人性化的移动端 AI 编程助手 · v1.1.23
+> 温暖、智能、人性化的移动端 AI 编程助手 · v1.1.24
 
 把一个能写代码、控手机、还能**远程操控电脑上 Claude Code / Codex / OpenCode** 的 AI 助手装进口袋。
 
@@ -56,11 +56,11 @@
 
 或直接到 [Releases](https://github.com/jjjjqx960-wq/nuclear-boy/releases) 下载 APK。
 
-## 1.1.23 重点
+## 1.1.24 重点
 
-- 第三方模型“测试聊天”升级为两阶段：先轻量 ping，再用同一配置验证正式 stream=true 聊天链路。
-- 正式测试会携带诊断工具定义，能提前暴露“ping 成功但聊天页/Agent 路径失败”的网关兼容问题。
-- 测试排障包同时复制轻量请求和正式 stream 请求模板，继续保持 Key 脱敏。
+- 新增 `ccswitch-prompts/` 仓库级提示词目录，方便在 CC Switch 中统一同步 Claude Code 与 Codex 的项目规则。
+- 提示词整合分层架构、敏感信息脱敏、真实用户旅程验证和第三方模型真实聊天链路检查要求。
+- App 版本同步到 `1.1.24 / versionCode 134`，方便真机与 Release 对齐。
 
 ## 远程电脑使用指南
 
