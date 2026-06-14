@@ -57,6 +57,23 @@ class ToolActionDraftHintTest {
         assertNull(evidence)
     }
 
+    @Test
+    fun buildModelGuardForToolRequest() {
+        val guard = buildToolActionModelGuard("请创建文件 demo.md 并运行测试")
+
+        assertNotNull(guard)
+        assertTrue(guard.orEmpty().contains("本轮工具真实性约束"))
+        assertTrue(guard.orEmpty().contains("工具受限，未真实执行"))
+        assertTrue(guard.orEmpty().contains("不得声称已经读取、写入、运行"))
+    }
+
+    @Test
+    fun skipModelGuardForOrdinaryChat() {
+        val guard = buildToolActionModelGuard("帮我写一个睡前故事")
+
+        assertNull(guard)
+    }
+
     private fun String.countOccurrences(needle: String): Int =
         split(needle).size - 1
 }

@@ -14,6 +14,7 @@ import com.nuclearboy.common.AppConstants
 import com.nuclearboy.common.AppResult
 import com.nuclearboy.memory.MemoryStore
 import com.nuclearboy.ui.chat.parts.buildToolActionEvidenceMessage
+import com.nuclearboy.ui.chat.parts.buildToolActionModelGuard
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -297,6 +298,7 @@ class ChatViewModel @Inject constructor(
         val toolEvidenceMessage = buildToolActionEvidenceMessage(trimmed)?.let { evidence ->
             ChatMessage(role = MessageRole.SYSTEM, content = evidence, status = MessageStatus.COMPLETE)
         }
+        val toolModelGuard = buildToolActionModelGuard(trimmed)
         // Check API key
         val key = apiKeyManager.getActiveKey()
         android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() credential status: configured=${key != null} blank=${key?.isBlank() == true}")
@@ -363,7 +365,10 @@ class ChatViewModel @Inject constructor(
             userProfile = UserProfile(),
             activeSkills = skillManager.activeSkills.value,
             memoryContext = memoryCtxWithGoal,
-            customInstructions = appSettings.customInstructions(),
+            customInstructions = buildTurnCustomInstructions(
+                base = appSettings.customInstructions(),
+                turnGuard = toolModelGuard,
+            ),
         )
         android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() projectContext built: project=${projectContext.project?.name} files=${projectContext.currentFiles.size} skills=${projectContext.activeSkills.size}")
 
@@ -752,6 +757,16 @@ class ChatViewModel @Inject constructor(
             it + ChatMessage(role = MessageRole.SYSTEM, content = text, status = MessageStatus.COMPLETE)
         }
         _scrollToBottom.value++
+    }
+
+    private fun buildTurnCustomInstructions(base: String, turnGuard: String?): String = buildString {
+        val baseTrimmed = base.trim()
+        if (baseTrimmed.isNotEmpty()) append(baseTrimmed)
+        val guardTrimmed = turnGuard?.trim().orEmpty()
+        if (guardTrimmed.isNotEmpty()) {
+            if (isNotEmpty()) append("\n\n")
+            append(guardTrimmed)
+        }
     }
 
     private fun goalFile(projectId: String = currentProjectId ?: "__general__"): java.io.File =

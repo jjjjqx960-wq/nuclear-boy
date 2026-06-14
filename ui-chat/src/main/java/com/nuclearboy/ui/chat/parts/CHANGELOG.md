@@ -1,3 +1,4 @@
+2026-06-14 1.1.31 ToolActionDraftHint 新增 buildToolActionModelGuard，供发送链路向模型注入本轮工具真实性约束。
 2026-06-14 1.1.30 ToolActionDraftHint 新增工具型发送证据提示文案生成，提示回看时以工具卡、文件变更卡或明确工具受限为准。
 2026-06-14 1.1.29 ToolActionDraftHint 新增 appendToolRealityGuard，去重追加防假执行约束，避免提示词重复膨胀。
 2026-06-14 1.1.28 新增 ToolActionDraftHint 纯函数，识别读写文件、运行命令和验证项目类草稿并生成发送前工具能力预警。

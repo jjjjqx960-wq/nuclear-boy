@@ -45,6 +45,17 @@ fun buildToolActionEvidenceMessage(text: String): String? {
     return "本轮工具能力提示：${hint.summary}\n回看时请以可见工具执行卡、文件变更卡或明确的“工具受限，未真实执行”为准；没有这些证据就不要当作已完成。"
 }
 
+fun buildToolActionModelGuard(text: String): String? {
+    val hint = detectToolActionDraftHint(text) ?: return null
+    return """
+        【本轮工具真实性约束】
+        用户这轮请求已命中工具型任务风险：${hint.summary}
+        如果你没有通过真实工具调用拿到成功结果，不得声称已经读取、写入、运行、安装、测试或验证。
+        没有工具结果时必须明确写：工具受限，未真实执行；然后给出下一步需要的真实操作。
+        如果工具已成功执行，回复必须引用可见工具结果、文件变更或验证结果。
+    """.trimIndent()
+}
+
 private fun hasRealityGuard(text: String): Boolean =
     realityGuardMarkers.any { text.contains(it, ignoreCase = true) }
 
