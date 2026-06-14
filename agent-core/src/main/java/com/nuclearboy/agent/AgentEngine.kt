@@ -166,9 +166,6 @@ class AgentEngine(
     @Volatile private var scopeJob = SupervisorJob()
     private val scope get() = CoroutineScope(scopeJob + Dispatchers.IO)
 
-    /** Maximum consecutive retryable API errors before surfacing an error to the user. */
-    private val maxConsecutiveRetryableErrors = 3
-
     /** 单个工具结果注入对话的最大字符数；超出截断（读大文件/长目录列表的主要膨胀源）。 */
     private val maxToolOutputChars = 12_000
 
@@ -284,8 +281,8 @@ class AgentEngine(
         var iteration = 0
         var finalResponse: ChatMessage? = null
         var contextTrimNotified = false
-        var consecutiveRetryableErrors = 0
         val toolCallLoopGuard = ToolCallLoopGuard()
+        val retryableErrorGate = RetryableErrorGate()
 
         while (finalResponse == null && currentCoroutineContext().isActive) {
             iteration++
@@ -376,7 +373,7 @@ class AgentEngine(
                 }
 
                 android.util.Log.e("NuclearBoy", "[AgentEngine] run() stream finished iteration=$iteration contentEvents=$contentEventCount responseLen=${responseContent.length} reasoningLen=${reasoningContent.length} toolCallsDetected=$toolCallsDetected iterTimeMs=${System.currentTimeMillis() - iterStartMs}")
-                consecutiveRetryableErrors = 0
+                retryableErrorGate.onSuccessfulApiRound()
 
                 // After the stream completes, check for tool calls
                 if (toolCallsDetected && accumulator.hasPartialCalls()) {
@@ -513,18 +510,19 @@ class AgentEngine(
             } catch (e: Exception) {
                 val appError = classifyException(e)
                 android.util.Log.e("NuclearBoy", "[AgentEngine] run() Exception caught iteration=$iteration type=${e.javaClass.simpleName} message=${e.message} appError=${appError} isRetryable=${appError.isRetryable}")
-                emit(AgentEvent.Error(appError, e.message))
 
-                // Retry transient API errors briefly, but do not impose a fixed tool-call iteration cap.
-                if (appError.isRetryable && consecutiveRetryableErrors < maxConsecutiveRetryableErrors) {
-                    consecutiveRetryableErrors++
-                    android.util.Log.e("NuclearBoy", "[AgentEngine] run() retrying attempt=$consecutiveRetryableErrors/$maxConsecutiveRetryableErrors iteration=$iteration reason=${appError.humanMessage}")
-                    emit(AgentEvent.Retrying(consecutiveRetryableErrors, appError.humanMessage))
-                    delay(1000)
-                    continue
+                when (val decision = retryableErrorGate.classify(appError)) {
+                    is RetryDecision.Retry -> {
+                        android.util.Log.e("NuclearBoy", "[AgentEngine] run() retrying attempt=${decision.attempt}/${decision.maxAttempts} iteration=$iteration reason=${appError.humanMessage}")
+                        emit(AgentEvent.Retrying(decision.attempt, appError.humanMessage))
+                        delay(1000)
+                        continue
+                    }
+                    RetryDecision.FinalError -> Unit
                 }
 
                 android.util.Log.e("NuclearBoy", "[AgentEngine] run() non-retryable error, breaking loop")
+                emit(AgentEvent.Error(appError, e.message))
                 finalResponse = ChatMessage(
                     role = MessageRole.ASSISTANT,
                     content = "抱歉，处理过程中遇到了问题：${appError.humanMessage}",
