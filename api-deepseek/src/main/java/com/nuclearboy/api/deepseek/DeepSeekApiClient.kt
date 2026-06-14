@@ -158,6 +158,7 @@ class DeepSeekApiClient(
                         code = response.code,
                         message = errorResponse?.error?.message ?: "HTTP ${response.code}",
                         errorType = errorResponse?.error?.type,
+                        retryAfterMillis = parseRetryAfterMillis(response.header("retry-after")),
                     )
                 }
 
@@ -233,16 +234,16 @@ class DeepSeekApiClient(
                 lastException = e
                 val appError = classifyError(e)
                 android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() error retryCount=$retryCount maxRetries=${AppConstants.MAX_RETRIES} appError=$appError isRetryable=${appError.isRetryable}")
-                if (
-                    isCustomProvider &&
-                    !providerCompatibilityMode &&
-                    !tools.isNullOrEmpty() &&
-                    e is DeepSeekHttpException &&
-                    e.code in CUSTOM_PROVIDER_COMPATIBILITY_HTTP_CODES
-                ) {
+                if (shouldFallbackCustomProviderTools(
+                    isCustomProvider = isCustomProvider,
+                    providerCompatibilityMode = providerCompatibilityMode,
+                    toolsPresent = !tools.isNullOrEmpty(),
+                    exception = e,
+                    retryCount = retryCount,
+                )) {
                     providerCompatibilityMode = true
-                    android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() custom provider rejected tool format; retrying without tools")
-                    emit(StreamEvent.Thinking("当前网关不接受工具调用格式，已切换兼容聊天模式重试…"))
+                    android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() custom provider tool request failed; retrying without tool protocol")
+                    emit(StreamEvent.Thinking("当前网关在工具调用下持续失败，已切换兼容聊天模式重试…"))
                     continue
                 }
                 if (!appError.isRetryable || retryCount >= AppConstants.MAX_RETRIES) {
@@ -251,9 +252,9 @@ class DeepSeekApiClient(
                     return@flow
                 }
                 retryCount++
-                val delayMs = AppConstants.RETRY_BASE_DELAY_MS * (1 shl (retryCount - 1)) + random.nextInt(500).toLong()
+                val delayMs = retryDelayMillis(retryCount, e)
                 android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() retrying attempt=$retryCount delayMs=$delayMs")
-                emit(StreamEvent.Thinking("重试第 ${retryCount} 次…"))
+                emit(StreamEvent.Thinking("重试第 ${retryCount} 次，约 ${(delayMs + 999) / 1000} 秒…"))
                 delay(delayMs)
             }
         }
@@ -681,6 +682,7 @@ class DeepSeekApiClient(
                         code = response.code,
                         message = parseProviderErrorMessage(errorBody) ?: "HTTP ${response.code}",
                         errorType = null,
+                        retryAfterMillis = parseRetryAfterMillis(response.header("retry-after")),
                     )
                 }
 
@@ -788,8 +790,8 @@ class DeepSeekApiClient(
                     return@flow
                 }
                 retryCount++
-                val delayMs = AppConstants.RETRY_BASE_DELAY_MS * (1 shl (retryCount - 1)) + random.nextInt(500).toLong()
-                emit(StreamEvent.Thinking("重试第 ${retryCount} 次…"))
+                val delayMs = retryDelayMillis(retryCount, e)
+                emit(StreamEvent.Thinking("重试第 ${retryCount} 次，约 ${(delayMs + 999) / 1000} 秒…"))
                 delay(delayMs)
             }
         }
@@ -1537,6 +1539,13 @@ class DeepSeekApiClient(
         return result
     }
 
+    private fun retryDelayMillis(attempt: Int, exception: Exception): Long {
+        val exponentialMs = AppConstants.RETRY_BASE_DELAY_MS * (1 shl (attempt - 1))
+        val retryAfterMs = (exception as? DeepSeekHttpException)?.retryAfterMillis ?: 0L
+        val boundedRetryAfterMs = retryAfterMs.coerceAtMost(MAX_RETRY_AFTER_DELAY_MS)
+        return maxOf(exponentialMs, boundedRetryAfterMs) + random.nextInt(500).toLong()
+    }
+
     private fun estimatePromptTokens(messages: List<MessageDto>): Long {
         val totalChars = messages.sumOf { (it.content?.length ?: 0) + (it.reasoningContent?.length ?: 0) }
         val result = totalChars / 3L
@@ -1557,6 +1566,15 @@ class DeepSeekApiClient(
     }
 
     companion object {
+        internal const val MAX_RETRY_AFTER_DELAY_MS = 30_000L
+
+        internal fun parseRetryAfterMillis(raw: String?): Long? {
+            val seconds = raw?.trim()?.toLongOrNull() ?: return null
+            return seconds
+                .takeIf { it >= 0L }
+                ?.times(1000L)
+        }
+
         fun normalizeOpenAiBaseUrl(
             raw: String,
             endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
@@ -1670,6 +1688,20 @@ class DeepSeekApiClient(
 // ── Supporting Types ──────────────────────────────────
 
 internal val CUSTOM_PROVIDER_COMPATIBILITY_HTTP_CODES = setOf(400, 404, 422)
+internal val CUSTOM_PROVIDER_TOOL_RETRY_FALLBACK_HTTP_CODES = setOf(500, 502, 503, 504)
+
+internal fun shouldFallbackCustomProviderTools(
+    isCustomProvider: Boolean,
+    providerCompatibilityMode: Boolean,
+    toolsPresent: Boolean,
+    exception: Exception,
+    retryCount: Int,
+): Boolean {
+    if (!isCustomProvider || providerCompatibilityMode || !toolsPresent) return false
+    val httpException = exception as? DeepSeekHttpException ?: return false
+    if (httpException.code in CUSTOM_PROVIDER_COMPATIBILITY_HTTP_CODES) return true
+    return retryCount >= 1 && httpException.code in CUSTOM_PROVIDER_TOOL_RETRY_FALLBACK_HTTP_CODES
+}
 
 internal fun sanitizeChatMessagesForProvider(
     messages: List<MessageDto>,
@@ -1678,7 +1710,11 @@ internal fun sanitizeChatMessagesForProvider(
 ): List<MessageDto> {
     return messages.mapNotNull { message ->
         if (omitToolProtocol && message.role == "tool") {
-            return@mapNotNull null
+            val toolName = message.name?.takeIf { it.isNotBlank() } ?: "unknown_tool"
+            return@mapNotNull MessageDto(
+                role = "user",
+                content = "工具结果（$toolName）：\n${message.content.orEmpty()}",
+            )
         }
 
         val sanitized = message.copy(
@@ -1741,4 +1777,5 @@ class DeepSeekHttpException(
     val code: Int,
     message: String,
     val errorType: String?,
+    val retryAfterMillis: Long? = null,
 ) : IOException(message)

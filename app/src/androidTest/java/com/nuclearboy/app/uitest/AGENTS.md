@@ -4,7 +4,7 @@
 
 ## 边界
 
-这里只通过可见控件和无障碍语义操作界面，不调用内部 ViewModel、Repository 或模型客户端实现细节。
+这里只通过可见控件和无障碍语义操作界面，不调用内部 ViewModel、Repository 或模型客户端实现细节。可抽取 UIAutomator robot 复用启动、输入、发送、等待和错误拦截等真实前端操作。
 
 ## 允许依赖
 
@@ -17,7 +17,8 @@
 ## 常用命令
 
 - `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.nuclearboy.app.uitest.ChatUserJourneyTest`
+- `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.nuclearboy.app.uitest.ChatMultiTurnUserJourneyTest`
 
 ## 验证方式
 
-测试必须能启动 App、确认目标 App 保持前台、找到聊天输入框、输入唯一消息、点击发送、等待正式聊天结束，并确认没有已知空回复、配置错误或请求格式错误。当前受限 ROM 依赖 root `su -c input` 完成真实输入事件。
+测试必须能启动 App、确认目标 App 保持前台、找到聊天输入框、输入唯一消息、点击发送、等待正式聊天结束，并确认没有已知空回复、配置错误或请求格式错误。多轮对话测试还必须连续发送多类提示，覆盖上下文延续、工具调用、输入清空、停止状态恢复、错误残留，以及最终轮不自报“有问题/误报/存在不一致/自相矛盾”等语义失败。当前受限 ROM 依赖 root `su -c input` 完成真实点击；中文长文本可通过 UIAutomator 对可见输入框执行文本设置。

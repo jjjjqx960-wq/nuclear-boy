@@ -97,7 +97,7 @@ class DeepSeekModelsTest {
     }
 
     @Test
-    fun `custom provider compatibility mode removes tool protocol messages`() {
+    fun `custom provider compatibility mode removes tool protocol but keeps tool output as text context`() {
         val messages = listOf(
             MessageDto(role = "user", content = "Hi"),
             MessageDto(role = "assistant", content = "Visible", reasoningContent = "hidden reasoning"),
@@ -120,11 +120,15 @@ class DeepSeekModelsTest {
             omitToolProtocol = true,
         )
 
-        assertEquals(2, sanitized.size)
-        assertEquals(listOf("user", "assistant"), sanitized.map { it.role })
+        assertEquals(3, sanitized.size)
+        assertEquals(listOf("user", "assistant", "user"), sanitized.map { it.role })
         assertEquals("Visible", sanitized[1].content)
         assertNull(sanitized[1].reasoningContent)
         assertNull(sanitized[1].toolCalls)
+        assertTrue(sanitized[2].content.orEmpty().contains("read_file"))
+        assertTrue(sanitized[2].content.orEmpty().contains("file content"))
+        assertNull(sanitized[2].toolCallId)
+        assertNull(sanitized[2].name)
     }
 
     @Test
@@ -149,6 +153,65 @@ class DeepSeekModelsTest {
     @Test
     fun `custom provider compatibility retry includes gateway route not found`() {
         assertTrue(CUSTOM_PROVIDER_COMPATIBILITY_HTTP_CODES.containsAll(listOf(400, 404, 422)))
+    }
+
+    @Test
+    fun `custom provider retries without tools after repeated gateway 5xx`() {
+        assertFalse(
+            shouldFallbackCustomProviderTools(
+                isCustomProvider = true,
+                providerCompatibilityMode = false,
+                toolsPresent = true,
+                exception = DeepSeekHttpException(500, "gateway busy", null),
+                retryCount = 0,
+            )
+        )
+        assertTrue(
+            shouldFallbackCustomProviderTools(
+                isCustomProvider = true,
+                providerCompatibilityMode = false,
+                toolsPresent = true,
+                exception = DeepSeekHttpException(500, "gateway busy", null),
+                retryCount = 1,
+            )
+        )
+    }
+
+    @Test
+    fun `custom provider tool fallback ignores official or tool-less requests`() {
+        val exception = DeepSeekHttpException(500, "gateway busy", null)
+        assertFalse(
+            shouldFallbackCustomProviderTools(
+                isCustomProvider = false,
+                providerCompatibilityMode = false,
+                toolsPresent = true,
+                exception = exception,
+                retryCount = 1,
+            )
+        )
+        assertFalse(
+            shouldFallbackCustomProviderTools(
+                isCustomProvider = true,
+                providerCompatibilityMode = false,
+                toolsPresent = false,
+                exception = exception,
+                retryCount = 1,
+            )
+        )
+    }
+
+    @Test
+    fun `retry after seconds parse to milliseconds`() {
+        assertEquals(9_000L, DeepSeekApiClient.parseRetryAfterMillis("9"))
+        assertEquals(30_000L, DeepSeekApiClient.parseRetryAfterMillis(" 30 "))
+    }
+
+    @Test
+    fun `retry after parser ignores invalid values`() {
+        assertNull(DeepSeekApiClient.parseRetryAfterMillis(null))
+        assertNull(DeepSeekApiClient.parseRetryAfterMillis(""))
+        assertNull(DeepSeekApiClient.parseRetryAfterMillis("soon"))
+        assertNull(DeepSeekApiClient.parseRetryAfterMillis("-1"))
     }
 
     @Test

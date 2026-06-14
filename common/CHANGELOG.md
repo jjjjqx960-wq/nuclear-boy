@@ -1,3 +1,4 @@
+2026-06-14 1.1.25 通用模型服务错误文案去除硬编码 DeepSeek，第三方模型失败时不再误导用户排查官方服务。
 2026-06-12 1.1.6 新增 AppSettingsStore（SharedPreferences），承载自定义指令。
 2026-06-12 1.1.5 新增 SharedIntentBus（replay=1 SharedFlow，分享文本投递），3 单测。
 2026-06-12 1.1.0 新增 TokenUsageFormat.inline：↑输入↓输出+缓存命中，无拆分回退总量，纯函数 5 单测。

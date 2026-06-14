@@ -11,12 +11,12 @@ enum class AppError(
     // Network
     NetworkTimeout("网络好像有点卡…我再试一次？😅", "ERR_NET_TIMEOUT"),
     NetworkUnavailable("看起来没有网络连接 📡", "ERR_NET_OFFLINE"),
-    ServerError("DeepSeek 那边好像有点忙，稍等一下…", "ERR_SERVER"),
+    ServerError("模型服务那边好像有点忙，稍等一下…", "ERR_SERVER"),
 
     // API
     ApiKeyInvalid("这个 API Key 好像不对，要不要检查一下？🔑", "ERR_API_KEY"),
-    InsufficientBalance("哎呀，DeepSeek 余额不太够了。要不要我帮你看看怎么充值？🔋", "ERR_BALANCE"),
-    RateLimited("我们太快了！DeepSeek 让我们慢一点…等一下就好 ⏳", "ERR_RATE_LIMIT"),
+    InsufficientBalance("哎呀，模型服务余额不太够了。要不要我帮你看看怎么充值？🔋", "ERR_BALANCE"),
+    RateLimited("我们太快了！模型服务让我们慢一点…等一下就好 ⏳", "ERR_RATE_LIMIT"),
 
     // File System
     FileNotFound("找不到这个文件了 🤷", "ERR_FILE_NOT_FOUND"),

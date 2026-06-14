@@ -1,6 +1,6 @@
 ## 目录职责
 
-`api-deepseek` 源码包承载模型服务协议、第三方网关配置、第三方网关兼容降级、endpoint 构造、模型名和服务地址清理、模型列表解析探测、正式聊天流式兼容探测、诊断提示、SSE 解析与 Token 统计。
+`api-deepseek` 源码包承载模型服务协议、第三方网关配置、第三方网关兼容降级、第三方工具请求 5xx/Retry-After 降级、兼容降级时工具结果文本化保留、endpoint 构造、模型名和服务地址清理、模型列表解析探测、正式聊天流式兼容探测、诊断提示、SSE 解析与 Token 统计。
 
 ## 边界
 
@@ -23,4 +23,4 @@
 
 ## 验证方式
 
-修改协议、第三方网关兼容降级、endpoint、模型列表探测、正式聊天流式兼容探测、模型名或服务地址清理逻辑后，必须运行 `:api-deepseek:test`，并在涉及 app 接入时补跑 `:app:testDebugUnitTest` 和 `:app:assembleDebug`。
+修改协议、第三方网关兼容降级、第三方工具请求连续 5xx/Retry-After 降级、兼容降级工具结果文本化保留、endpoint、模型列表探测、正式聊天流式兼容探测、模型名或服务地址清理逻辑后，必须运行 `:api-deepseek:test`，并在涉及 app 接入时补跑 `:app:testDebugUnitTest` 和 `:app:assembleDebug`。

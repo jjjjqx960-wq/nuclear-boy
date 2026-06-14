@@ -58,6 +58,23 @@ class AppErrorTest {
     }
 
     @Test
+    fun `model service errors do not hard-code one provider`() {
+        val providerNeutralErrors = listOf(
+            AppError.ServerError,
+            AppError.InsufficientBalance,
+            AppError.RateLimited,
+        )
+
+        providerNeutralErrors.forEach { error ->
+            assertFalse(
+                "Error ${error.name} should be neutral for custom providers",
+                error.humanMessage.contains("DeepSeek"),
+            )
+            assertTrue(error.humanMessage.contains("模型服务"))
+        }
+    }
+
+    @Test
     fun `balance error triggers prompt`() {
         assertTrue(AppError.InsufficientBalance.shouldShowBalancePrompt)
         assertFalse(AppError.NetworkTimeout.shouldShowBalancePrompt)

@@ -17,8 +17,10 @@
 ## 常用命令
 
 - `./gradlew :app:connectedDebugAndroidTest`
+- `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.nuclearboy.app.modeltest.ProviderLightweightConnectivityTest`
 - `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.nuclearboy.app.uitest.ChatUserJourneyTest`
+- `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.nuclearboy.app.uitest.ChatMultiTurnUserJourneyTest`
 
 ## 验证方式
 
-发布前优先运行聊天真实旅程测试，确认 App 可启动、聊天输入可操作、发送按钮可用、正式聊天完成且没有空回复或误导错误。受限 ROM 上需要先确认 `adb shell su -c id` 可用，否则不得用该测试结果替代真实前端验证。
+发布前优先运行模型轻量连通性和聊天真实旅程测试，确认当前选中模型能完成最小 ping，App 可启动、聊天输入可操作、发送按钮可用、正式聊天完成且没有空回复或误导错误。涉及模型/聊天路径时，除单轮 smoke 外还要运行多轮真实对话测试，覆盖连续输入、上下文延续、工具调用可见性、错误残留、停止状态恢复和最终自检不自报“有问题/误报/存在不一致/自相矛盾”。受限 ROM 上需要先确认 `adb shell su -c id` 可用，否则不得用该测试结果替代真实前端验证。
