@@ -166,8 +166,8 @@ class AgentEngine(
     @Volatile private var scopeJob = SupervisorJob()
     private val scope get() = CoroutineScope(scopeJob + Dispatchers.IO)
 
-    /** Maximum number of tool-call -> execute -> feedback iterations per turn. */
-    private val maxToolIterations = 20
+    /** Maximum consecutive retryable API errors before surfacing an error to the user. */
+    private val maxConsecutiveRetryableErrors = 3
 
     /** 单个工具结果注入对话的最大字符数；超出截断（读大文件/长目录列表的主要膨胀源）。 */
     private val maxToolOutputChars = 12_000
@@ -284,11 +284,13 @@ class AgentEngine(
         var iteration = 0
         var finalResponse: ChatMessage? = null
         var contextTrimNotified = false
+        var consecutiveRetryableErrors = 0
+        val toolCallLoopGuard = ToolCallLoopGuard()
 
-        while (iteration < maxToolIterations && finalResponse == null) {
+        while (finalResponse == null && currentCoroutineContext().isActive) {
             iteration++
             val iterStartMs = System.currentTimeMillis()
-            android.util.Log.e("NuclearBoy", "[AgentEngine] run() iteration=$iteration/$maxToolIterations contextUsed=${contextManager.budget.value.totalUsed}")
+            android.util.Log.e("NuclearBoy", "[AgentEngine] run() iteration=$iteration contextUsed=${contextManager.budget.value.totalUsed}")
 
             // 发送前把对话负载真实裁剪到模型窗口内。
             // 旧实现只改 ContextWindowManager 的计数器、却谎报"已压缩 ✨"而不动真实 payload；
@@ -374,6 +376,7 @@ class AgentEngine(
                 }
 
                 android.util.Log.e("NuclearBoy", "[AgentEngine] run() stream finished iteration=$iteration contentEvents=$contentEventCount responseLen=${responseContent.length} reasoningLen=${reasoningContent.length} toolCallsDetected=$toolCallsDetected iterTimeMs=${System.currentTimeMillis() - iterStartMs}")
+                consecutiveRetryableErrors = 0
 
                 // After the stream completes, check for tool calls
                 if (toolCallsDetected && accumulator.hasPartialCalls()) {
@@ -382,6 +385,19 @@ class AgentEngine(
                     accumulator.clear()
 
                     if (toolCalls.isNotEmpty()) {
+                        val loopObservation = toolCallLoopGuard.observe(toolCalls)
+                        if (loopObservation.shouldStop) {
+                            android.util.Log.e(
+                                "NuclearBoy",
+                                "[AgentEngine] run() duplicate tool-call loop stopped count=${loopObservation.consecutiveDuplicateBatches}/${loopObservation.maxConsecutiveDuplicateBatches} tools=${loopObservation.toolSummary}",
+                            )
+                            finalResponse = ChatMessage(
+                                role = MessageRole.ASSISTANT,
+                                content = "我连续 ${loopObservation.consecutiveDuplicateBatches} 次准备执行同一组工具调用（${loopObservation.toolSummary}），这通常表示任务陷入了重复操作。为避免继续浪费时间或重复改动，我先停在这里。你可以换个描述、缩小目标，或指定下一步要我做什么。",
+                                status = MessageStatus.ERROR,
+                            )
+                            break
+                        }
                         android.util.Log.e("NuclearBoy", "[AgentEngine] run() executing ${toolCalls.size} tool calls: ${toolCalls.map { it.function.name }}")
                         // Add the assistant message with tool calls to history
                         val assistantMsg = MessageDto(
@@ -499,10 +515,11 @@ class AgentEngine(
                 android.util.Log.e("NuclearBoy", "[AgentEngine] run() Exception caught iteration=$iteration type=${e.javaClass.simpleName} message=${e.message} appError=${appError} isRetryable=${appError.isRetryable}")
                 emit(AgentEvent.Error(appError, e.message))
 
-                // Don't break — let the model try to recover if possible
-                if (appError.isRetryable && iteration < maxToolIterations) {
-                    android.util.Log.e("NuclearBoy", "[AgentEngine] run() retrying iteration=$iteration reason=${appError.humanMessage}")
-                    emit(AgentEvent.Retrying(iteration, appError.humanMessage))
+                // Retry transient API errors briefly, but do not impose a fixed tool-call iteration cap.
+                if (appError.isRetryable && consecutiveRetryableErrors < maxConsecutiveRetryableErrors) {
+                    consecutiveRetryableErrors++
+                    android.util.Log.e("NuclearBoy", "[AgentEngine] run() retrying attempt=$consecutiveRetryableErrors/$maxConsecutiveRetryableErrors iteration=$iteration reason=${appError.humanMessage}")
+                    emit(AgentEvent.Retrying(consecutiveRetryableErrors, appError.humanMessage))
                     delay(1000)
                     continue
                 }
@@ -515,17 +532,6 @@ class AgentEngine(
                 )
                 break
             }
-        }
-
-        // 工具循环耗尽（达到 maxToolIterations 仍没拿到最终回复）→ 给用户一个解释，
-        // 不要静默无回复
-        if (finalResponse == null && iteration >= maxToolIterations) {
-            android.util.Log.e("NuclearBoy", "[AgentEngine] run() tool loop exhausted at $iteration iterations, no final response")
-            finalResponse = ChatMessage(
-                role = MessageRole.ASSISTANT,
-                content = "这个任务连续调用了 $maxToolIterations 次工具还没完成，先停一下～ 可以把需求拆小一点、或告诉我下一步重点，我接着干。",
-                status = MessageStatus.COMPLETE,
-            )
         }
 
         // Emit the final response if we have one
