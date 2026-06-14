@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.sp
 import android.widget.TextView
 import androidx.compose.ui.viewinterop.AndroidView
 import com.nuclearboy.common.*
+import com.nuclearboy.ui.chat.components.ToolLimitNoticeCard
+import com.nuclearboy.ui.chat.parts.detectToolLimitNotice
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -109,6 +111,18 @@ fun MessageBubble(
                     message.toolCalls.forEach { toolCall ->
                         ToolExecutionCard(toolCall = toolCall)
                     }
+                }
+
+                val toolLimitNotice = remember(message.role, message.content, isStreaming) {
+                    if (message.role == MessageRole.ASSISTANT && !isStreaming) {
+                        detectToolLimitNotice(message.content)
+                    } else {
+                        null
+                    }
+                }
+                if (toolLimitNotice != null) {
+                    ToolLimitNoticeCard(notice = toolLimitNotice)
+                    Spacer(Modifier.height(6.dp))
                 }
 
                 // Message content (selectable text)

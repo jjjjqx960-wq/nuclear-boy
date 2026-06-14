@@ -31,6 +31,16 @@
                 <action android:name="com.nuclearboy.app.DEBUG_SAVE_PC_BRIDGE" />
             </intent-filter>
         </receiver>
+
+        <!-- 调试会话入口：写入固定测试对话，便于真机验证聊天 UI 状态。
+             仅 debug 构建注册；接收器内部再次校验 BuildConfig.DEBUG。 -->
+        <receiver
+            android:name="com.nuclearboy.app.diagnostics.DebugConversationSeedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.nuclearboy.app.DEBUG_SEED_CONVERSATION" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

@@ -1,3 +1,6 @@
+2026-06-14 1.1.27 ChatJourneyRobot 启动目标 App 后会先处理常见系统权限弹窗，再执行前台门禁，避免 MIUI 授权页误拦正式聊天实测。
+2026-06-14 1.1.27 ToolLimitNoticeUiTest 改为通过 debug-only Receiver 注入会话，规避受限 ROM 对 test 进程和 run-as 写 Android/data 的拦截。
+2026-06-14 1.1.27 新增 ToolLimitNoticeUiTest，验证持久化的工具受限助手消息会在真实前端渲染提示卡和可定位语义。
 2026-06-14 1.1.26 ChatJourneyRobot 收紧自报异常断言，避免把用户提示中的“没有问题”误判为模型自报“有问题”。
 2026-06-14 1.1.26 SkillPromptGenerationJourneyTest 改为验证 workspace 真实写入路径，并在第三方工具降级时要求助手明确“工具受限、未写入”而非伪造成功。
 2026-06-14 1.1.25 新增 SkillPromptGenerationJourneyTest，通过真实 App 对话生成测试 skill 与系统提示词，并读取设备项目文件验证落盘。

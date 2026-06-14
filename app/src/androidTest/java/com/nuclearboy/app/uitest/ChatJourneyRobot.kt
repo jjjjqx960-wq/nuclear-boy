@@ -55,7 +55,9 @@ class ChatJourneyRobot {
                 launchResult.contains("Exception", ignoreCase = true),
         )
         device.waitForIdle(5_000)
+        dismissCommonSystemPrompts()
         assertTrue("启动后目标 App 应处于前台：${focusedWindowSummary()}", waitUntil(10_000) {
+            dismissCommonSystemPrompts()
             isAppInForeground()
         })
     }
@@ -147,8 +149,8 @@ class ChatJourneyRobot {
     }
 
     private fun dismissCommonSystemPrompts() {
-        listOf("允许", "确定", "OK", "Allow").forEach { label ->
-            device.findObject(By.text(label))?.let(::tapObject)
+        listOf("始终允许", "仅在使用中允许", "允许", "确定", "同意", "继续", "OK", "Allow").forEach { label ->
+            device.findObject(By.text(label))?.let(::tapPromptObject)
         }
     }
 
@@ -170,6 +172,10 @@ class ChatJourneyRobot {
 
     private fun tapObject(target: UiObject2) {
         assertAppInForeground("执行点击前")
+        tapPromptObject(target)
+    }
+
+    private fun tapPromptObject(target: UiObject2) {
         val bounds = target.visibleBounds
         executeRootInput("input tap ${bounds.centerX()} ${bounds.centerY()}")
         device.waitForIdle(1_000)

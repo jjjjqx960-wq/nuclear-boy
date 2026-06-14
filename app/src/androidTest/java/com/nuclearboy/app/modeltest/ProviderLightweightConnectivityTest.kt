@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.api.deepseek.DeepSeekApiClient
+import com.nuclearboy.api.deepseek.ProviderEndpointMode
 import com.nuclearboy.common.AppResult
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
@@ -19,8 +20,12 @@ class ProviderLightweightConnectivityTest {
     fun activeCustomProviderRespondsToLightweightPing() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val apiKeyManager = ApiKeyManager(context)
+        configureProviderFromInstrumentationArgs(apiKeyManager)
         val modelName = apiKeyManager.getModelOverride()
-        assertTrue("轻量连通性测试需要当前选中自定义模型", apiKeyManager.isCustomProviderEnabled())
+        assertTrue(
+            "轻量连通性测试需要当前选中自定义模型，或通过 nbBaseUrl/nbModel instrumentation 参数注入",
+            apiKeyManager.isCustomProviderEnabled(),
+        )
         assertFalse("自定义模型名不能为空", modelName.isNullOrBlank())
 
         val apiClient = DeepSeekApiClient(
@@ -50,4 +55,24 @@ class ProviderLightweightConnectivityTest {
             apiClient.close()
         }
     }
+
+    private fun configureProviderFromInstrumentationArgs(apiKeyManager: ApiKeyManager) {
+        val args = InstrumentationRegistry.getArguments()
+        val baseUrl = args.getString("nbBaseUrl")?.trim().orEmpty()
+        val model = args.getString("nbModel")?.trim().orEmpty()
+        if (baseUrl.isBlank() || model.isBlank()) return
+
+        apiKeyManager.setCustomProviderConfig(
+            baseUrl = baseUrl,
+            modelName = model,
+            apiKey = args.getString("nbApiKey")?.trim(),
+            endpointMode = parseEndpointMode(args.getString("nbEndpointMode")),
+        )
+    }
+
+    private fun parseEndpointMode(raw: String?): ProviderEndpointMode =
+        when (raw.orEmpty().trim().lowercase()) {
+            "exact", "full", "完整地址" -> ProviderEndpointMode.EXACT
+            else -> ProviderEndpointMode.AUTO
+        }
 }

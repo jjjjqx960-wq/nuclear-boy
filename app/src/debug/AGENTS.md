@@ -4,7 +4,7 @@
 
 ## 边界
 
-这里只能放调试构建专用配置，不承载正式业务能力。可注册 ADB 诊断、调试写配置等开发入口，但 release 包不得暴露这些组件。
+这里只能放调试构建专用配置，不承载正式业务能力。可注册 ADB 诊断、调试写配置、固定测试会话注入等开发入口，但 release 包不得暴露这些组件。
 
 ## 允许依赖
 
@@ -20,6 +20,7 @@
 - `adb shell am broadcast -a com.nuclearboy.app.RUN_DIAGNOSTICS -n com.nuclearboy.app.debug/com.nuclearboy.app.diagnostics.DiagnosticsReceiver`
 - `adb shell am broadcast -a com.nuclearboy.app.DEBUG_SAVE_CUSTOM_MODEL -n com.nuclearboy.app.debug/com.nuclearboy.app.diagnostics.DebugModelConfigReceiver ...`
 - `adb shell am broadcast -a com.nuclearboy.app.DEBUG_SAVE_PC_BRIDGE -n com.nuclearboy.app.debug/com.nuclearboy.app.diagnostics.DebugPcBridgeConfigReceiver --es url "ws://<电脑IP>:7860" --es token "<token>" --ez enabled true`（可选 `--es run_cli claude --es run_prompt "..."` 实跑一条任务，结果看 logcat 标签 NuclearBoyDebugPcBridge）
+- `adb shell am broadcast -a com.nuclearboy.app.DEBUG_SEED_CONVERSATION -n com.nuclearboy.app.debug/com.nuclearboy.app.diagnostics.DebugConversationSeedReceiver`
 
 ## 验证方式
 
