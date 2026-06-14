@@ -62,10 +62,12 @@ import com.nuclearboy.ui.chat.components.FilePanelSearchField
 import com.nuclearboy.ui.chat.components.FilePanelSortBar
 import com.nuclearboy.ui.chat.components.FileSelectionActionBar
 import com.nuclearboy.ui.chat.components.ScrollToBottomAction
+import com.nuclearboy.ui.chat.components.ToolActionDraftHintBar
 import com.nuclearboy.ui.chat.parts.appendToChatDraft
 import com.nuclearboy.ui.chat.parts.buildFilePanelOverview
 import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
 import com.nuclearboy.ui.chat.parts.buildFileReferencesPrompt
+import com.nuclearboy.ui.chat.parts.detectToolActionDraftHint
 import com.nuclearboy.ui.chat.parts.fileReferenceToastMessage
 import com.nuclearboy.ui.chat.parts.fileSelectionStatusLabel
 import com.nuclearboy.ui.chat.parts.fileSelectionTotalSizeBytes
@@ -387,6 +389,7 @@ fun ChatScreen(
                 hasMessages = uiState.messages.any { it.role != MessageRole.SYSTEM },
                 focusRequest = inputFocusRequest,
                 placeholder = if (projectId == "__general__") "和核弹男孩对话…" else "输入指令…",
+                showToolActionDraftHint = apiKeyState.customProviderEnabled,
                 onAttachFile = {
                     android.util.Log.e("NuclearBoy", "[ChatScreen] filePicker launched")
                     filePickerLauncher.launch(arrayOf("*/*"))
@@ -1361,10 +1364,14 @@ private fun ChatInputBar(
     focusRequest: Long = 0L,
     onAttachFile: (() -> Unit)? = null,
     placeholder: String = "输入指令…",
+    showToolActionDraftHint: Boolean = false,
 ) {
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
     val nc = NuclearBoyTheme.colorScheme
+    val toolActionDraftHint = remember(text, showToolActionDraftHint) {
+        if (showToolActionDraftHint) detectToolActionDraftHint(text) else null
+    }
     LaunchedEffect(focusRequest) {
         if (focusRequest > 0) focusRequester.requestFocus()
     }
@@ -1396,6 +1403,10 @@ private fun ChatInputBar(
                 },
             )
             Spacer(Modifier.height(4.dp))
+            toolActionDraftHint?.let { hint ->
+                ToolActionDraftHintBar(hint)
+                Spacer(Modifier.height(4.dp))
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,

@@ -1,3 +1,6 @@
+2026-06-14 1.1.28 沉淀 Compose 输入态测试规则：发送前 UI 状态测试复用 ChatJourneyRobot.enterDraftText，不再裸用 UiObject2.setText 后直接断言。
+2026-06-14 1.1.28 ChatJourneyRobot 暴露 enterDraftText，供发送前输入态测试复用真实聚焦、清空和设值路径。
+2026-06-14 1.1.28 新增 ToolDraftHintUiTest，用真实 App 输入框验证第三方模型工具型草稿会在发送前出现工具能力预警。
 2026-06-14 1.1.27 ChatJourneyRobot 启动目标 App 后会先处理常见系统权限弹窗，再执行前台门禁，避免 MIUI 授权页误拦正式聊天实测。
 2026-06-14 1.1.27 ToolLimitNoticeUiTest 改为通过 debug-only Receiver 注入会话，规避受限 ROM 对 test 进程和 run-as 写 Android/data 的拦截。
 2026-06-14 1.1.27 新增 ToolLimitNoticeUiTest，验证持久化的工具受限助手消息会在真实前端渲染提示卡和可定位语义。

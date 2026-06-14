@@ -70,6 +70,15 @@ class ChatJourneyRobot {
                 ?: device.findObject(By.textContains("和核弹男孩对话"))
         }
 
+    fun enterDraftText(text: String) {
+        focusChatInputWithKeyboard()
+        clearInputText()
+        setInputText(text)
+        assertTrue("输入框应持有测试草稿", waitUntil(15_000) {
+            chatInputText()?.contains(text) == true
+        })
+    }
+
     fun sendPromptAndWait(
         prompt: String,
         label: String,
