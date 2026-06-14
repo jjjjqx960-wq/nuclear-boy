@@ -40,7 +40,9 @@ import androidx.lifecycle.viewModelScope
 import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.api.deepseek.DeepSeekApiClient
 import com.nuclearboy.api.deepseek.ProviderEndpointMode
+import com.nuclearboy.api.deepseek.ProviderFormalChatTestResult
 import com.nuclearboy.api.deepseek.ProviderProtocol
+import com.nuclearboy.api.deepseek.ProviderTestResult
 import com.nuclearboy.api.deepseek.sanitizeProviderBaseUrl
 import com.nuclearboy.api.deepseek.sanitizeProviderModelName
 import com.nuclearboy.app.R
@@ -62,6 +64,7 @@ import com.nuclearboy.app.ui.settings.parts.providerExactEndpointCompletionActio
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointRecoveryActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerExactEndpointWarning
 import com.nuclearboy.app.ui.settings.parts.providerEndpointPreviewSummary
+import com.nuclearboy.app.ui.settings.parts.providerFormalChatCurlTemplate
 import com.nuclearboy.app.ui.settings.parts.providerModelListClearFilterActionLabel
 import com.nuclearboy.app.ui.settings.parts.providerModelListCurlTemplate
 import com.nuclearboy.app.ui.settings.parts.providerModelListPickerHint
@@ -340,6 +343,74 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
+    private fun providerProbeRequestBundle(
+        protocolLabel: String,
+        endpoint: String,
+        modelName: String,
+        hasApiKey: Boolean,
+    ): String {
+        val lightweightTemplate = providerRequestCurlTemplate(
+            protocolLabel = protocolLabel,
+            endpoint = endpoint,
+            modelName = modelName,
+            hasApiKey = hasApiKey,
+        )
+        val formalTemplate = providerFormalChatCurlTemplate(
+            protocolLabel = protocolLabel,
+            endpoint = endpoint,
+            modelName = modelName,
+            hasApiKey = hasApiKey,
+        )
+        return buildString {
+            if (lightweightTemplate.isNotBlank()) {
+                append("轻量 ping 请求：")
+                append('\n')
+                append(lightweightTemplate)
+            }
+            if (formalTemplate.isNotBlank()) {
+                if (isNotEmpty()) append("\n\n")
+                append("正式 stream 聊天请求：")
+                append('\n')
+                append(formalTemplate)
+            }
+        }
+    }
+
+    private fun lightweightProbeSummary(result: ProviderTestResult): String =
+        buildString {
+            append("轻量 ping：")
+            append(result.latencyMs)
+            append(" ms")
+            if (result.replyPreview.isNotBlank()) {
+                append("\n轻量响应：")
+                append(result.replyPreview)
+            }
+        }
+
+    private fun formalChatProbeSummary(result: ProviderFormalChatTestResult): String =
+        buildString {
+            append("正式聊天：stream=")
+            append(result.stream)
+            append(" · 工具定义=")
+            append(if (result.toolsRequested) "已携带" else "兼容模式未携带")
+            append(" · ")
+            append(result.latencyMs)
+            append(" ms")
+            append("\nSSE：")
+            append(result.lineCount)
+            append(" 行 · 内容=")
+            append(if (result.sawContent) "有" else "无")
+            append(" · 工具事件=")
+            append(if (result.sawToolEvent) "有" else "无")
+            if (result.compatibilityRetry) {
+                append("\n提示：网关不接受工具定义，已按正式聊天逻辑降级为兼容聊天模式；普通聊天可用，但工具调用能力可能受限。")
+            }
+            if (result.replyPreview.isNotBlank()) {
+                append("\n正式响应：")
+                append(result.replyPreview)
+            }
+        }
+
     private fun runCustomModelTest(
         targetId: String,
         baseUrl: String,
@@ -379,7 +450,7 @@ class SettingsViewModel @Inject constructor(
             endpointModeLabel = endpointMode.displayName,
             keyFingerprintSummary = keyFingerprint,
         )
-        val requestTemplate = providerRequestCurlTemplate(
+        val requestTemplate = providerProbeRequestBundle(
             protocolLabel = resolvedProtocol.displayName,
             endpoint = requestEndpoint,
             modelName = normalizedModel,
@@ -392,7 +463,7 @@ class SettingsViewModel @Inject constructor(
             message = "正在测试 $testLabel",
             requestTemplate = requestTemplate,
             detail = buildString {
-                append("会发送一条 max_tokens=8 的 ping 请求，不会保存或输出明文 Key。")
+                append("会先发送 max_tokens=8 的 ping 请求；成功后继续用 stream=true + 工具定义验证正式聊天链路。不会保存或输出明文 Key。")
                 if (baseUrlCleanupSummary.isNotBlank()) {
                     append('\n')
                     append(baseUrlCleanupSummary)
@@ -408,51 +479,108 @@ class SettingsViewModel @Inject constructor(
             },
         )
         viewModelScope.launch {
-            _modelTestState.value = when (val result = apiClient.testCustomProvider(
+            when (val result = apiClient.testCustomProvider(
                 baseUrl = normalizedBaseUrl,
                 modelName = normalizedModel,
                 apiKey = key,
                 protocol = protocol,
                 endpointMode = endpointMode,
             )) {
-                is AppResult.Success -> ModelTestUiState(
-                    targetId = targetId,
-                    success = true,
-                    message = "模型连接成功",
-                    requestTemplate = providerRequestCurlTemplate(
-                        protocolLabel = result.data.protocol.displayName,
-                        endpoint = result.data.endpoint,
-                        modelName = result.data.modelName,
+                is AppResult.Success -> {
+                    val lightweight = result.data
+                    val successRequestTemplate = providerProbeRequestBundle(
+                        protocolLabel = lightweight.protocol.displayName,
+                        endpoint = lightweight.endpoint,
+                        modelName = lightweight.modelName,
                         hasApiKey = key.orEmpty().trim().isNotBlank(),
-                    ),
-                    detail = buildString {
-                        append(
-                            modelTestRequestContextSummary(
-                                endpoint = result.data.endpoint,
-                                modelName = result.data.modelName,
-                                protocolLabel = result.data.protocol.displayName,
-                                endpointModeLabel = result.data.endpointMode.displayName,
-                                keyFingerprintSummary = keyFingerprint,
+                    )
+                    val successContext = modelTestRequestContextSummary(
+                        endpoint = lightweight.endpoint,
+                        modelName = lightweight.modelName,
+                        protocolLabel = lightweight.protocol.displayName,
+                        endpointModeLabel = lightweight.endpointMode.displayName,
+                        keyFingerprintSummary = keyFingerprint,
+                    )
+                    _modelTestState.value = ModelTestUiState(
+                        targetId = targetId,
+                        inProgress = true,
+                        message = "轻量连接成功，正在验证正式聊天",
+                        requestTemplate = successRequestTemplate,
+                        detail = buildString {
+                            append(successContext)
+                            append('\n')
+                            append(lightweightProbeSummary(lightweight))
+                            append("\n正在发送 stream=true + 工具定义的正式聊天测试。")
+                        },
+                    )
+                    _modelTestState.value = when (val formal = apiClient.testCustomProviderFormalChat(
+                        baseUrl = normalizedBaseUrl,
+                        modelName = normalizedModel,
+                        apiKey = key,
+                        protocol = protocol,
+                        endpointMode = endpointMode,
+                    )) {
+                        is AppResult.Success -> ModelTestUiState(
+                            targetId = targetId,
+                            success = true,
+                            message = "模型正式聊天可用",
+                            requestTemplate = providerProbeRequestBundle(
+                                protocolLabel = formal.data.protocol.displayName,
+                                endpoint = formal.data.endpoint,
+                                modelName = formal.data.modelName,
+                                hasApiKey = key.orEmpty().trim().isNotBlank(),
                             ),
+                            detail = buildString {
+                                append(successContext)
+                                append('\n')
+                                if (baseUrlCleanupSummary.isNotBlank()) {
+                                    append(baseUrlCleanupSummary)
+                                    append('\n')
+                                }
+                                if (cleanupSummary.isNotBlank()) {
+                                    append(cleanupSummary)
+                                    append('\n')
+                                }
+                                append(lightweightProbeSummary(lightweight))
+                                append('\n')
+                                append(formalChatProbeSummary(formal.data))
+                            },
                         )
-                        append('\n')
-                        if (baseUrlCleanupSummary.isNotBlank()) {
-                            append(baseUrlCleanupSummary)
-                            append('\n')
+                        is AppResult.Failure -> {
+                            val actionHint = modelTestFailureActionHint(formal.technicalDetail)
+                            ModelTestUiState(
+                                targetId = targetId,
+                                success = false,
+                                message = "轻量连接成功，正式聊天失败",
+                                requestTemplate = successRequestTemplate,
+                                detail = buildString {
+                                    append(successContext)
+                                    append('\n')
+                                    if (baseUrlCleanupSummary.isNotBlank()) {
+                                        append(baseUrlCleanupSummary)
+                                        append('\n')
+                                    }
+                                    if (cleanupSummary.isNotBlank()) {
+                                        append(cleanupSummary)
+                                        append('\n')
+                                    }
+                                    append(lightweightProbeSummary(lightweight))
+                                    append('\n')
+                                    append("正式聊天必须支持 stream=true；当前失败会导致聊天页不可用或空回复。")
+                                    if (actionHint.isNotBlank()) {
+                                        append('\n')
+                                        append(actionHint)
+                                    }
+                                    append('\n')
+                                    append(formal.technicalDetail ?: formal.error.humanMessage)
+                                },
+                            )
                         }
-                        if (cleanupSummary.isNotBlank()) {
-                            append(cleanupSummary)
-                            append('\n')
-                        }
-                        append("耗时：${result.data.latencyMs} ms")
-                        if (result.data.replyPreview.isNotBlank()) {
-                            append("\n响应：${result.data.replyPreview}")
-                        }
-                    },
-                )
+                    }
+                }
                 is AppResult.Failure -> {
                     val actionHint = modelTestFailureActionHint(result.technicalDetail)
-                    ModelTestUiState(
+                    _modelTestState.value = ModelTestUiState(
                         targetId = targetId,
                         success = false,
                         message = modelTestFailureMessage(result.error, result.technicalDetail),
@@ -1214,7 +1342,7 @@ fun SettingsScreen(
                                 Icon(Icons.Filled.WifiTethering, contentDescription = null, modifier = Modifier.size(18.dp))
                             }
                             Spacer(Modifier.width(6.dp))
-                            Text("测试填写")
+                            Text("测试聊天")
                         }
                         Button(
                             onClick = {

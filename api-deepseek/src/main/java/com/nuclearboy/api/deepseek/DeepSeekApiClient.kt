@@ -494,6 +494,81 @@ class DeepSeekApiClient(
         }
     }
 
+    suspend fun testCustomProviderFormalChat(
+        baseUrl: String,
+        modelName: String,
+        apiKey: String?,
+        protocol: ProviderProtocol = ProviderProtocol.AUTO,
+        endpointMode: ProviderEndpointMode = ProviderEndpointMode.AUTO,
+    ): AppResult<ProviderFormalChatTestResult> = withContext(Dispatchers.IO) {
+        val normalizedBaseUrl = sanitizeProviderBaseUrl(baseUrl)
+        val normalizedModel = sanitizeProviderModelName(modelName)
+        val resolvedProtocol = ProviderProtocol.resolve(protocol, normalizedBaseUrl, normalizedModel)
+        if (normalizedModel.isBlank()) {
+            return@withContext AppResult.failure(AppError.InvalidRequest, "模型名不能为空")
+        }
+        val endpoint = when (resolvedProtocol) {
+            ProviderProtocol.ANTHROPIC -> buildAnthropicMessagesEndpoint(normalizedBaseUrl, endpointMode)
+            else -> buildOpenAiChatCompletionsEndpoint(normalizedBaseUrl, endpointMode)
+        }
+        if (endpoint.isBlank()) {
+            return@withContext AppResult.failure(AppError.InvalidRequest, "服务地址不能为空")
+        }
+
+        return@withContext try {
+            if (resolvedProtocol == ProviderProtocol.ANTHROPIC) {
+                testAnthropicProviderFormalChat(
+                    endpoint = endpoint,
+                    modelName = normalizedModel,
+                    apiKey = apiKey,
+                    endpointMode = endpointMode,
+                )
+            } else {
+                testOpenAiProviderFormalChat(
+                    endpoint = endpoint,
+                    baseUrl = normalizedBaseUrl,
+                    modelName = normalizedModel,
+                    apiKey = apiKey,
+                    endpointMode = endpointMode,
+                )
+            }
+        } catch (e: IllegalArgumentException) {
+            AppResult.failure(
+                AppError.InvalidRequest,
+                "服务地址格式不正确：${e.message ?: "无法解析 URL"}。\n" +
+                    "示例：http://your-gateway:20128/v1 或 https://example.com/v1",
+            )
+        } catch (e: SSLException) {
+            AppResult.failure(
+                AppError.NetworkUnavailable,
+                "HTTPS/TLS 握手失败。若网关只支持 HTTP，请填 http:// 地址；若填的是 HTTPS，请检查证书链和域名。",
+            )
+        } catch (e: java.net.SocketTimeoutException) {
+            AppResult.failure(
+                AppError.NetworkTimeout,
+                "正式聊天连接超时。请确认手机当前网络能访问该 IP/域名和端口，网关服务正在运行。",
+            )
+        } catch (e: IOException) {
+            val message = e.message.orEmpty()
+            val detail = when {
+                message.contains("CLEARTEXT communication", ignoreCase = true) ->
+                    "Android 拦截了明文 HTTP 请求。当前地址是 HTTP，请升级到允许自定义 HTTP 网关的版本，或改用 HTTPS。"
+                message.contains("Failed to connect", ignoreCase = true) ||
+                    message.contains("Connection refused", ignoreCase = true) ->
+                    "正式聊天连接失败。请确认地址、端口、防火墙和网关进程状态。"
+                message.contains("Unable to resolve host", ignoreCase = true) ->
+                    "域名解析失败。请检查域名或 DNS；如果是 IP 地址，请确认格式正确。"
+                else -> "正式聊天请求失败：${message.ifBlank { e.javaClass.simpleName }}"
+            }
+            AppResult.failure(classifyError(e), detail)
+        } catch (e: Exception) {
+            AppResult.failure(
+                classifyError(e),
+                "正式聊天测试异常：${e.message ?: e.javaClass.simpleName}",
+            )
+        }
+    }
+
     suspend fun listOpenAiProviderModels(
         baseUrl: String,
         apiKey: String?,
@@ -790,7 +865,317 @@ class DeepSeekApiClient(
         }
     }
 
+    private fun testOpenAiProviderFormalChat(
+        endpoint: String,
+        baseUrl: String,
+        modelName: String,
+        apiKey: String?,
+        endpointMode: ProviderEndpointMode,
+    ): AppResult<ProviderFormalChatTestResult> {
+        val startedAt = System.currentTimeMillis()
+        val key = apiKey?.trim().orEmpty()
+        var compatibilityMode = false
+
+        while (true) {
+            val request = ChatCompletionRequest(
+                model = modelName,
+                messages = listOf(MessageDto(role = "user", content = "ping")),
+                temperature = 0.0,
+                topP = 1.0,
+                maxTokens = 32,
+                stream = true,
+                tools = if (compatibilityMode) null else listOf(providerDiagnosticTool()),
+                thinking = null,
+                reasoningEffort = null,
+            )
+            val body = json.encodeToString(ChatCompletionRequest.serializer(), request)
+            val requestBuilder = Request.Builder()
+                .url(endpoint)
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Accept", "text/event-stream")
+            if (key.isNotBlank()) {
+                requestBuilder.addHeader("Authorization", "Bearer $key")
+            }
+
+            var shouldRetryCompatibility = false
+            diagnosticClient.newCall(requestBuilder.build()).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val responseBody = response.body?.string().orEmpty()
+                    if (
+                        !compatibilityMode &&
+                        response.code in CUSTOM_PROVIDER_COMPATIBILITY_HTTP_CODES
+                    ) {
+                        compatibilityMode = true
+                        shouldRetryCompatibility = true
+                        return@use
+                    }
+                    val modelListDetail = if (response.code == 404) {
+                        "\n" + probeOpenAiModelList(
+                            baseUrl = baseUrl,
+                            endpointMode = endpointMode,
+                            apiKey = key,
+                            requestedModel = modelName,
+                        )
+                    } else {
+                        ""
+                    }
+                    return AppResult.failure(
+                        providerHttpError(response.code),
+                        buildProviderHttpFailureDetail(
+                            httpCode = response.code,
+                            endpoint = endpoint,
+                            modelName = modelName,
+                            body = responseBody,
+                        ) + modelListDetail,
+                    )
+                }
+
+                val responseBody = response.body ?: return AppResult.failure(
+                    AppError.Unknown,
+                    "正式聊天返回 HTTP 200，但响应体为空。",
+                )
+                val parsed = parseOpenAiFormalStream(responseBody.charStream().buffered())
+                val elapsedMs = System.currentTimeMillis() - startedAt
+                if (!parsed.hasUsefulOutput) {
+                    return AppResult.failure(
+                        AppError.Unknown,
+                        "正式聊天 stream=true 返回成功，但没有内容或工具事件。" +
+                            " lineCount=${parsed.lineCount}; done=${parsed.sawDone}; finish=${parsed.sawFinish}",
+                    )
+                }
+
+                return AppResult.success(
+                    ProviderFormalChatTestResult(
+                        endpoint = endpoint,
+                        modelName = modelName,
+                        protocol = ProviderProtocol.OPENAI,
+                        endpointMode = endpointMode,
+                        latencyMs = elapsedMs,
+                        stream = true,
+                        toolsRequested = !compatibilityMode,
+                        compatibilityRetry = compatibilityMode,
+                        sawContent = parsed.sawContent,
+                        sawToolEvent = parsed.sawToolEvent,
+                        lineCount = parsed.lineCount,
+                        replyPreview = parsed.replyPreview,
+                    )
+                )
+            }
+            if (shouldRetryCompatibility) continue
+        }
+    }
+
+    private fun testAnthropicProviderFormalChat(
+        endpoint: String,
+        modelName: String,
+        apiKey: String?,
+        endpointMode: ProviderEndpointMode,
+    ): AppResult<ProviderFormalChatTestResult> {
+        val startedAt = System.currentTimeMillis()
+        val body = buildAnthropicRequestBody(
+            messages = listOf(MessageDto(role = "user", content = "ping")),
+            model = modelName,
+            tools = listOf(providerDiagnosticTool()),
+            stream = true,
+            maxTokens = 32,
+        )
+        val requestBuilder = Request.Builder()
+            .url(endpoint)
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Accept", "text/event-stream")
+            .addHeader("anthropic-version", "2023-06-01")
+        val key = apiKey?.trim().orEmpty()
+        if (key.isNotBlank()) {
+            requestBuilder.addHeader("x-api-key", key)
+        }
+
+        return diagnosticClient.newCall(requestBuilder.build()).execute().use { response ->
+            if (!response.isSuccessful) {
+                val responseBody = response.body?.string().orEmpty()
+                return AppResult.failure(
+                    providerHttpError(response.code),
+                    buildProviderHttpFailureDetail(
+                        httpCode = response.code,
+                        endpoint = endpoint,
+                        modelName = modelName,
+                        body = responseBody,
+                    ),
+                )
+            }
+            val responseBody = response.body ?: return AppResult.failure(
+                AppError.Unknown,
+                "正式聊天返回 HTTP 200，但响应体为空。",
+            )
+            val parsed = parseAnthropicFormalStream(responseBody.charStream().buffered())
+            val elapsedMs = System.currentTimeMillis() - startedAt
+            if (!parsed.hasUsefulOutput) {
+                return AppResult.failure(
+                    AppError.Unknown,
+                    "正式聊天 stream=true 返回成功，但没有内容或工具事件。" +
+                        " lineCount=${parsed.lineCount}; done=${parsed.sawDone}; finish=${parsed.sawFinish}",
+                )
+            }
+
+            AppResult.success(
+                ProviderFormalChatTestResult(
+                    endpoint = endpoint,
+                    modelName = modelName,
+                    protocol = ProviderProtocol.ANTHROPIC,
+                    endpointMode = endpointMode,
+                    latencyMs = elapsedMs,
+                    stream = true,
+                    toolsRequested = true,
+                    compatibilityRetry = false,
+                    sawContent = parsed.sawContent,
+                    sawToolEvent = parsed.sawToolEvent,
+                    lineCount = parsed.lineCount,
+                    replyPreview = parsed.replyPreview,
+                )
+            )
+        }
+    }
+
     // ── Private ────────────────────────────────────────
+
+    private fun providerDiagnosticTool(): ToolDefinitionDto =
+        ToolDefinitionDto(
+            function = FunctionDefinitionDto(
+                name = "diagnostic_noop",
+                description = "Diagnostic no-op tool used to verify chat tool schema compatibility.",
+                parameters = buildJsonObject {
+                    put("type", JsonPrimitive("object"))
+                    put("properties", buildJsonObject { })
+                },
+            ),
+        )
+
+    private data class FormalStreamParseResult(
+        val sawContent: Boolean,
+        val sawToolEvent: Boolean,
+        val sawDone: Boolean,
+        val sawFinish: Boolean,
+        val lineCount: Int,
+        val replyPreview: String,
+    ) {
+        val hasUsefulOutput: Boolean = sawContent || sawToolEvent
+    }
+
+    private fun parseOpenAiFormalStream(reader: java.io.BufferedReader): FormalStreamParseResult {
+        var sawContent = false
+        var sawToolEvent = false
+        var sawDone = false
+        var sawFinish = false
+        var lineCount = 0
+        val content = StringBuilder()
+
+        reader.useLines { lines ->
+            for (line in lines) {
+                if (line.isBlank() || !line.startsWith("data: ")) continue
+                val payload = line.removePrefix("data: ").trim()
+                if (payload == "[DONE]") {
+                    sawDone = true
+                    break
+                }
+                lineCount++
+                val chunk = runCatching { json.decodeFromString(StreamChunk.serializer(), payload) }
+                    .getOrNull()
+                    ?: continue
+                chunk.choices.forEach { choice ->
+                    if (!choice.finishReason.isNullOrBlank()) {
+                        sawFinish = true
+                    }
+                    val delta = choice.delta ?: return@forEach
+                    if (!delta.content.isNullOrBlank()) {
+                        sawContent = true
+                        content.append(delta.content)
+                    }
+                    if (!delta.toolCalls.isNullOrEmpty()) {
+                        sawToolEvent = true
+                    }
+                }
+            }
+        }
+
+        return FormalStreamParseResult(
+            sawContent = sawContent,
+            sawToolEvent = sawToolEvent,
+            sawDone = sawDone,
+            sawFinish = sawFinish,
+            lineCount = lineCount,
+            replyPreview = content.toString().trim().take(120),
+        )
+    }
+
+    private fun parseAnthropicFormalStream(reader: java.io.BufferedReader): FormalStreamParseResult {
+        var sawContent = false
+        var sawToolEvent = false
+        var sawDone = false
+        var sawFinish = false
+        var lineCount = 0
+        val content = StringBuilder()
+
+        reader.useLines { lines ->
+            for (line in lines) {
+                if (line.isBlank() || !line.startsWith("data: ")) continue
+                val payload = line.removePrefix("data: ").trim()
+                if (payload == "[DONE]") {
+                    sawDone = true
+                    break
+                }
+                lineCount++
+                val event = runCatching { json.parseToJsonElement(payload).jsonObject }
+                    .getOrNull()
+                    ?: continue
+                when (event["type"]?.jsonPrimitive?.contentOrNull) {
+                    "message_stop" -> sawFinish = true
+                    "content_block_start" -> {
+                        val block = event["content_block"]?.jsonObject
+                        if (block?.get("type")?.jsonPrimitive?.contentOrNull == "tool_use") {
+                            sawToolEvent = true
+                        }
+                        val text = block
+                            ?.get("text")
+                            ?.jsonPrimitive
+                            ?.contentOrNull
+                            .orEmpty()
+                        if (text.isNotBlank()) {
+                            sawContent = true
+                            content.append(text)
+                        }
+                    }
+                    "content_block_delta" -> {
+                        val delta = event["delta"]?.jsonObject
+                        val type = delta?.get("type")?.jsonPrimitive?.contentOrNull.orEmpty()
+                        when (type) {
+                            "text_delta" -> {
+                                val text = delta
+                                    ?.get("text")
+                                    ?.jsonPrimitive
+                                    ?.contentOrNull
+                                    .orEmpty()
+                                if (text.isNotBlank()) {
+                                    sawContent = true
+                                    content.append(text)
+                                }
+                            }
+                            "input_json_delta" -> sawToolEvent = true
+                        }
+                    }
+                }
+            }
+        }
+
+        return FormalStreamParseResult(
+            sawContent = sawContent,
+            sawToolEvent = sawToolEvent,
+            sawDone = sawDone,
+            sawFinish = sawFinish,
+            lineCount = lineCount,
+            replyPreview = content.toString().trim().take(120),
+        )
+    }
 
     private fun activeProviderProtocol(modelName: String): ProviderProtocol {
         return if (modelOverrideProvider() == null) {
@@ -1319,6 +1704,21 @@ data class ProviderTestResult(
     val protocol: ProviderProtocol,
     val endpointMode: ProviderEndpointMode,
     val latencyMs: Long,
+    val replyPreview: String,
+)
+
+data class ProviderFormalChatTestResult(
+    val endpoint: String,
+    val modelName: String,
+    val protocol: ProviderProtocol,
+    val endpointMode: ProviderEndpointMode,
+    val latencyMs: Long,
+    val stream: Boolean,
+    val toolsRequested: Boolean,
+    val compatibilityRetry: Boolean,
+    val sawContent: Boolean,
+    val sawToolEvent: Boolean,
+    val lineCount: Int,
     val replyPreview: String,
 )
 

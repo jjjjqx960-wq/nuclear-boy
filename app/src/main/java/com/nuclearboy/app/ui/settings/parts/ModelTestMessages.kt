@@ -195,6 +195,49 @@ internal fun providerRequestCurlTemplate(
     }
 }
 
+internal fun providerFormalChatCurlTemplate(
+    protocolLabel: String,
+    endpoint: String,
+    modelName: String,
+    hasApiKey: Boolean,
+): String {
+    val normalizedEndpoint = endpoint.trim()
+    val normalizedModel = modelName.trim()
+    if (normalizedEndpoint.isBlank() || normalizedModel.isBlank()) return ""
+
+    val isAnthropic = protocolLabel.trim().equals("Anthropic", ignoreCase = true)
+    val body = if (isAnthropic) {
+        """{"model":"${normalizedModel.jsonEscaped()}","max_tokens":32,"stream":true,"messages":[{"role":"user","content":"ping"}],"tools":[{"name":"diagnostic_noop","description":"Diagnostic no-op tool.","input_schema":{"type":"object","properties":{}}}]}"""
+    } else {
+        """{"model":"${normalizedModel.jsonEscaped()}","messages":[{"role":"user","content":"ping"}],"temperature":0.0,"top_p":1.0,"max_tokens":32,"stream":true,"tools":[{"type":"function","function":{"name":"diagnostic_noop","description":"Diagnostic no-op tool.","parameters":{"type":"object","properties":{}}}}]}"""
+    }
+    val headers = buildList {
+        add("  -H ${"Accept: text/event-stream".shellSingleQuoted()}")
+        add("  -H ${"Content-Type: application/json; charset=utf-8".shellSingleQuoted()}")
+        if (hasApiKey) {
+            val header = if (isAnthropic) {
+                "x-api-key: <REDACTED_TOKEN>"
+            } else {
+                "Authorization: Bearer <REDACTED_TOKEN>"
+            }
+            add("  -H ${header.shellSingleQuoted()}")
+        }
+        if (isAnthropic) {
+            add("  -H ${"anthropic-version: 2023-06-01".shellSingleQuoted()}")
+        }
+    }
+
+    return buildString {
+        append("curl -N -X POST ")
+        append(normalizedEndpoint.shellSingleQuoted())
+        append(" \\\n")
+        append(headers.joinToString(" \\\n"))
+        append(" \\\n")
+        append("  --data ")
+        append(body.shellSingleQuoted())
+    }
+}
+
 internal fun providerModelListCurlTemplate(
     endpoint: String,
     hasApiKey: Boolean,

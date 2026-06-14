@@ -1,3 +1,5 @@
+2026-06-14 1.1.24 新增 `ccswitch-prompts` 仓库级提示词目录，整合 Claude Code 与 Codex 共用的 NuclearBoy 开发规范、分层约束、敏感信息脱敏规则和 CC Switch 同步建议。
+2026-06-14 1.1.23 第三方模型设置页测试升级为真实聊天链路前置验证：轻量 ping 成功后继续用同一配置发送 stream=true + 工具定义的正式聊天探测，只有正式链路也可用才显示成功，避免用户添加后回到聊天页才发现空回复或兼容失败。
 2026-06-14 1.1.22 Agent 临时可重试错误不再先渲染成最终错误气泡；新增 RetryableErrorGate 区分“重试中”和“最终失败”，避免网络/API 短暂波动后聊天里残留误导性“处理时遇到问题”。
 2026-06-14 1.1.21 Agent 长任务移除固定 20 次工具调用上限，允许真实多步骤任务持续执行到最终回复或用户取消；同时新增连续重复同一批工具调用 3 次的保护，避免模型陷入无意义循环。
 2026-06-13 1.1.20 中文感知的记忆召回（效果优化，替代 FTS 方案）：原计划给语义记忆上 SQLite FTS，但深查发现——本项目内容以中文为主，FTS4/5 默认分词器不切中文（整段当一个 token，反比现有 LIKE 子串更差），真正能做中文子串的 FTS5 trigram 需 SQLite≥3.34=API31+，而项目 minSdk 26 覆盖不到；加上 memory 表很小、LIKE 速度本非瓶颈，且 FTS 要动用户数据做 schema 迁移有风险。故**放弃 FTS**，改做零迁移、全 API 通用、真正提升中文召回的方案：①新增 extractSearchTerms（中文按 2-gram、ASCII 整词小写，去重+上限，纯函数 7 单测）；②MemoryDao 加 @RawQuery searchSemanticMemoriesRaw（参数化动态 OR-LIKE，无 schema 改动）；③MemoryStore.searchSemanticByTerms 用分词构建查询，**任何异常/无命中都安全回退原整句子串搜索**，保证不弱于改造前。原先中文查询无空格→整句变一个词→只能整句匹配，现按 bigram 大幅提升召回。全单测 + R8 release 绿。

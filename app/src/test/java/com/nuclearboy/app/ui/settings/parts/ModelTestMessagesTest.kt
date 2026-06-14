@@ -2,6 +2,8 @@ package com.nuclearboy.app.ui.settings.parts
 
 import com.nuclearboy.common.AppError
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ModelTestMessagesTest {
@@ -86,6 +88,36 @@ class ModelTestMessagesTest {
         val hint = modelTestFailureActionHint("unexpected gateway body")
 
         assertEquals("", hint)
+    }
+
+    @Test
+    fun `formal chat curl template uses stream and redacted openai authorization`() {
+        val template = providerFormalChatCurlTemplate(
+            protocolLabel = "OpenAI",
+            endpoint = "http://154.12.90.249:20128/v1/chat/completions",
+            modelName = "nvidia/minimaxai/minimax-m2.7",
+            hasApiKey = true,
+        )
+
+        assertTrue(template.contains("stream\":true"))
+        assertTrue(template.contains("diagnostic_noop"))
+        assertTrue(template.contains("Authorization: Bearer <REDACTED_TOKEN>"))
+        assertFalse(template.contains("sk-"))
+    }
+
+    @Test
+    fun `formal chat curl template uses anthropic headers and tool schema`() {
+        val template = providerFormalChatCurlTemplate(
+            protocolLabel = "Anthropic",
+            endpoint = "https://gateway.example.com/v1/messages",
+            modelName = "claude-3-5-sonnet",
+            hasApiKey = true,
+        )
+
+        assertTrue(template.contains("stream\":true"))
+        assertTrue(template.contains("input_schema"))
+        assertTrue(template.contains("x-api-key: <REDACTED_TOKEN>"))
+        assertTrue(template.contains("anthropic-version: 2023-06-01"))
     }
 
     @Test
