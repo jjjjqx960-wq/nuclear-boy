@@ -34,6 +34,25 @@ fun detectToolActionDraftHint(text: String): ToolActionDraftHint? {
     )
 }
 
+fun appendToolRealityGuard(text: String): String {
+    val trimmed = text.trimEnd()
+    if (trimmed.isBlank() || hasRealityGuard(trimmed)) return text
+    return "$trimmed\n\n$TOOL_REALITY_GUARD"
+}
+
+private fun hasRealityGuard(text: String): Boolean =
+    realityGuardMarkers.any { text.contains(it, ignoreCase = true) }
+
+const val TOOL_REALITY_GUARD: String =
+    "如果当前没有真实工具调用能力，请明确回答：工具受限，未真实执行；不要编造已读取、已写入、已运行或已验证的结果。"
+
+private val realityGuardMarkers = listOf(
+    "工具受限，未真实执行",
+    "不要编造已读取",
+    "不要伪造成功",
+    "禁止伪造",
+)
+
 private val fileWriteMarkers = listOf(
     "写入",
     "写文件",

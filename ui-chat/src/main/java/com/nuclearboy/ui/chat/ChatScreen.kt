@@ -63,6 +63,7 @@ import com.nuclearboy.ui.chat.components.FilePanelSortBar
 import com.nuclearboy.ui.chat.components.FileSelectionActionBar
 import com.nuclearboy.ui.chat.components.ScrollToBottomAction
 import com.nuclearboy.ui.chat.components.ToolActionDraftHintBar
+import com.nuclearboy.ui.chat.parts.appendToolRealityGuard
 import com.nuclearboy.ui.chat.parts.appendToChatDraft
 import com.nuclearboy.ui.chat.parts.buildFilePanelOverview
 import com.nuclearboy.ui.chat.parts.buildFileReferencePrompt
@@ -1404,7 +1405,13 @@ private fun ChatInputBar(
             )
             Spacer(Modifier.height(4.dp))
             toolActionDraftHint?.let { hint ->
-                ToolActionDraftHintBar(hint)
+                ToolActionDraftHintBar(
+                    hint = hint,
+                    onAppendGuard = {
+                        onTextChange(appendToolRealityGuard(text))
+                        focusRequester.requestFocus()
+                    },
+                )
                 Spacer(Modifier.height(4.dp))
             }
             Row(

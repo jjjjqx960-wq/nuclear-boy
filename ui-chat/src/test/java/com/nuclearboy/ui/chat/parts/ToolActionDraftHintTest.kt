@@ -30,4 +30,16 @@ class ToolActionDraftHintTest {
 
         assertNull(hint)
     }
+
+    @Test
+    fun appendRealityGuardOnce() {
+        val guarded = appendToolRealityGuard("请读取 demo.md")
+
+        assertTrue(guarded.contains("工具受限，未真实执行"))
+        assertTrue(guarded.contains("不要编造已读取"))
+        assertTrue(appendToolRealityGuard(guarded).countOccurrences("工具受限，未真实执行") == 1)
+    }
+
+    private fun String.countOccurrences(needle: String): Int =
+        split(needle).size - 1
 }

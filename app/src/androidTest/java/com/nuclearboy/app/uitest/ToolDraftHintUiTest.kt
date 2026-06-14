@@ -32,6 +32,17 @@ class ToolDraftHintUiTest {
             device.hasObject(By.descContains("工具能力预警"))
         })
         assertTrue("工具型草稿预警标题应可见", device.hasObject(By.textContains("可能需要工具能力")))
+
+        val appendGuard = device.findObject(By.desc("追加防假执行提示"))
+            ?: device.findObject(By.text("追加防假执行提示"))
+        assertTrue("工具型草稿预警应提供追加防假执行提示操作", appendGuard != null)
+        appendGuard?.click()
+
+        val input = robot.waitForChatInput(10_000)
+        assertTrue("追加后输入框应包含防假执行约束", waitUntil(10_000) {
+            input.text.orEmpty().contains("工具受限，未真实执行") &&
+                input.text.orEmpty().contains("不要编造已读取")
+        })
     }
 
     private fun waitUntil(timeoutMs: Long, predicate: () -> Boolean): Boolean {
