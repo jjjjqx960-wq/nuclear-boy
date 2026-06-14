@@ -5,8 +5,8 @@ agp = "8.7.3"
 androidx-core = "1.15.0"
 
 # Nuclear Boy project config
-nuclearboy-version-code = "135"
-nuclearboy-version-name = "1.1.25"
+nuclearboy-version-code = "140"
+nuclearboy-version-name = "1.1.30"
 nuclearboy-min-sdk = "26"
 nuclearboy-target-sdk = "35"
 nuclearboy-compile-sdk = "35"

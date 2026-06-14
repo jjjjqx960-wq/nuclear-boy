@@ -13,6 +13,7 @@ import com.nuclearboy.common.*
 import com.nuclearboy.common.AppConstants
 import com.nuclearboy.common.AppResult
 import com.nuclearboy.memory.MemoryStore
+import com.nuclearboy.ui.chat.parts.buildToolActionEvidenceMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -293,13 +294,18 @@ class ChatViewModel @Inject constructor(
         trimmed: String,
         clearAgentJobOnFinalize: Boolean = true,
     ): String {
+        val toolEvidenceMessage = buildToolActionEvidenceMessage(trimmed)?.let { evidence ->
+            ChatMessage(role = MessageRole.SYSTEM, content = evidence, status = MessageStatus.COMPLETE)
+        }
         // Check API key
         val key = apiKeyManager.getActiveKey()
         android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() credential status: configured=${key != null} blank=${key?.isBlank() == true}")
         if (key == null) {
             android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() no API key, showing tip")
             val userMessage = ChatMessage(role = MessageRole.USER, content = trimmed, status = MessageStatus.COMPLETE)
-            _messages.update { it + userMessage }
+            _messages.update { current ->
+                if (toolEvidenceMessage == null) current + userMessage else current + userMessage + toolEvidenceMessage
+            }
             addSystemMessage("需要配置 DeepSeek API Key 才能开始\n\n请到右上角「设置」输入你的 Key（sk-v4- 开头），保存后即可使用。\n如果你用的是自建模型服务，也可以在设置里开启「第三方模型」")
             return ""
         }
@@ -307,7 +313,9 @@ class ChatViewModel @Inject constructor(
         val userMessage = ChatMessage(
             role = MessageRole.USER, content = trimmed, status = MessageStatus.COMPLETE,
         )
-        _messages.update { it + userMessage }
+        _messages.update { current ->
+            if (toolEvidenceMessage == null) current + userMessage else current + userMessage + toolEvidenceMessage
+        }
         android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() userMessage created id=${userMessage.id}")
         lastUserMessage = userMessage
         saveMessages()

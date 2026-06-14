@@ -40,6 +40,11 @@ fun appendToolRealityGuard(text: String): String {
     return "$trimmed\n\n$TOOL_REALITY_GUARD"
 }
 
+fun buildToolActionEvidenceMessage(text: String): String? {
+    val hint = detectToolActionDraftHint(text) ?: return null
+    return "本轮工具能力提示：${hint.summary}\n回看时请以可见工具执行卡、文件变更卡或明确的“工具受限，未真实执行”为准；没有这些证据就不要当作已完成。"
+}
+
 private fun hasRealityGuard(text: String): Boolean =
     realityGuardMarkers.any { text.contains(it, ignoreCase = true) }
 

@@ -1,3 +1,4 @@
+2026-06-14 1.1.30 ToolActionDraftHintTest 覆盖工具型发送证据提示生成和普通聊天不插入证据提示。
 2026-06-14 1.1.29 ToolActionDraftHintTest 覆盖防假执行约束只追加一次，避免重复污染草稿。
 2026-06-14 1.1.28 新增 ToolActionDraftHintTest，覆盖写文件、运行 Gradle 命令和普通写作请求不误判。
 2026-06-14 1.1.27 新增 ToolLimitNoticeTest，覆盖工具协议降级、兼容模式限制和普通 404 错误不误判。

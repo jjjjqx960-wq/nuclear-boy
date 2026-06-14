@@ -390,7 +390,7 @@ fun ChatScreen(
                 hasMessages = uiState.messages.any { it.role != MessageRole.SYSTEM },
                 focusRequest = inputFocusRequest,
                 placeholder = if (projectId == "__general__") "和核弹男孩对话…" else "输入指令…",
-                showToolActionDraftHint = apiKeyState.customProviderEnabled,
+                showToolActionDraftHint = true,
                 onAttachFile = {
                     android.util.Log.e("NuclearBoy", "[ChatScreen] filePicker launched")
                     filePickerLauncher.launch(arrayOf("*/*"))
@@ -1404,16 +1404,6 @@ private fun ChatInputBar(
                 },
             )
             Spacer(Modifier.height(4.dp))
-            toolActionDraftHint?.let { hint ->
-                ToolActionDraftHintBar(
-                    hint = hint,
-                    onAppendGuard = {
-                        onTextChange(appendToolRealityGuard(text))
-                        focusRequester.requestFocus()
-                    },
-                )
-                Spacer(Modifier.height(4.dp))
-            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1490,6 +1480,16 @@ private fun ChatInputBar(
                         tint = if (canSend) Color.Black else nc.material.onSurfaceVariant.copy(alpha = 0.3f))
                 }
             }
+            }
+            toolActionDraftHint?.let { hint ->
+                Spacer(Modifier.height(4.dp))
+                ToolActionDraftHintBar(
+                    hint = hint,
+                    onAppendGuard = {
+                        onTextChange(appendToolRealityGuard(text))
+                        focusRequester.requestFocus()
+                    },
+                )
             }
         }
     }

@@ -40,6 +40,23 @@ class ToolActionDraftHintTest {
         assertTrue(appendToolRealityGuard(guarded).countOccurrences("工具受限，未真实执行") == 1)
     }
 
+    @Test
+    fun buildEvidenceMessageForToolRequest() {
+        val evidence = buildToolActionEvidenceMessage("请读取 demo.md 并运行测试")
+
+        assertNotNull(evidence)
+        assertTrue(evidence.orEmpty().contains("本轮工具能力提示"))
+        assertTrue(evidence.orEmpty().contains("可见工具执行卡"))
+        assertTrue(evidence.orEmpty().contains("工具受限，未真实执行"))
+    }
+
+    @Test
+    fun skipEvidenceMessageForOrdinaryChat() {
+        val evidence = buildToolActionEvidenceMessage("帮我写一个睡前故事")
+
+        assertNull(evidence)
+    }
+
     private fun String.countOccurrences(needle: String): Int =
         split(needle).size - 1
 }

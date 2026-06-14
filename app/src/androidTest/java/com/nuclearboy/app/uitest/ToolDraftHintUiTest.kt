@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiObject2
 import com.nuclearboy.api.deepseek.ApiKeyManager
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,7 +30,8 @@ class ToolDraftHintUiTest {
         robot.enterDraftText("请读取 skills/app-dialog-smoke/SKILL.md 并运行验证")
 
         assertTrue("工具型草稿应在发送前显示工具能力预警语义", waitUntil(10_000) {
-            device.hasObject(By.descContains("工具能力预警"))
+            device.hasObject(By.descContains("工具能力预警")) ||
+                device.hasObject(By.textContains("可能需要工具能力"))
         })
         assertTrue("工具型草稿预警标题应可见", device.hasObject(By.textContains("可能需要工具能力")))
 
@@ -43,6 +45,40 @@ class ToolDraftHintUiTest {
             input.text.orEmpty().contains("工具受限，未真实执行") &&
                 input.text.orEmpty().contains("不要编造已读取")
         })
+
+        val sendButton = waitForObject("发送消息按钮", 10_000) {
+            device.findObject(By.desc("发送消息"))
+        }
+        tapObject(sendButton)
+
+        assertTrue("发送后聊天流应留下工具能力证据提示", waitUntil(10_000) {
+            device.hasObject(By.textContains("本轮工具能力提示")) &&
+                device.hasObject(By.textContains("可见工具执行卡"))
+        })
+    }
+
+    private fun tapObject(target: UiObject2) {
+        val bounds = target.visibleBounds
+        val result = device.executeShellCommand("su -c input tap ${bounds.centerX()} ${bounds.centerY()}")
+        assertTrue(
+            "root 点击不应失败：$result",
+            !result.contains("SecurityException", ignoreCase = true) &&
+                !result.contains("Permission denied", ignoreCase = true),
+        )
+        device.waitForIdle(1_000)
+    }
+
+    private fun waitForObject(
+        label: String,
+        timeoutMs: Long,
+        finder: () -> UiObject2?,
+    ): UiObject2 {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        do {
+            finder()?.let { return it }
+            Thread.sleep(250)
+        } while (System.currentTimeMillis() < deadline)
+        throw AssertionError("等待 $label 超时")
     }
 
     private fun waitUntil(timeoutMs: Long, predicate: () -> Boolean): Boolean {

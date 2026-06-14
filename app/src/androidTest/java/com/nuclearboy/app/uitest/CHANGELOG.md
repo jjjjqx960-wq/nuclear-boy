@@ -1,3 +1,4 @@
+2026-06-14 1.1.30 ToolDraftHintUiTest 增加真实点击发送后的系统证据提示断言，防止提示只停留在草稿态。
 2026-06-14 1.1.29 ToolDraftHintUiTest 增加“追加防假执行提示”按钮点击和输入框回填断言。
 2026-06-14 1.1.28 沉淀 Compose 输入态测试规则：发送前 UI 状态测试复用 ChatJourneyRobot.enterDraftText，不再裸用 UiObject2.setText 后直接断言。
 2026-06-14 1.1.28 ChatJourneyRobot 暴露 enterDraftText，供发送前输入态测试复用真实聚焦、清空和设值路径。
