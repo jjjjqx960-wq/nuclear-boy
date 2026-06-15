@@ -228,6 +228,33 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun detectOrderCancelRequest() {
+        val hint = detectToolActionDraftHint("帮我把这个订单取消掉")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.summary.orEmpty().contains("修改远程配置"))
+    }
+
+    @Test
+    fun detectShippingNumberUpdateRequest() {
+        val hint = detectToolActionDraftHint("把这个订单改物流单号")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("接口/API 调用记录"))
+    }
+
+    @Test
+    fun detectTicketAssignRequest() {
+        val hint = detectToolActionDraftHint("帮我把这个工单指派给管理员")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("远程配置变更记录"))
+    }
+
+    @Test
     fun ignoreApiConceptQuestion() {
         val hint = detectToolActionDraftHint("API 是什么")
 
@@ -314,6 +341,27 @@ class ToolActionDraftHintTest {
     @Test
     fun ignorePermissionDocumentationRequest() {
         val hint = detectToolActionDraftHint("帮我创建权限说明文档")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreOrderCancelLearningQuestion() {
+        val hint = detectToolActionDraftHint("怎么取消订单")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreShippingNoticeWritingRequest() {
+        val hint = detectToolActionDraftHint("帮我写一段发货通知文案")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreOrderCodeModelRequest() {
+        val hint = detectToolActionDraftHint("帮我创建订单数据类")
 
         assertNull(hint)
     }
