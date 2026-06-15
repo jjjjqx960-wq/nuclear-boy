@@ -20,6 +20,8 @@
 - `adb shell am broadcast -a com.nuclearboy.app.RUN_DIAGNOSTICS -n com.nuclearboy.app.debug/com.nuclearboy.app.diagnostics.DiagnosticsReceiver`
 - `adb shell am broadcast -a com.nuclearboy.app.DEBUG_SAVE_CUSTOM_MODEL -n com.nuclearboy.app.debug/com.nuclearboy.app.diagnostics.DebugModelConfigReceiver ...`
 
+调试模型配置广播优先使用 `base_url_b64`、`model_name_b64`、`display_name_b64`、`api_key_b64` 传值，避免 shell/`am broadcast` 拆分 `http://`、斜杠、空格或密钥特殊字符；日志仍不得输出明文 Key。
+
 ## 验证方式
 
 验证设置页全量诊断、ADB 广播诊断、debug 模型配置写入、debug 固定会话注入、模型连通性、第三方正式聊天兼容性、Python 执行、文件写读删和工具注册表执行结果。

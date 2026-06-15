@@ -74,6 +74,53 @@ class ToolActionDraftHintTest {
         assertNull(guard)
     }
 
+    @Test
+    fun buildMissingEvidenceReviewWhenToolRequestHasNoEvidence() {
+        val review = buildToolActionMissingEvidenceReview(
+            userText = "请读取 demo.md 并运行测试",
+            assistantText = "我已经检查完了，结果正常。",
+            hasVisibleToolEvidence = false,
+        )
+
+        assertNotNull(review)
+        assertTrue(review.orEmpty().contains("本轮结果复核"))
+        assertTrue(review.orEmpty().contains("未看到工具执行卡"))
+        assertTrue(review.orEmpty().contains("不要把本轮回复当作已完成结果"))
+    }
+
+    @Test
+    fun skipMissingEvidenceReviewWhenToolEvidenceExists() {
+        val review = buildToolActionMissingEvidenceReview(
+            userText = "请读取 demo.md 并运行测试",
+            assistantText = "已根据工具结果完成。",
+            hasVisibleToolEvidence = true,
+        )
+
+        assertNull(review)
+    }
+
+    @Test
+    fun skipMissingEvidenceReviewWhenAssistantDeclaresLimitation() {
+        val review = buildToolActionMissingEvidenceReview(
+            userText = "请读取 demo.md 并运行测试",
+            assistantText = "工具受限，未真实执行。需要切换支持 tools 的模型。",
+            hasVisibleToolEvidence = false,
+        )
+
+        assertNull(review)
+    }
+
+    @Test
+    fun skipMissingEvidenceReviewForOrdinaryChat() {
+        val review = buildToolActionMissingEvidenceReview(
+            userText = "帮我写一个睡前故事",
+            assistantText = "从前有一颗星星。",
+            hasVisibleToolEvidence = false,
+        )
+
+        assertNull(review)
+    }
+
     private fun String.countOccurrences(needle: String): Int =
         split(needle).size - 1
 }

@@ -56,8 +56,21 @@ fun buildToolActionModelGuard(text: String): String? {
     """.trimIndent()
 }
 
+fun buildToolActionMissingEvidenceReview(
+    userText: String,
+    assistantText: String,
+    hasVisibleToolEvidence: Boolean,
+): String? {
+    val hint = detectToolActionDraftHint(userText) ?: return null
+    if (hasVisibleToolEvidence || assistantDeclaresToolLimitation(assistantText)) return null
+    return "本轮结果复核：${hint.summary}\n未看到工具执行卡、文件变更卡，也未看到明确的“工具受限，未真实执行”说明；请先不要把本轮回复当作已完成结果。"
+}
+
 private fun hasRealityGuard(text: String): Boolean =
     realityGuardMarkers.any { text.contains(it, ignoreCase = true) }
+
+private fun assistantDeclaresToolLimitation(text: String): Boolean =
+    toolLimitationMarkers.any { text.contains(it, ignoreCase = true) }
 
 const val TOOL_REALITY_GUARD: String =
     "如果当前没有真实工具调用能力，请明确回答：工具受限，未真实执行；不要编造已读取、已写入、已运行或已验证的结果。"
@@ -67,6 +80,15 @@ private val realityGuardMarkers = listOf(
     "不要编造已读取",
     "不要伪造成功",
     "禁止伪造",
+)
+
+private val toolLimitationMarkers = listOf(
+    "工具受限",
+    "未真实执行",
+    "尚未执行",
+    "没有真实工具",
+    "无法调用工具",
+    "不能真实",
 )
 
 private val fileWriteMarkers = listOf(

@@ -1,3 +1,8 @@
+2026-06-14 1.1.32 ToolMissingEvidenceReviewUiTest 改用非法 scheme 的快速失败调试模型，避免不可达 loopback 在设备上触发 120 秒网络超时。
+2026-06-14 1.1.32 ChatJourneyRobot 的调试模型注入改用 base64 extras 传递 baseUrl、模型名和 Key，避免 `http://` 被 shell/广播拆坏导致正式聊天使用畸形 URL。
+2026-06-14 1.1.32 ChatJourneyRobot 移除调试模型广播里的带空格 display name，避免受限设备 shell 拆参后影响 Receiver 投递。
+2026-06-14 1.1.32 ChatJourneyRobot 的调试模型注入改为走目标 App debug-only Receiver，避免 test 进程写配置后目标前端仍使用旧模型。
+2026-06-14 1.1.32 新增 ToolMissingEvidenceReviewUiTest，使用真实 App 输入、发送和不可达调试模型验证工具型请求完成后的复核提示可见。
 2026-06-14 1.1.30 ToolDraftHintUiTest 增加真实点击发送后的系统证据提示断言，防止提示只停留在草稿态。
 2026-06-14 1.1.29 ToolDraftHintUiTest 增加“追加防假执行提示”按钮点击和输入框回填断言。
 2026-06-14 1.1.28 沉淀 Compose 输入态测试规则：发送前 UI 状态测试复用 ChatJourneyRobot.enterDraftText，不再裸用 UiObject2.setText 后直接断言。

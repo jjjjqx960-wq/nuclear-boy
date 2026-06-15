@@ -1,5 +1,6 @@
 package com.nuclearboy.app.uitest
 
+import android.util.Base64
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
@@ -35,8 +36,32 @@ class ChatJourneyRobot {
         val model = args.getString("nbModel")?.trim().orEmpty()
         if (baseUrl.isBlank() || model.isBlank()) return
         val apiKey = args.getString("nbApiKey")?.trim().orEmpty()
-        val manager = com.nuclearboy.api.deepseek.ApiKeyManager(instrumentation.targetContext)
-        manager.setCustomProviderConfig(baseUrl = baseUrl, modelName = model, apiKey = apiKey)
+        val endpointMode = args.getString("nbEndpointMode")?.trim().orEmpty().ifBlank { "auto" }
+        configureDebugProvider(baseUrl, model, apiKey, endpointMode)
+    }
+
+    fun configureDebugProvider(
+        baseUrl: String,
+        model: String,
+        apiKey: String,
+        endpointMode: String = "auto",
+    ) {
+        val result = device.executeShellCommand(
+            listOf(
+                "am broadcast",
+                "-a com.nuclearboy.app.DEBUG_SAVE_CUSTOM_MODEL",
+                "-n $appPackageName/com.nuclearboy.app.diagnostics.DebugModelConfigReceiver",
+                "--es base_url_b64 ${baseUrl.toShellSafeBase64()}",
+                "--es model_name_b64 ${model.toShellSafeBase64()}",
+                "--es api_key_b64 ${apiKey.toShellSafeBase64()}",
+                "--es protocol openai",
+                "--es endpoint_mode ${endpointMode.shellSingleQuoted()}",
+                "--ez select_after_save true",
+                "--ez keep_only true",
+            ).joinToString(" "),
+        )
+        assertFalse("调试模型配置广播不应失败：$result", result.contains("Exception", ignoreCase = true))
+        assertTrue("调试模型配置广播应完成：$result", result.contains("Broadcast completed"))
     }
 
     fun resetConversationHistory() {
@@ -84,6 +109,7 @@ class ChatJourneyRobot {
         label: String,
         timeoutMs: Long = 150_000,
         requireVisibleAssistantIncrease: Boolean = true,
+        failOnKnownChatFailure: Boolean = true,
     ): ChatTurnEvidence {
         val assistantCountBefore = assistantMessageCount()
         focusChatInputWithKeyboard()
@@ -103,8 +129,13 @@ class ChatJourneyRobot {
             chatInputText()?.contains(prompt) != true
         })
 
-        val stopWasVisible = waitForChatCompletion(label, assistantCountBefore, timeoutMs)
-        assertNoKnownChatFailure()
+        val stopWasVisible = waitForChatCompletion(
+            label = label,
+            assistantCountBefore = assistantCountBefore,
+            timeoutMs = timeoutMs,
+            failOnKnownChatFailure = failOnKnownChatFailure,
+        )
+        if (failOnKnownChatFailure) assertNoKnownChatFailure()
         val assistantCountAfter = assistantMessageCount()
         if (requireVisibleAssistantIncrease) {
             assertTrue(
@@ -239,11 +270,12 @@ class ChatJourneyRobot {
         label: String,
         assistantCountBefore: Int,
         timeoutMs: Long,
+        failOnKnownChatFailure: Boolean,
     ): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
         var stopWasVisible = false
         do {
-            assertNoKnownChatFailure()
+            if (failOnKnownChatFailure) assertNoKnownChatFailure()
             val assistantCountAfter = assistantMessageCount()
             val processing = device.hasObject(By.desc("停止"))
             stopWasVisible = stopWasVisible || processing
@@ -314,6 +346,12 @@ class ChatJourneyRobot {
 
     private fun String.isShellInputSafe(): Boolean =
         all { it.code in 0x21..0x7E && it !in shellSpecialChars } && isNotBlank()
+
+    private fun String.shellSingleQuoted(): String =
+        "'" + replace("'", "'\\''") + "'"
+
+    private fun String.toShellSafeBase64(): String =
+        Base64.encodeToString(toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
 
     private companion object {
         private val shellSpecialChars = setOf('"', '\'', '\\', ';', '&', '|', '<', '>', '(', ')', '$', '`')

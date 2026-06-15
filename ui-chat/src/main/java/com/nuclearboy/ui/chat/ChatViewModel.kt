@@ -14,6 +14,7 @@ import com.nuclearboy.common.AppConstants
 import com.nuclearboy.common.AppResult
 import com.nuclearboy.memory.MemoryStore
 import com.nuclearboy.ui.chat.parts.buildToolActionEvidenceMessage
+import com.nuclearboy.ui.chat.parts.buildToolActionMissingEvidenceReview
 import com.nuclearboy.ui.chat.parts.buildToolActionModelGuard
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -1040,6 +1041,7 @@ class ChatViewModel @Inject constructor(
         currentAssistantMsgId = null
         // Show "ready" notification with content summary — find last ASSISTANT message
         val lastAssistant = _messages.value.findLast { it.role == MessageRole.ASSISTANT }
+        appendToolActionMissingEvidenceReview(lastAssistant)
         val notificationSent = lastAssistant != null && lastAssistant.content.isNotBlank()
         android.util.Log.e("NuclearBoy", "[ChatVM] finalizeProcessing() notificationSent=$notificationSent lastAssistantRole=${lastAssistant?.role}")
         if (lastAssistant != null && lastAssistant.content.isNotBlank()) {
@@ -1074,6 +1076,24 @@ class ChatViewModel @Inject constructor(
         _messages.update { messages ->
             messages.map { msg -> if (msg.id == id) transform(msg) else msg }
         }
+    }
+
+    private fun appendToolActionMissingEvidenceReview(lastAssistant: ChatMessage?) {
+        val userText = lastUserMessage?.content.orEmpty()
+        val assistant = lastAssistant ?: return
+        if (assistant.status != MessageStatus.COMPLETE || assistant.content.isBlank()) return
+        val hasVisibleToolEvidence = assistant.toolCalls.isNotEmpty() || assistant.fileChanges.isNotEmpty()
+        val review = buildToolActionMissingEvidenceReview(
+            userText = userText,
+            assistantText = assistant.content,
+            hasVisibleToolEvidence = hasVisibleToolEvidence,
+        ) ?: return
+        val lastMessage = _messages.value.lastOrNull()
+        if (lastMessage?.role == MessageRole.SYSTEM && lastMessage.content == review) return
+        _messages.update {
+            it + ChatMessage(role = MessageRole.SYSTEM, content = review, status = MessageStatus.COMPLETE)
+        }
+        _scrollToBottom.value++
     }
 
     companion object {

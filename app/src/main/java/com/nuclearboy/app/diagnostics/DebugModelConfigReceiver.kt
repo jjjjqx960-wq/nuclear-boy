@@ -3,6 +3,7 @@ package com.nuclearboy.app.diagnostics
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Base64
 import android.util.Log
 import com.nuclearboy.api.deepseek.ApiKeyManager
 import com.nuclearboy.api.deepseek.ProviderEndpointMode
@@ -23,13 +24,13 @@ class DebugModelConfigReceiver : BroadcastReceiver() {
             return
         }
 
-        val baseUrl = intent.getStringExtra(EXTRA_BASE_URL).orEmpty().trim()
-        val modelName = intent.getStringExtra(EXTRA_MODEL_NAME).orEmpty().trim()
-        val displayName = intent.getStringExtra(EXTRA_DISPLAY_NAME)
+        val baseUrl = intent.stringExtra(EXTRA_BASE_URL, EXTRA_BASE_URL_B64).orEmpty().trim()
+        val modelName = intent.stringExtra(EXTRA_MODEL_NAME, EXTRA_MODEL_NAME_B64).orEmpty().trim()
+        val displayName = intent.stringExtra(EXTRA_DISPLAY_NAME, EXTRA_DISPLAY_NAME_B64)
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?: modelName.ifBlank { "调试模型" }
-        val apiKey = intent.getStringExtra(EXTRA_API_KEY)?.trim().orEmpty()
+        val apiKey = intent.stringExtra(EXTRA_API_KEY, EXTRA_API_KEY_B64)?.trim().orEmpty()
         val protocol = parseProtocol(intent.getStringExtra(EXTRA_PROTOCOL))
         val endpointMode = parseEndpointMode(intent.getStringExtra(EXTRA_ENDPOINT_MODE))
         val selectAfterSave = intent.getBooleanExtra(EXTRA_SELECT_AFTER_SAVE, true)
@@ -81,13 +82,23 @@ class DebugModelConfigReceiver : BroadcastReceiver() {
             else -> ProviderEndpointMode.AUTO
         }
 
+    private fun Intent.stringExtra(rawKey: String, base64Key: String): String? =
+        getStringExtra(base64Key)?.decodeBase64Utf8OrNull() ?: getStringExtra(rawKey)
+
+    private fun String.decodeBase64Utf8OrNull(): String? =
+        runCatching { String(Base64.decode(this, Base64.NO_WRAP), Charsets.UTF_8) }.getOrNull()
+
     companion object {
         private const val TAG = "NuclearBoyDebugModelConfig"
         const val ACTION_SAVE_CUSTOM_MODEL = "com.nuclearboy.app.DEBUG_SAVE_CUSTOM_MODEL"
         const val EXTRA_BASE_URL = "base_url"
+        const val EXTRA_BASE_URL_B64 = "base_url_b64"
         const val EXTRA_MODEL_NAME = "model_name"
+        const val EXTRA_MODEL_NAME_B64 = "model_name_b64"
         const val EXTRA_DISPLAY_NAME = "display_name"
+        const val EXTRA_DISPLAY_NAME_B64 = "display_name_b64"
         const val EXTRA_API_KEY = "api_key"
+        const val EXTRA_API_KEY_B64 = "api_key_b64"
         const val EXTRA_PROTOCOL = "protocol"
         const val EXTRA_ENDPOINT_MODE = "endpoint_mode"
         const val EXTRA_SELECT_AFTER_SAVE = "select_after_save"
