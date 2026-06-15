@@ -194,6 +194,10 @@ private val apiObjectMarkers = listOf(
     "服务器",
     "后台",
     "网关",
+    "provider",
+    "模型配置",
+    "模型路由",
+    "路由",
 )
 
 private val apiActionMarkers = listOf(
@@ -215,11 +219,19 @@ private val apiActionMarkers = listOf(
 
 private val apiMutationMarkers = listOf(
     "加进去",
+    "加上",
+    "加到",
+    "加一下",
     "添加",
     "新增",
+    "接入",
     "创建",
     "更新",
     "配置",
+    "配上",
+    "开通",
+    "启用",
+    "录入",
     "导入",
     "同步",
     "提交",

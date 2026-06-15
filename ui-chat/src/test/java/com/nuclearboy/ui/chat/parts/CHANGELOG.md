@@ -1,3 +1,4 @@
+2026-06-15 1.1.48 ToolActionDraftHintTest 覆盖“后台加一下这个模型到网关里”这类自然语言远程配置草稿，确认不依赖显式“走 API”也会触发接口/API 证据要求。
 2026-06-15 1.1.47 ToolActionDraftHintTest 覆盖 API/接口草稿的专属“不能真实调用接口”文案、接口调用记录/远程配置变更证据链、模型约束，以及追加防假执行提示后仍保持 API 分类。
 2026-06-15 1.1.46 ToolActionDraftHintTest 覆盖“走 API 给我加进去”和 API 概念问答不误判，并验证 API 请求缺少工具证据时会触发后置复核。
 2026-06-15 1.1.45 ToolLimitNoticeTest 覆盖模型无法 verify/run tests 且缺少 runtime environment 时的结构化工具受限识别。

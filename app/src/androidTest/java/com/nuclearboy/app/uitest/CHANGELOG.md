@@ -1,3 +1,4 @@
+2026-06-15 1.1.48 ToolDraftHintUiTest 改用“后台加一下这个模型到网关里”真实输入路径，验证自然语言后台/网关配置草稿仍触发工具能力预警和接口/API 调用记录证据提示。
 2026-06-15 1.1.47 ToolDraftHintUiTest 断言 API/远程配置草稿显示“不能真实调用接口”，并在发送后显示接口/API 调用记录证据要求。
 2026-06-15 1.1.46 ToolDraftHintUiTest 改用“你走 API 给我加进去呢”真实输入路径，验证 API/接口操作草稿会显示工具能力预警、接口调用范围和发送后证据提示。
 2026-06-15 1.1.45 ToolLimitNoticeUiTest 改用模型无法 verify fix/run tests 且缺少 runtime environment 的英文消息注入真实前端，验证仍渲染工具受限卡。

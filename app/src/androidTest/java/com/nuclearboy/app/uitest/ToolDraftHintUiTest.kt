@@ -27,7 +27,7 @@ class ToolDraftHintUiTest {
         robot.launchApp()
 
         robot.waitForChatInput(30_000)
-        robot.enterDraftText("你走 API 给我加进去呢")
+        robot.enterDraftText("后台加一下这个模型到网关里")
 
         assertTrue("工具型草稿应在发送前显示工具能力预警语义", waitUntil(10_000) {
             device.hasObject(By.descContains("工具能力预警")) ||

@@ -36,6 +36,16 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun detectNaturalGatewayConfigRequest() {
+        val hint = detectToolActionDraftHint("后台加一下这个模型到网关里")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.summary.orEmpty().contains("不能真实调用接口"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("远程配置变更记录"))
+    }
+
+    @Test
     fun ignoreApiConceptQuestion() {
         val hint = detectToolActionDraftHint("API 是什么")
 
