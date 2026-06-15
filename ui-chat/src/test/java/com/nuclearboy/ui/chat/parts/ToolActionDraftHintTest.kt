@@ -174,6 +174,33 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun detectAccountRechargeRequest() {
+        val hint = detectToolActionDraftHint("帮我给这个账号充值")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("远程配置变更记录"))
+    }
+
+    @Test
+    fun detectQuotaTopUpRequest() {
+        val hint = detectToolActionDraftHint("把账户额度补一下")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.summary.orEmpty().contains("修改远程配置"))
+    }
+
+    @Test
+    fun detectInvoiceRequest() {
+        val hint = detectToolActionDraftHint("帮我把这笔账单开票")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("接口/API 调用记录"))
+    }
+
+    @Test
     fun ignoreApiConceptQuestion() {
         val hint = detectToolActionDraftHint("API 是什么")
 
@@ -237,8 +264,29 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun ignoreAccountRechargeLearningQuestion() {
+        val hint = detectToolActionDraftHint("怎么给账号充值")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreAccountSystemDesignRequest() {
+        val hint = detectToolActionDraftHint("帮我设计一个账号体系")
+
+        assertNull(hint)
+    }
+
+    @Test
     fun ignoreKeyValueCodeModelRequest() {
         val hint = detectToolActionDraftHint("帮我创建一个 key-value 配置模型类")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreAccountCodeModelRequest() {
+        val hint = detectToolActionDraftHint("帮我创建一个账号模型类")
 
         assertNull(hint)
     }

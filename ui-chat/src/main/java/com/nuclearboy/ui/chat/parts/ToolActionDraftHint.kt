@@ -26,6 +26,9 @@ fun detectToolActionDraftHint(text: String): ToolActionDraftHint? {
     if (shouldSkipApiLearningQuestion(compact, lower, hasApiObject, hasApiAction)) {
         return null
     }
+    if (shouldSkipCodeModelArtifactRequest(compact, lower, hasApiAction)) {
+        return null
+    }
 
     if (!hasExplicitFileWrite && !hasExplicitFileRead && !hasCommand && !hasApiAction && !(hasRunAction && hasToolObject)) {
         return null
@@ -134,6 +137,19 @@ private fun shouldSkipApiLearningQuestion(
     return asksForExplanation || !hasExecutionIntent
 }
 
+private fun shouldSkipCodeModelArtifactRequest(
+    compact: String,
+    lower: String,
+    hasApiAction: Boolean,
+): Boolean {
+    if (!hasApiAction) return false
+    return compact.contains("模型类") ||
+        compact.contains("数据类") ||
+        compact.contains("实体类") ||
+        lower.contains("data class") ||
+        lower.contains("model class")
+}
+
 const val TOOL_REALITY_GUARD: String =
     "如果当前没有真实工具调用能力，请明确回答：工具受限，未真实执行；不要编造已读取、已写入、已运行或已验证的结果。"
 
@@ -216,6 +232,21 @@ private val apiObjectMarkers = listOf(
     "访问令牌",
     "密钥",
     "凭证",
+    "账号",
+    "账户",
+    "余额",
+    "额度",
+    "套餐",
+    "订阅",
+    "账单",
+    "发票",
+    "钱包",
+    "计费",
+    "billing",
+    "invoice",
+    "quota",
+    "balance",
+    "subscription",
     "服务端",
     "服务器",
     "后台",
@@ -324,6 +355,21 @@ private val apiMutationMarkers = listOf(
     "停用",
     "禁用",
     "关停",
+    "充值",
+    "续费",
+    "购买套餐",
+    "补额度",
+    "补充额度",
+    "加额度",
+    "增加额度",
+    "补一下",
+    "扣款",
+    "退款",
+    "开票",
+    "支付",
+    "升级套餐",
+    "降级套餐",
+    "改套餐",
 )
 
 private val apiLearningQuestionMarkers = listOf(
