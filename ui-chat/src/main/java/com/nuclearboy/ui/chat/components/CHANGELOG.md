@@ -1,3 +1,4 @@
+2026-06-14 1.1.37 ChatFailureNoticeCard 接入正式链路测试口径，WarningNoticeCard 增加可选链路元信息行和语义描述。
 2026-06-14 1.1.36 ChatFailureNoticeCard 接入诊断指纹，WarningNoticeCard 支持可选紧凑诊断行和对应无障碍语义。
 2026-06-14 1.1.34 新增 ChatFailureNoticeCard，复用 WarningNoticeCard 展示正式聊天失败原因和下一步。
 2026-06-14 1.1.33 新增 ToolMissingEvidenceReviewCard，并抽出 WarningNoticeCard 复用工具受限和结果复核两类警告卡布局。

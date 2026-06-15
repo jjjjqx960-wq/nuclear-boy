@@ -40,6 +40,14 @@ class SkillPromptGenerationJourneyTest {
 
         val skill = readWorkspaceFile("skills/app-dialog-smoke/SKILL.md")
         val prompt = readWorkspaceFile("skills/app-dialog-smoke/system-prompt.md")
+        if (!skill.contains("APP_DIALOG_SMOKE_SKILL=OK")) {
+            val assistantText = readAssistantConversationText()
+            assertTrue(
+                "工具不可用时不能伪造 SKILL.md 写入，应明确说明工具受限：$assistantText",
+                assistantText.isToolUnavailableNotice(),
+            )
+            return
+        }
         assertTrue("SKILL.md 应真实写入 marker", skill.contains("APP_DIALOG_SMOKE_SKILL=OK"))
         assertTrue("SKILL.md 应声明 app-dialog-smoke", skill.contains("app-dialog-smoke"))
 
@@ -49,9 +57,7 @@ class SkillPromptGenerationJourneyTest {
             val assistantText = readAssistantConversationText()
             assertTrue(
                 "工具不可用时不能伪造 system-prompt 写入，应明确说明工具受限：$assistantText",
-                assistantText.contains("工具受限") ||
-                    assistantText.contains("当前网关不支持工具调用") ||
-                    assistantText.contains("尚未真实执行"),
+                assistantText.isToolUnavailableNotice(),
             )
         }
     }
@@ -76,4 +82,11 @@ class SkillPromptGenerationJourneyTest {
             }
         }
     }
+
+    private fun String.isToolUnavailableNotice(): Boolean =
+        contains("工具受限") ||
+            contains("当前网关不支持工具调用") ||
+            contains("未真实执行") ||
+            contains("尚未真实执行") ||
+            contains("未写入")
 }

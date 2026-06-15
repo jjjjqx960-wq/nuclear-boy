@@ -34,6 +34,7 @@ class ChatFailureNoticeUiTest {
         assertTrue("提示卡应显示 provider 前缀", device.hasObject(By.textContains("nvidia")))
         assertTrue("提示卡应显示脱敏诊断指纹", device.hasObject(By.textContains("route.provider")))
         assertTrue("提示卡应显示 HTTP 状态", device.hasObject(By.textContains("HTTP 404")))
+        assertTrue("提示卡应显示正式链路口径", device.hasObject(By.textContains("正式聊天 / stream=true")))
         assertTrue("提示卡应给出模型列表下一步", device.hasObject(By.textContains("获取模型列表")))
     }
 
@@ -53,6 +54,7 @@ class ChatFailureNoticeUiTest {
         assertTrue("提示卡应提示 API Key", device.hasObject(By.textContains("API Key")))
         assertTrue("提示卡应显示鉴权诊断指纹", device.hasObject(By.textContains("auth.key")))
         assertTrue("提示卡无障碍语义应包含诊断指纹", device.hasObject(By.descContains("诊断指纹")))
+        assertTrue("提示卡无障碍语义应包含测试口径", device.hasObject(By.descContains("测试口径")))
         assertTrue("提示卡应提示重新测试正式聊天", device.hasObject(By.textContains("重新测试正式聊天")))
     }
 

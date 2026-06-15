@@ -20,6 +20,7 @@ class ChatFailureNoticeTest {
         assertTrue(notice?.summary.orEmpty().contains("nvidia"))
         assertTrue(notice?.actions.orEmpty().any { it.contains("获取模型列表") })
         assertEquals("route.provider / provider=nvidia / HTTP 404", notice?.diagnosticLabel)
+        assertEquals("正式聊天 / stream=true / 工具定义", notice?.verificationLabel)
         assertTrue(notice?.semantics.orEmpty().contains("上游凭证"))
     }
 

@@ -5,6 +5,7 @@ data class ChatFailureNotice(
     val summary: String,
     val actions: List<String>,
     val diagnosticLabel: String,
+    val verificationLabel: String = "正式聊天 / stream=true / 工具定义",
     val semantics: String,
 )
 

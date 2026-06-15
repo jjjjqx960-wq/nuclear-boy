@@ -50,14 +50,16 @@ internal fun WarningNoticeCard(
     semantics: String,
     modifier: Modifier = Modifier,
     diagnosticLabel: String? = null,
+    verificationLabel: String? = null,
 ) {
     val nc = NuclearBoyTheme.colorScheme
     val shape = RoundedCornerShape(8.dp)
     val normalizedDiagnosticLabel = diagnosticLabel?.takeIf { it.isNotBlank() }
-    val semanticText = if (normalizedDiagnosticLabel == null) {
-        semantics
-    } else {
-        "$semantics 诊断指纹：$normalizedDiagnosticLabel。"
+    val normalizedVerificationLabel = verificationLabel?.takeIf { it.isNotBlank() }
+    val semanticText = buildString {
+        append(semantics)
+        normalizedDiagnosticLabel?.let { append(" 诊断指纹：").append(it).append("。") }
+        normalizedVerificationLabel?.let { append(" 测试口径：").append(it).append("。") }
     }
 
     Column(
@@ -97,34 +99,10 @@ internal fun WarningNoticeCard(
             modifier = Modifier.padding(top = 5.dp),
         )
         normalizedDiagnosticLabel?.let { label ->
-            Row(
-                modifier = Modifier
-                    .padding(top = 6.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(nc.warning.copy(alpha = 0.14f))
-                    .padding(horizontal = 7.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "诊断",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = nc.warning,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp,
-                    ),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = nc.material.onSurfaceVariant,
-                        fontFamily = FontFamily.Monospace,
-                        lineHeight = 14.sp,
-                        fontSize = 10.sp,
-                    ),
-                )
-            }
+            NoticeMetaRow(label = "诊断", value = label)
+        }
+        normalizedVerificationLabel?.let { label ->
+            NoticeMetaRow(label = "链路", value = label)
         }
         actions.forEach { action ->
             Row(
@@ -150,5 +128,41 @@ internal fun WarningNoticeCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun NoticeMetaRow(
+    label: String,
+    value: String,
+) {
+    val nc = NuclearBoyTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .padding(top = 6.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(nc.warning.copy(alpha = 0.14f))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = nc.warning,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+            ),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = nc.material.onSurfaceVariant,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 14.sp,
+                fontSize = 10.sp,
+            ),
+        )
     }
 }
