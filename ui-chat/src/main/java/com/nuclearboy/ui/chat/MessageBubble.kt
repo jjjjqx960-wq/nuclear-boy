@@ -42,8 +42,10 @@ import androidx.compose.ui.unit.sp
 import android.widget.TextView
 import androidx.compose.ui.viewinterop.AndroidView
 import com.nuclearboy.common.*
+import com.nuclearboy.ui.chat.components.ChatFailureNoticeCard
 import com.nuclearboy.ui.chat.components.ToolLimitNoticeCard
 import com.nuclearboy.ui.chat.components.ToolMissingEvidenceReviewCard
+import com.nuclearboy.ui.chat.parts.detectChatFailureNotice
 import com.nuclearboy.ui.chat.parts.detectToolLimitNotice
 import com.nuclearboy.ui.chat.parts.detectToolMissingEvidenceReviewNotice
 import kotlinx.coroutines.delay
@@ -139,8 +141,20 @@ fun MessageBubble(
                     Spacer(Modifier.height(6.dp))
                 }
 
+                val chatFailureNotice = remember(message.role, message.content, isStreaming) {
+                    if (!isStreaming && message.role != MessageRole.USER) {
+                        detectChatFailureNotice(message.content)
+                    } else {
+                        null
+                    }
+                }
+                if (chatFailureNotice != null) {
+                    ChatFailureNoticeCard(notice = chatFailureNotice)
+                    Spacer(Modifier.height(6.dp))
+                }
+
                 // Message content (selectable text)
-                if (missingEvidenceReview == null) {
+                if (missingEvidenceReview == null && chatFailureNotice == null) {
                     SelectionContainer {
                         MessageContent(
                             content = message.content,

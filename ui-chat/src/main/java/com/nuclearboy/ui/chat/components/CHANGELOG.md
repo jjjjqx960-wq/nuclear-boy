@@ -1,3 +1,4 @@
+2026-06-14 1.1.34 新增 ChatFailureNoticeCard，复用 WarningNoticeCard 展示正式聊天失败原因和下一步。
 2026-06-14 1.1.33 新增 ToolMissingEvidenceReviewCard，并抽出 WarningNoticeCard 复用工具受限和结果复核两类警告卡布局。
 2026-06-14 1.1.29 ToolActionDraftHintBar 新增“追加防假执行提示”操作按钮，暴露稳定语义供真机测试定位。
 2026-06-14 1.1.28 新增 ToolActionDraftHintBar，用于在输入区以紧凑提示条提醒第三方模型工具型草稿可能需要真实工具调用能力。

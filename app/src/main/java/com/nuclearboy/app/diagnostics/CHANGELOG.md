@@ -1,3 +1,4 @@
+2026-06-14 1.1.34 DebugConversationSeedReceiver 支持 user_content_b64 和 assistant_content_b64，避免真机 UI 测试注入失败文案时被 shell 拆参。
 2026-06-14 1.1.32 DebugModelConfigReceiver 支持 base64 调试模型参数，避免真机广播把 baseUrl、模型名或 Key 中的特殊字符拆坏。
 2026-06-14 1.1.27 新增 debug-only 会话注入接收器，可写入固定工具受限对话供真机 UI 门禁验证，日志只记录长度和路径。
 2026-06-11 1.0.68 新增第三方正式聊天兼容性诊断，使用流式请求和工具定义覆盖“测试能通但聊天失败”的场景。
