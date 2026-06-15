@@ -18,6 +18,8 @@ class ToolMissingEvidenceReviewNoticeTest {
         assertEquals("本轮结果复核", notice?.title)
         assertTrue(notice?.summary.orEmpty().contains("不要把本轮回复当作已完成结果"))
         assertTrue(notice?.actions.orEmpty().any { it.contains("tools/function_call") })
+        assertEquals("tool.evidence.missing", notice?.diagnosticLabel)
+        assertEquals("正式聊天 / stream=true / 工具定义", notice?.verificationLabel)
         assertTrue(notice?.semantics.orEmpty().contains("结果复核提示"))
     }
 

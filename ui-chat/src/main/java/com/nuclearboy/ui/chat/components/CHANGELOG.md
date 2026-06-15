@@ -1,3 +1,4 @@
+2026-06-14 1.1.39 ToolMissingEvidenceReviewCard 接入 WarningNoticeCard 的诊断行和测试口径行，缺少工具证据时可见 `tool.evidence.missing` 和正式链路来源。
 2026-06-14 1.1.38 ToolLimitNoticeCard 接入 WarningNoticeCard 的诊断行和测试口径行，工具受限时可见 `tool.protocol` 和正式链路来源。
 2026-06-14 1.1.37 ChatFailureNoticeCard 接入正式链路测试口径，WarningNoticeCard 增加可选链路元信息行和语义描述。
 2026-06-14 1.1.36 ChatFailureNoticeCard 接入诊断指纹，WarningNoticeCard 支持可选紧凑诊断行和对应无障碍语义。
