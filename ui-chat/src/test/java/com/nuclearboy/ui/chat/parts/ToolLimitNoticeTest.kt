@@ -72,6 +72,20 @@ class ToolLimitNoticeTest {
     }
 
     @Test
+    fun detectModelSelfDisclaimerAboutPhoneUiControl() {
+        val notice = detectToolLimitNotice(
+            "I can't interact with your screen, click buttons, open apps, install apps, or control your phone directly from here.",
+        )
+
+        assertNotNull(notice)
+        assertTrue(notice?.summary.orEmpty().contains("操作屏幕/App"))
+        assertTrue(notice?.summary.orEmpty().contains("没有真实发生"))
+        assertTrue(notice?.semantics.orEmpty().contains("前端控制"))
+        assertTrue(notice?.actions.orEmpty().any { it.contains("不要把本轮当作已执行") })
+        assertEquals("tool.protocol", notice?.diagnosticLabel)
+    }
+
+    @Test
     fun ignoreOrdinaryModelError() {
         val notice = detectToolLimitNotice("处理时遇到了问题：HTTP 404: model not found")
 

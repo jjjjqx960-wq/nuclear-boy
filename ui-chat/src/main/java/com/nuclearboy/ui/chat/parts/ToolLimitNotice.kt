@@ -18,7 +18,7 @@ fun detectToolLimitNotice(content: String): ToolLimitNotice? {
 
     val needsExecution = text.containsAnyToolMarker(TOOL_ACTION_MARKERS)
     val summary = if (needsExecution) {
-        "模型连接正常，但当前网关没有可用的工具调用协议或外部操作能力；本轮访问网站、服务器、ADB/SSH、读写、运行或测试没有真实发生。"
+        "模型连接正常，但当前网关没有可用的工具调用协议或外部操作能力；本轮操作屏幕/App、访问网站、服务器、ADB/SSH、读写、运行或测试没有真实发生。"
     } else {
         "模型连接正常，但当前网关没有可用的工具调用协议；只能继续普通问答。"
     }
@@ -38,7 +38,7 @@ fun detectToolLimitNotice(content: String): ToolLimitNotice? {
         title = "工具受限",
         summary = summary,
         actions = actions,
-        semantics = "工具受限提示：模型连接正常，但当前网关工具调用协议或外部操作能力不可用，本轮未真实执行。",
+        semantics = "工具受限提示：模型连接正常，但当前网关工具调用协议、前端控制或外部操作能力不可用，本轮未真实执行。",
     )
 }
 
@@ -92,6 +92,28 @@ private val TOOL_LIMIT_MARKERS = listOf(
     "cannot ssh",
     "can't use adb",
     "cannot use adb",
+    "can't interact with your device",
+    "cannot interact with your device",
+    "can't interact with your screen",
+    "cannot interact with your screen",
+    "can't interact with your app",
+    "cannot interact with your app",
+    "can't control your phone",
+    "cannot control your phone",
+    "can't control your device",
+    "cannot control your device",
+    "can't click buttons",
+    "cannot click buttons",
+    "can't tap buttons",
+    "cannot tap buttons",
+    "can't open apps",
+    "cannot open apps",
+    "can't install apps",
+    "cannot install apps",
+    "can't operate your phone",
+    "cannot operate your phone",
+    "can't see your screen",
+    "cannot see your screen",
     "无法访问文件",
     "不能访问文件",
     "无法运行命令",
@@ -112,6 +134,22 @@ private val TOOL_LIMIT_MARKERS = listOf(
     "不能使用 ssh",
     "无法使用 adb",
     "不能使用 adb",
+    "无法操作手机",
+    "不能操作手机",
+    "无法控制手机",
+    "不能控制手机",
+    "无法操作屏幕",
+    "不能操作屏幕",
+    "无法点击",
+    "不能点击",
+    "无法点按",
+    "不能点按",
+    "无法打开应用",
+    "不能打开应用",
+    "无法安装应用",
+    "不能安装应用",
+    "无法看到你的屏幕",
+    "不能看到你的屏幕",
 )
 
 private val TOOL_ACTION_MARKERS = listOf(
@@ -150,6 +188,14 @@ private val TOOL_ACTION_MARKERS = listOf(
     "adb",
     "device",
     "android",
+    "screen",
+    "app",
+    "ui",
+    "click",
+    "tap",
+    "button",
+    "install",
+    "open",
     "联网",
     "互联网",
     "网络",
@@ -160,6 +206,15 @@ private val TOOL_ACTION_MARKERS = listOf(
     "服务器",
     "手机",
     "设备",
+    "屏幕",
+    "应用",
+    "前端",
+    "界面",
+    "点击",
+    "点按",
+    "按钮",
+    "安装",
+    "打开",
 )
 
 private fun String.containsAnyToolMarker(markers: List<String>): Boolean =

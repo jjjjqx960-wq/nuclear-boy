@@ -36,7 +36,7 @@ class ToolLimitNoticeUiTest {
     }
 
     private fun seedToolLimitConversation() {
-        val assistantContent = "I cannot browse the internet, access GitHub, connect to your server, or use ADB/SSH on your Android device from here."
+        val assistantContent = "I can't interact with your screen, click buttons, open apps, install apps, or control your phone directly from here."
         val assistantContentB64 = Base64.encodeToString(
             assistantContent.toByteArray(Charsets.UTF_8),
             Base64.NO_WRAP,

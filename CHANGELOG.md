@@ -1,3 +1,4 @@
+2026-06-15 1.1.43 工具受限识别扩展前端和手机操作自述失败：`can't interact with your screen`、`click buttons`、`open/install apps`、`control your phone`、`无法操作手机/无法点击/无法安装应用` 等会转成结构化“工具受限”卡，避免用户把 App 前端或手机控制免责声明误判为已执行。
 2026-06-15 1.1.42 工具受限识别扩展外部访问和设备控制自述失败：`cannot browse the internet`、`access GitHub`、`connect to your server`、`use ADB/SSH`、`无法联网/无法连接服务器/无法使用 ADB/SSH` 等会转成结构化“工具受限”卡，避免用户把网页、GitHub、服务器或手机操作误判为已执行。
 2026-06-14 1.1.41 工具受限识别扩展模型自述限制：`I don't have access to files`、`can't run commands`、`无法访问文件/不能运行命令` 等回复会转成结构化“工具受限”卡，避免用户把模型免责声明误当成真实执行结果。
 2026-06-14 1.1.40 工具受限识别扩展英文网关提示和大小写不敏感匹配：`Tool calls are not supported`、`function_call unsupported`、`READ_FILE/RUN_PYTHON` 等表达会转成同一张结构化“工具受限”卡，减少第三方网关英文错误漏识别。
