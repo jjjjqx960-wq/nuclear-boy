@@ -46,6 +46,16 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun detectColloquialGatewayJoinRequest() {
+        val hint = detectToolActionDraftHint("帮我把这个模型加入网关")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.summary.orEmpty().contains("不能真实调用接口"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("接口/API 调用记录"))
+    }
+
+    @Test
     fun ignoreApiConceptQuestion() {
         val hint = detectToolActionDraftHint("API 是什么")
 
