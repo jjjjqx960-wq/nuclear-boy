@@ -1,6 +1,7 @@
 package com.nuclearboy.ui.chat.parts
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -18,6 +19,7 @@ class ChatFailureNoticeTest {
         assertEquals("模型路由失败", notice?.title)
         assertTrue(notice?.summary.orEmpty().contains("nvidia"))
         assertTrue(notice?.actions.orEmpty().any { it.contains("获取模型列表") })
+        assertEquals("route.provider / provider=nvidia / HTTP 404", notice?.diagnosticLabel)
         assertTrue(notice?.semantics.orEmpty().contains("上游凭证"))
     }
 
@@ -27,6 +29,7 @@ class ChatFailureNoticeTest {
 
         assertNotNull(notice)
         assertEquals("聊天链路失败", notice?.title)
+        assertEquals("chat.format", notice?.diagnosticLabel)
         assertTrue(notice?.summary.orEmpty().contains("没有生成有效回复"))
         assertTrue(notice?.actions.orEmpty().any { it.contains("stream=true") })
     }
@@ -37,6 +40,7 @@ class ChatFailureNoticeTest {
 
         assertNotNull(notice)
         assertEquals("鉴权失败", notice?.title)
+        assertEquals("auth.key / HTTP 401", notice?.diagnosticLabel)
         assertTrue(notice?.actions.orEmpty().any { it.contains("API Key") })
         assertTrue(notice?.semantics.orEmpty().contains("API Key"))
     }
@@ -47,6 +51,7 @@ class ChatFailureNoticeTest {
 
         assertNotNull(notice)
         assertEquals("额度或限流不足", notice?.title)
+        assertEquals("quota.rate / HTTP 429", notice?.diagnosticLabel)
         assertTrue(notice?.actions.orEmpty().any { it.contains("余额") || it.contains("额度") })
     }
 
@@ -56,7 +61,19 @@ class ChatFailureNoticeTest {
 
         assertNotNull(notice)
         assertEquals("网络连接失败", notice?.title)
+        assertEquals("network.connect", notice?.diagnosticLabel)
         assertTrue(notice?.actions.orEmpty().any { it.contains("VPN") })
+    }
+
+    @Test
+    fun diagnosticLabelDoesNotIncludeSecretValue() {
+        val notice = detectChatFailureNotice(
+            "处理时遇到了问题：HTTP 401: unauthorized invalid api key sk-test-secret-value",
+        )
+
+        assertNotNull(notice)
+        assertEquals("auth.key / HTTP 401", notice?.diagnosticLabel)
+        assertFalse(notice?.diagnosticLabel.orEmpty().contains("sk-test-secret-value"))
     }
 
     @Test

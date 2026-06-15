@@ -13,6 +13,7 @@ internal fun ChatFailureNoticeCard(
         title = notice.title,
         summary = notice.summary,
         actions = notice.actions,
+        diagnosticLabel = notice.diagnosticLabel,
         semantics = notice.semantics,
         modifier = modifier,
     )

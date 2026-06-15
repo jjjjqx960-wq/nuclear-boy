@@ -1,3 +1,4 @@
+2026-06-14 1.1.36 ChatFailureNoticeTest 覆盖脱敏诊断指纹，确认 HTTP 状态和 provider 可定位且不会带出密钥。
 2026-06-14 1.1.35 ChatFailureNoticeTest 扩展鉴权、额度限流和网络失败断言，避免泛化错误回退。
 2026-06-14 1.1.34 新增 ChatFailureNoticeTest，验证正式聊天失败可转为结构化诊断卡数据。
 2026-06-14 1.1.33 新增 ToolMissingEvidenceReviewNoticeTest，验证后置复核消息可转为结构化警告卡数据。

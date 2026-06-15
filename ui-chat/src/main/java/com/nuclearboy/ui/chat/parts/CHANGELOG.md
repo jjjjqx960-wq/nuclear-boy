@@ -1,3 +1,4 @@
+2026-06-14 1.1.36 ChatFailureNotice 新增脱敏 diagnosticLabel，按错误类别、provider 前缀和 HTTP 状态生成稳定诊断指纹。
 2026-06-14 1.1.35 ChatFailureNotice 增加鉴权、权限、额度限流和网络失败识别规则，补齐第三方网关正式聊天常见失败面。
 2026-06-14 1.1.34 新增 ChatFailureNotice 识别零件，覆盖 provider 凭证缺失、模型路由失败、空回复和请求格式错误。
 2026-06-14 1.1.33 新增 ToolMissingEvidenceReviewNotice 识别零件，把后置结果复核系统消息转为标题、摘要、下一步和语义描述。

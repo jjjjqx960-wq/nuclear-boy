@@ -49,9 +49,16 @@ internal fun WarningNoticeCard(
     actions: List<String>,
     semantics: String,
     modifier: Modifier = Modifier,
+    diagnosticLabel: String? = null,
 ) {
     val nc = NuclearBoyTheme.colorScheme
     val shape = RoundedCornerShape(8.dp)
+    val normalizedDiagnosticLabel = diagnosticLabel?.takeIf { it.isNotBlank() }
+    val semanticText = if (normalizedDiagnosticLabel == null) {
+        semantics
+    } else {
+        "$semantics 诊断指纹：$normalizedDiagnosticLabel。"
+    }
 
     Column(
         modifier = modifier
@@ -59,7 +66,7 @@ internal fun WarningNoticeCard(
             .clip(shape)
             .background(nc.warning.copy(alpha = 0.10f))
             .border(1.dp, nc.warning.copy(alpha = 0.55f), shape)
-            .semantics { contentDescription = semantics }
+            .semantics { contentDescription = semanticText }
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -89,6 +96,36 @@ internal fun WarningNoticeCard(
             ),
             modifier = Modifier.padding(top = 5.dp),
         )
+        normalizedDiagnosticLabel?.let { label ->
+            Row(
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(nc.warning.copy(alpha = 0.14f))
+                    .padding(horizontal = 7.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "诊断",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = nc.warning,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                    ),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = nc.material.onSurfaceVariant,
+                        fontFamily = FontFamily.Monospace,
+                        lineHeight = 14.sp,
+                        fontSize = 10.sp,
+                    ),
+                )
+            }
+        }
         actions.forEach { action ->
             Row(
                 modifier = Modifier.padding(top = 4.dp),

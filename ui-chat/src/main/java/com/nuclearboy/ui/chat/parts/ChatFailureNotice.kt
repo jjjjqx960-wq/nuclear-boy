@@ -4,6 +4,7 @@ data class ChatFailureNotice(
     val title: String,
     val summary: String,
     val actions: List<String>,
+    val diagnosticLabel: String,
     val semantics: String,
 )
 
@@ -19,6 +20,11 @@ fun detectChatFailureNotice(content: String): ChatFailureNotice? {
                 "到设置页获取模型列表，点选网关实际返回的完整模型名",
                 "如果必须使用 $provider 前缀，请在网关后台补齐该 provider 的 API Key 或额度",
             ),
+            diagnosticLabel = buildDiagnosticLabel(
+                category = "route.provider",
+                text = text,
+                provider = provider,
+            ),
             semantics = "模型路由失败提示：网关缺少 $provider 上游凭证，正式聊天未完成。",
         )
     }
@@ -30,6 +36,10 @@ fun detectChatFailureNotice(content: String): ChatFailureNotice? {
             actions = listOf(
                 "先获取模型列表并点选列表里的模型名",
                 "如果列表为空，检查网关后台模型映射、上游 Key 和额度",
+            ),
+            diagnosticLabel = buildDiagnosticLabel(
+                category = "route.model",
+                text = text,
             ),
             semantics = "模型路由失败提示：模型名或上游路由不可用，正式聊天未完成。",
         )
@@ -43,6 +53,10 @@ fun detectChatFailureNotice(content: String): ChatFailureNotice? {
                 "核对 API Key 是否属于当前服务地址，注意不要把其他网关的 Key 填到这里",
                 "如果这是免鉴权本地网关，可以清空 API Key 后重新测试正式聊天",
             ),
+            diagnosticLabel = buildDiagnosticLabel(
+                category = "auth.key",
+                text = text,
+            ),
             semantics = "鉴权失败提示：API Key 未通过验证，正式聊天未完成。",
         )
     }
@@ -54,6 +68,10 @@ fun detectChatFailureNotice(content: String): ChatFailureNotice? {
             actions = listOf(
                 "换用有该模型权限的 Key，或点选模型列表中当前账号可用的模型",
                 "如果网关有上游账号池，检查对应 provider 的权限和额度",
+            ),
+            diagnosticLabel = buildDiagnosticLabel(
+                category = "auth.permission",
+                text = text,
             ),
             semantics = "模型权限不足提示：当前账号无法访问所选模型，正式聊天未完成。",
         )
@@ -67,6 +85,10 @@ fun detectChatFailureNotice(content: String): ChatFailureNotice? {
                 "检查网关和上游账号余额、额度、并发数或 RPM/TPM 限制",
                 "稍后重试，或切换到有可用额度的模型/Key",
             ),
+            diagnosticLabel = buildDiagnosticLabel(
+                category = "quota.rate",
+                text = text,
+            ),
             semantics = "额度或限流不足提示：请求被额度或限流拦截，正式聊天未完成。",
         )
     }
@@ -78,6 +100,10 @@ fun detectChatFailureNotice(content: String): ChatFailureNotice? {
             actions = listOf(
                 "检查手机网络、VPN、服务地址、端口和网关进程是否可达",
                 "在设置页重新运行轻量连通和正式聊天测试，确认 stream=true 能持续返回",
+            ),
+            diagnosticLabel = buildDiagnosticLabel(
+                category = "network.connect",
+                text = text,
             ),
             semantics = "网络连接失败提示：模型服务不可达或超时，正式聊天未完成。",
         )
@@ -91,6 +117,10 @@ fun detectChatFailureNotice(content: String): ChatFailureNotice? {
                 "先重启对话或新建对话后重试，清掉可能损坏的上下文",
                 "若刚切换第三方模型，回设置页运行正式聊天测试并确认支持 stream=true 和工具定义",
             ),
+            diagnosticLabel = buildDiagnosticLabel(
+                category = "chat.format",
+                text = text,
+            ),
             semantics = "聊天链路失败提示：正式聊天没有生成有效回复，请重启对话或重新测试模型。",
         )
     }
@@ -100,6 +130,24 @@ fun detectChatFailureNotice(content: String): ChatFailureNotice? {
 
 private val inactiveProviderPattern = Regex(
     pattern = """no active credentials for provider:\s*([A-Za-z0-9_.-]+)""",
+    option = RegexOption.IGNORE_CASE,
+)
+
+private fun buildDiagnosticLabel(
+    category: String,
+    text: String,
+    provider: String? = null,
+): String {
+    val parts = buildList {
+        add(category)
+        provider?.takeIf { it.isNotBlank() }?.let { add("provider=$it") }
+        httpStatusPattern.find(text)?.groupValues?.getOrNull(1)?.let { add("HTTP $it") }
+    }
+    return parts.joinToString(" / ")
+}
+
+private val httpStatusPattern = Regex(
+    pattern = """HTTP\s*(\d{3})""",
     option = RegexOption.IGNORE_CASE,
 )
 
