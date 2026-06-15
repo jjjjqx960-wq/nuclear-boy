@@ -56,6 +56,34 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun detectBackendConfigFillRequest() {
+        val hint = detectToolActionDraftHint("帮我把这个 key 填到后台配置里")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.summary.orEmpty().contains("修改远程配置"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("远程配置变更记录"))
+    }
+
+    @Test
+    fun detectImperativeBackendConfigFillRequest() {
+        val hint = detectToolActionDraftHint("把这个 key 填到后台配置里")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("远程配置变更记录"))
+    }
+
+    @Test
+    fun detectDeployToServerRequest() {
+        val hint = detectToolActionDraftHint("帮我把这个配置部署到服务器")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("远程配置变更记录"))
+    }
+
+    @Test
     fun ignoreApiConceptQuestion() {
         val hint = detectToolActionDraftHint("API 是什么")
 
@@ -72,6 +100,13 @@ class ToolActionDraftHintTest {
     @Test
     fun ignoreApiParameterLearningQuestion() {
         val hint = detectToolActionDraftHint("请调用接口时怎么带参数")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreBackendConfigFillLearningQuestion() {
+        val hint = detectToolActionDraftHint("怎么把 key 填到后台配置里")
 
         assertNull(hint)
     }
