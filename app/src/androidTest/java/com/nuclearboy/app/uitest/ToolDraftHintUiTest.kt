@@ -55,9 +55,33 @@ class ToolDraftHintUiTest {
 
         assertTrue("发送后聊天流应留下工具能力证据提示", waitUntil(10_000) {
             device.hasObject(By.textContains("本轮工具能力提示")) &&
-                device.hasObject(By.textContains("接口/API 调用记录"))
+            device.hasObject(By.textContains("接口/API 调用记录"))
         })
     }
+
+    @Test
+    fun apiLearningQuestionDoesNotShowToolDraftHint() {
+        ApiKeyManager(instrumentation.targetContext).setCustomProviderConfig(
+            baseUrl = "http://127.0.0.1:1/v1",
+            modelName = "local/tool-draft-hint",
+            apiKey = "",
+        )
+        robot.resetConversationHistory()
+        robot.launchApp()
+
+        robot.waitForChatInput(30_000)
+        robot.enterDraftText("怎么调用接口添加模型")
+        Thread.sleep(1_500)
+
+        assertTrue(
+            "学习型 API 问题不应显示工具能力预警",
+            !hasToolDraftWarning(),
+        )
+    }
+
+    private fun hasToolDraftWarning(): Boolean =
+        device.hasObject(By.descContains("工具能力预警")) ||
+            device.hasObject(By.textContains("可能需要工具能力"))
 
     private fun tapObject(target: UiObject2) {
         val bounds = target.visibleBounds

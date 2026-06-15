@@ -53,6 +53,21 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun ignoreApiLearningQuestion() {
+        val hint = detectToolActionDraftHint("怎么调用接口添加模型")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun detectApiExecutionEvenWhenTextMentionsHow() {
+        val hint = detectToolActionDraftHint("你看看怎么走 API 给我加进去")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+    }
+
+    @Test
     fun ignoreOrdinaryChatRequest() {
         val hint = detectToolActionDraftHint("帮我写一个睡前故事")
 

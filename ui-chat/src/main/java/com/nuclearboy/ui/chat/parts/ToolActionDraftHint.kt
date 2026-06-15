@@ -23,6 +23,10 @@ fun detectToolActionDraftHint(text: String): ToolActionDraftHint? {
     val hasApiAction = apiActionMarkers.any { compact.contains(it) || lower.contains(it) } ||
         (hasApiObject && hasApiMutation)
 
+    if (shouldSkipApiLearningQuestion(compact, lower, hasApiObject, hasApiAction)) {
+        return null
+    }
+
     if (!hasExplicitFileWrite && !hasExplicitFileRead && !hasCommand && !hasApiAction && !(hasRunAction && hasToolObject)) {
         return null
     }
@@ -115,6 +119,20 @@ private fun String.withoutToolRealityGuard(): String =
 
 private fun assistantDeclaresToolLimitation(text: String): Boolean =
     toolLimitationMarkers.any { text.contains(it, ignoreCase = true) }
+
+private fun shouldSkipApiLearningQuestion(
+    compact: String,
+    lower: String,
+    hasApiObject: Boolean,
+    hasApiAction: Boolean,
+): Boolean {
+    if (!hasApiObject && !hasApiAction) return false
+    val hasLearningQuestion = apiLearningQuestionMarkers.any { compact.contains(it) || lower.contains(it) }
+    if (!hasLearningQuestion) return false
+    val asksForExplanation = apiExplanationMarkers.any { compact.contains(it) || lower.contains(it) }
+    val hasExecutionIntent = apiExecutionIntentMarkers.any { compact.contains(it) || lower.contains(it) }
+    return asksForExplanation || !hasExecutionIntent
+}
 
 const val TOOL_REALITY_GUARD: String =
     "如果当前没有真实工具调用能力，请明确回答：工具受限，未真实执行；不要编造已读取、已写入、已运行或已验证的结果。"
@@ -240,6 +258,48 @@ private val apiMutationMarkers = listOf(
     "绑定",
     "切换",
     "删除",
+)
+
+private val apiLearningQuestionMarkers = listOf(
+    "怎么",
+    "如何",
+    "怎样",
+    "什么是",
+    "是什么",
+    "用法",
+    "教程",
+    "示例",
+    "文档",
+)
+
+private val apiExplanationMarkers = listOf(
+    "告诉我",
+    "讲讲",
+    "解释",
+    "说明",
+    "介绍",
+    "用法",
+    "教程",
+    "示例",
+    "文档",
+)
+
+private val apiExecutionIntentMarkers = listOf(
+    "帮我",
+    "给我",
+    "替我",
+    "请调用",
+    "请把",
+    "直接",
+    "马上",
+    "现在",
+    "走api",
+    "走 api",
+    "把",
+    "加进去",
+    "加上",
+    "加到",
+    "加一下",
 )
 
 private val toolObjectMarkers = listOf(
