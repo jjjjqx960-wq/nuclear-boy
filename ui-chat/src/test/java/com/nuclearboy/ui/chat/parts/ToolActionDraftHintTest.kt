@@ -84,6 +84,24 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun detectGatewayModelSwitchRequest() {
+        val hint = detectToolActionDraftHint("把网关模型换成 deepseek")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("远程配置变更记录"))
+    }
+
+    @Test
+    fun detectModelRouteReplaceRequest() {
+        val hint = detectToolActionDraftHint("请把模型路由改为 deepseek")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("接口/API 调用记录"))
+    }
+
+    @Test
     fun ignoreApiConceptQuestion() {
         val hint = detectToolActionDraftHint("API 是什么")
 
@@ -107,6 +125,13 @@ class ToolActionDraftHintTest {
     @Test
     fun ignoreBackendConfigFillLearningQuestion() {
         val hint = detectToolActionDraftHint("怎么把 key 填到后台配置里")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreGatewayModelSwitchLearningQuestion() {
+        val hint = detectToolActionDraftHint("怎么把网关模型换成 deepseek")
 
         assertNull(hint)
     }

@@ -1,3 +1,4 @@
+2026-06-15 1.1.53 ToolActionDraftHintTest 覆盖“把网关模型换成 deepseek”和“请把模型路由改为 deepseek”触发远程配置证据要求，并确认“怎么把网关模型换成 deepseek”仍不误报。
 2026-06-15 1.1.52 ToolActionDraftHintTest 覆盖“帮我把这个 key 填到后台配置里”和“帮我把这个配置部署到服务器”触发远程配置证据要求，并确认“怎么把 key 填到后台配置里”仍不误报。
 2026-06-15 1.1.51 ToolActionDraftHintTest 覆盖“帮我把这个模型加入网关”这类没有显式 API 的远程配置执行口语仍触发接口/API 证据要求。
 2026-06-15 1.1.50 ToolActionDraftHintTest 覆盖“请调用接口时怎么带参数”这类容易包含执行字样的 API 用法咨询不触发工具能力预警。
