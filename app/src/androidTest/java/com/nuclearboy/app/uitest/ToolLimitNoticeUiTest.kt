@@ -36,7 +36,7 @@ class ToolLimitNoticeUiTest {
     }
 
     private fun seedToolLimitConversation() {
-        val assistantContent = "Tool calls are NOT supported by this gateway, so I cannot READ_FILE, WRITE_FILE, or RUN_PYTHON. No real execution happened."
+        val assistantContent = "I don't have access to files or the local filesystem here, so I can't run commands, edit files, or run tests in your project."
         val assistantContentB64 = Base64.encodeToString(
             assistantContent.toByteArray(Charsets.UTF_8),
             Base64.NO_WRAP,

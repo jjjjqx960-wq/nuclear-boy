@@ -1,3 +1,4 @@
+2026-06-14 1.1.41 ToolLimitNoticeUiTest 改用模型自述无法访问文件和运行命令的英文消息注入真实前端，验证仍渲染工具受限卡。
 2026-06-14 1.1.40 ToolLimitNoticeUiTest 改用英文工具受限助手消息注入真实前端，断言仍能渲染中文结构化工具受限卡。
 2026-06-14 1.1.39 ToolMissingEvidenceReviewUiTest 断言真实前端结果复核卡显示 `tool.evidence.missing`、正式聊天链路口径和测试口径语义。
 2026-06-14 1.1.38 ToolLimitNoticeUiTest 断言真实前端工具受限卡显示 `tool.protocol`、正式聊天链路口径和测试口径语义。

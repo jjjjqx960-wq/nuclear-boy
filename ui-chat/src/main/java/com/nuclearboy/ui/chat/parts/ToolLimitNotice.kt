@@ -58,6 +58,26 @@ private val TOOL_LIMIT_MARKERS = listOf(
     "does not support tools",
     "no available tool",
     "no tool calls",
+    "can't access local files",
+    "cannot access local files",
+    "can't access files",
+    "cannot access files",
+    "don't have access to files",
+    "do not have access to files",
+    "no access to the filesystem",
+    "no access to file system",
+    "can't run commands",
+    "cannot run commands",
+    "can't execute commands",
+    "cannot execute commands",
+    "can't execute code",
+    "cannot execute code",
+    "无法访问文件",
+    "不能访问文件",
+    "无法运行命令",
+    "不能运行命令",
+    "无法执行代码",
+    "不能执行代码",
 )
 
 private val TOOL_ACTION_MARKERS = listOf(
@@ -77,6 +97,13 @@ private val TOOL_ACTION_MARKERS = listOf(
     "test",
     "validate",
     "function_call",
+    "access",
+    "command",
+    "commands",
+    "file",
+    "files",
+    "filesystem",
+    "file system",
 )
 
 private fun String.containsAnyToolMarker(markers: List<String>): Boolean =
