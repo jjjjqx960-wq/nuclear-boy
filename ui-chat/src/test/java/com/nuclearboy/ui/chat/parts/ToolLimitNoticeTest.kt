@@ -86,6 +86,19 @@ class ToolLimitNoticeTest {
     }
 
     @Test
+    fun detectModelOnlyGuidanceDisclaimerForExecutionTask() {
+        val notice = detectToolLimitNotice(
+            "I can only provide guidance and steps here; I can't perform actions for you, run tests, or make changes directly in the app.",
+        )
+
+        assertNotNull(notice)
+        assertTrue(notice?.summary.orEmpty().contains("没有真实发生"))
+        assertTrue(notice?.semantics.orEmpty().contains("未真实执行"))
+        assertTrue(notice?.actions.orEmpty().any { it.contains("不要把本轮当作已执行") })
+        assertEquals("tool.protocol", notice?.diagnosticLabel)
+    }
+
+    @Test
     fun ignoreOrdinaryModelError() {
         val notice = detectToolLimitNotice("处理时遇到了问题：HTTP 404: model not found")
 

@@ -1,3 +1,4 @@
+2026-06-15 1.1.44 ToolLimitNoticeTest 覆盖模型只提供 guidance/steps、不能 perform actions/run tests/make changes 时的结构化工具受限识别。
 2026-06-15 1.1.43 ToolLimitNoticeTest 覆盖模型自述无法操作屏幕、点击按钮、打开/安装应用或控制手机时的结构化工具受限识别。
 2026-06-15 1.1.42 ToolLimitNoticeTest 覆盖模型自述无法访问互联网、GitHub、服务器、ADB/SSH 时的结构化工具受限识别。
 2026-06-14 1.1.41 ToolLimitNoticeTest 覆盖模型自述没有文件系统和命令执行访问权限时的结构化工具受限识别。
