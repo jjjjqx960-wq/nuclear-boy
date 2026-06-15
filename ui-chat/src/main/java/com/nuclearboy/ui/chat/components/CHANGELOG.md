@@ -1,3 +1,4 @@
+2026-06-14 1.1.38 ToolLimitNoticeCard 接入 WarningNoticeCard 的诊断行和测试口径行，工具受限时可见 `tool.protocol` 和正式链路来源。
 2026-06-14 1.1.37 ChatFailureNoticeCard 接入正式链路测试口径，WarningNoticeCard 增加可选链路元信息行和语义描述。
 2026-06-14 1.1.36 ChatFailureNoticeCard 接入诊断指纹，WarningNoticeCard 支持可选紧凑诊断行和对应无障碍语义。
 2026-06-14 1.1.34 新增 ChatFailureNoticeCard，复用 WarningNoticeCard 展示正式聊天失败原因和下一步。

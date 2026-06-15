@@ -1,3 +1,4 @@
+2026-06-14 1.1.38 ToolLimitNotice 新增 tool.protocol 诊断指纹和正式聊天链路测试口径字段，用于区分工具协议受限与普通聊天失败。
 2026-06-14 1.1.37 ChatFailureNotice 新增 verificationLabel，固定输出“正式聊天 / stream=true / 工具定义”测试口径。
 2026-06-14 1.1.36 ChatFailureNotice 新增脱敏 diagnosticLabel，按错误类别、provider 前缀和 HTTP 状态生成稳定诊断指纹。
 2026-06-14 1.1.35 ChatFailureNotice 增加鉴权、权限、额度限流和网络失败识别规则，补齐第三方网关正式聊天常见失败面。

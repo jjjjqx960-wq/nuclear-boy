@@ -19,6 +19,8 @@ class ToolLimitNoticeTest {
         assertTrue(notice?.summary.orEmpty().contains("没有可用的工具调用协议"))
         assertTrue(notice?.summary.orEmpty().contains("没有真实发生"))
         assertTrue(notice?.actions.orEmpty().any { it.contains("支持 tools/function_call") })
+        assertEquals("tool.protocol", notice?.diagnosticLabel)
+        assertEquals("正式聊天 / stream=true / 工具定义", notice?.verificationLabel)
     }
 
     @Test

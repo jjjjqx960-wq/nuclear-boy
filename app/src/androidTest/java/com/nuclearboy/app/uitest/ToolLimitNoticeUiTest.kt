@@ -29,6 +29,9 @@ class ToolLimitNoticeUiTest {
         })
         assertTrue("提示卡标题应可见", device.hasObject(By.textContains("工具受限")))
         assertTrue("提示卡应说明模型连接与工具协议状态", device.hasObject(By.textContains("模型连接正常")))
+        assertTrue("提示卡应显示工具协议诊断指纹", device.hasObject(By.textContains("tool.protocol")))
+        assertTrue("提示卡应显示正式链路口径", device.hasObject(By.textContains("正式聊天 / stream=true")))
+        assertTrue("提示卡无障碍语义应包含测试口径", device.hasObject(By.descContains("测试口径")))
     }
 
     private fun seedToolLimitConversation() {

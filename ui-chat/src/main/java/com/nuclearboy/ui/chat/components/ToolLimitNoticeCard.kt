@@ -37,6 +37,8 @@ internal fun ToolLimitNoticeCard(
         title = notice.title,
         summary = notice.summary,
         actions = notice.actions,
+        diagnosticLabel = notice.diagnosticLabel,
+        verificationLabel = notice.verificationLabel,
         semantics = notice.semantics,
         modifier = modifier,
     )

@@ -1,3 +1,4 @@
+2026-06-14 1.1.38 ToolLimitNoticeTest 覆盖工具受限卡片的 tool.protocol 诊断指纹和正式聊天链路测试口径。
 2026-06-14 1.1.37 ChatFailureNoticeTest 覆盖 verificationLabel，防止正式链路测试口径从失败卡片数据中丢失。
 2026-06-14 1.1.36 ChatFailureNoticeTest 覆盖脱敏诊断指纹，确认 HTTP 状态和 provider 可定位且不会带出密钥。
 2026-06-14 1.1.35 ChatFailureNoticeTest 扩展鉴权、额度限流和网络失败断言，避免泛化错误回退。
