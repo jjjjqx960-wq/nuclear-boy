@@ -27,13 +27,14 @@ class ToolDraftHintUiTest {
         robot.launchApp()
 
         robot.waitForChatInput(30_000)
-        robot.enterDraftText("请读取 skills/app-dialog-smoke/SKILL.md 并运行验证")
+        robot.enterDraftText("你走 API 给我加进去呢")
 
         assertTrue("工具型草稿应在发送前显示工具能力预警语义", waitUntil(10_000) {
             device.hasObject(By.descContains("工具能力预警")) ||
                 device.hasObject(By.textContains("可能需要工具能力"))
         })
         assertTrue("工具型草稿预警标题应可见", device.hasObject(By.textContains("可能需要工具能力")))
+        assertTrue("API 配置类草稿应显示接口调用范围", device.hasObject(By.textContains("调用接口/API")))
 
         val appendGuard = device.findObject(By.desc("追加防假执行提示"))
             ?: device.findObject(By.text("追加防假执行提示"))

@@ -16,8 +16,12 @@ fun detectToolActionDraftHint(text: String): ToolActionDraftHint? {
     val hasCommand = commandMarkers.any { lower.contains(it) }
     val hasRunAction = runMarkers.any { compact.contains(it) || lower.contains(it) }
     val hasToolObject = toolObjectMarkers.any { compact.contains(it) || lower.contains(it) }
+    val hasApiObject = apiObjectMarkers.any { compact.contains(it) || lower.contains(it) }
+    val hasApiMutation = apiMutationMarkers.any { compact.contains(it) || lower.contains(it) }
+    val hasApiAction = apiActionMarkers.any { compact.contains(it) || lower.contains(it) } ||
+        (hasApiObject && hasApiMutation)
 
-    if (!hasExplicitFileWrite && !hasExplicitFileRead && !hasCommand && !(hasRunAction && hasToolObject)) {
+    if (!hasExplicitFileWrite && !hasExplicitFileRead && !hasCommand && !hasApiAction && !(hasRunAction && hasToolObject)) {
         return null
     }
 
@@ -25,6 +29,7 @@ fun detectToolActionDraftHint(text: String): ToolActionDraftHint? {
         hasExplicitFileWrite -> "写入/创建文件"
         hasExplicitFileRead -> "读取/查看文件"
         hasCommand -> "运行命令或脚本"
+        hasApiAction -> "调用接口/API 或远程配置"
         else -> "执行/验证项目任务"
     }
     return ToolActionDraftHint(
@@ -137,6 +142,53 @@ private val commandMarkers = listOf(
     " pnpm ",
     " ./",
     "run_python",
+)
+
+private val apiObjectMarkers = listOf(
+    "api",
+    "接口",
+    "endpoint",
+    "webhook",
+    "http",
+    "https",
+    "服务端",
+    "服务器",
+    "后台",
+    "网关",
+)
+
+private val apiActionMarkers = listOf(
+    "走api",
+    "走 api",
+    "调用api",
+    "调用 api",
+    "调用接口",
+    "请求接口",
+    "接口请求",
+    "发请求",
+    "发起请求",
+    "post ",
+    "put ",
+    "patch ",
+    "delete ",
+    "curl ",
+)
+
+private val apiMutationMarkers = listOf(
+    "加进去",
+    "添加",
+    "新增",
+    "创建",
+    "更新",
+    "配置",
+    "导入",
+    "同步",
+    "提交",
+    "上传",
+    "注册",
+    "绑定",
+    "切换",
+    "删除",
 )
 
 private val toolObjectMarkers = listOf(

@@ -1,3 +1,4 @@
+2026-06-15 1.1.46 工具型草稿预警覆盖 API/接口操作：`走 API 给我加进去`、调用接口、请求接口、通过 API 添加/同步/配置等草稿会在发送前提示需要真实工具能力，并在发送后纳入证据链复核，避免把口头“已加好”误判为服务端已实际配置。
 2026-06-15 1.1.45 工具受限识别扩展无法验证/确认/运行环境免责声明：`can't verify`、`can't confirm`、`can't run the tests/app`、`don't have a runtime environment`、`无法验证/不能确认/没有运行环境` 等会转成结构化“工具受限”卡，避免用户把“我无法验证”误判为测试已通过。
 2026-06-15 1.1.44 工具受限识别扩展泛化指导类免责声明：`can only provide guidance/steps`、`can't perform actions for you`、`can't make changes directly`、`只能提供指导/只能给出步骤/不能替你执行` 等在执行型请求中会转成结构化“工具受限”卡，避免用户把“给步骤”误判为 App 已实际完成。
 2026-06-15 1.1.43 工具受限识别扩展前端和手机操作自述失败：`can't interact with your screen`、`click buttons`、`open/install apps`、`control your phone`、`无法操作手机/无法点击/无法安装应用` 等会转成结构化“工具受限”卡，避免用户把 App 前端或手机控制免责声明误判为已执行。

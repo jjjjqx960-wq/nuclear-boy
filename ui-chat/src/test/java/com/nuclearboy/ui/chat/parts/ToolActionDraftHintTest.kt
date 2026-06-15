@@ -25,6 +25,22 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun detectApiMutationRequest() {
+        val hint = detectToolActionDraftHint("你走 API 给我加进去呢")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.semantics.orEmpty().contains("工具真实执行"))
+    }
+
+    @Test
+    fun ignoreApiConceptQuestion() {
+        val hint = detectToolActionDraftHint("API 是什么")
+
+        assertNull(hint)
+    }
+
+    @Test
     fun ignoreOrdinaryChatRequest() {
         val hint = detectToolActionDraftHint("帮我写一个睡前故事")
 
@@ -86,6 +102,19 @@ class ToolActionDraftHintTest {
         assertTrue(review.orEmpty().contains("本轮结果复核"))
         assertTrue(review.orEmpty().contains("未看到工具执行卡"))
         assertTrue(review.orEmpty().contains("不要把本轮回复当作已完成结果"))
+    }
+
+    @Test
+    fun buildMissingEvidenceReviewWhenApiRequestHasNoEvidence() {
+        val review = buildToolActionMissingEvidenceReview(
+            userText = "走 API 把这个模型配置同步到后台",
+            assistantText = "已经加好了，可以直接用了。",
+            hasVisibleToolEvidence = false,
+        )
+
+        assertNotNull(review)
+        assertTrue(review.orEmpty().contains("调用接口/API"))
+        assertTrue(review.orEmpty().contains("未看到工具执行卡"))
     }
 
     @Test
