@@ -146,8 +146,14 @@ private fun shouldSkipCodeModelArtifactRequest(
     return compact.contains("模型类") ||
         compact.contains("数据类") ||
         compact.contains("实体类") ||
+        compact.contains("说明文档") ||
+        compact.contains("说明文件") ||
+        compact.contains("通知文案") ||
+        compact.contains("提示文案") ||
+        compact.contains("文案") ||
         lower.contains("data class") ||
-        lower.contains("model class")
+        lower.contains("model class") ||
+        lower.contains("documentation")
 }
 
 const val TOOL_REALITY_GUARD: String =
@@ -242,11 +248,31 @@ private val apiObjectMarkers = listOf(
     "发票",
     "钱包",
     "计费",
+    "这个用户",
+    "该用户",
+    "用户账号",
+    "用户权限",
+    "用户角色",
+    "权限",
+    "角色",
+    "管理员",
+    "成员",
+    "会员",
+    "手机号",
+    "邮箱",
+    "密码",
+    "登录",
+    "黑名单",
+    "白名单",
     "billing",
     "invoice",
     "quota",
     "balance",
     "subscription",
+    "user role",
+    "permission",
+    "admin",
+    "password",
     "服务端",
     "服务器",
     "后台",
@@ -370,6 +396,30 @@ private val apiMutationMarkers = listOf(
     "升级套餐",
     "降级套餐",
     "改套餐",
+    "封禁",
+    "解封",
+    "拉黑",
+    "加入黑名单",
+    "移出黑名单",
+    "授权",
+    "取消授权",
+    "给权限",
+    "开权限",
+    "开管理员权限",
+    "收回权限",
+    "改权限",
+    "改角色",
+    "设为管理员",
+    "设管理员",
+    "升管理员",
+    "取消管理员",
+    "重置密码",
+    "改密码",
+    "冻结",
+    "解冻",
+    "禁言",
+    "解除禁言",
+    "踢出",
 )
 
 private val apiLearningQuestionMarkers = listOf(

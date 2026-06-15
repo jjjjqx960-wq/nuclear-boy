@@ -201,6 +201,33 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun detectUserBanRequest() {
+        val hint = detectToolActionDraftHint("把这个用户封禁")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.summary.orEmpty().contains("修改远程配置"))
+    }
+
+    @Test
+    fun detectAdminPermissionGrantRequest() {
+        val hint = detectToolActionDraftHint("帮我给这个账号开管理员权限")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("接口/API 调用记录"))
+    }
+
+    @Test
+    fun detectPasswordResetRequest() {
+        val hint = detectToolActionDraftHint("把登录密码重置一下")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("远程配置变更记录"))
+    }
+
+    @Test
     fun ignoreApiConceptQuestion() {
         val hint = detectToolActionDraftHint("API 是什么")
 
@@ -273,6 +300,20 @@ class ToolActionDraftHintTest {
     @Test
     fun ignoreAccountSystemDesignRequest() {
         val hint = detectToolActionDraftHint("帮我设计一个账号体系")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreUserBanLearningQuestion() {
+        val hint = detectToolActionDraftHint("怎么封禁用户")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignorePermissionDocumentationRequest() {
+        val hint = detectToolActionDraftHint("帮我创建权限说明文档")
 
         assertNull(hint)
     }
