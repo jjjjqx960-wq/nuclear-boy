@@ -35,6 +35,7 @@ class ToolDraftHintUiTest {
         })
         assertTrue("工具型草稿预警标题应可见", device.hasObject(By.textContains("可能需要工具能力")))
         assertTrue("API 配置类草稿应显示接口调用范围", device.hasObject(By.textContains("调用接口/API")))
+        assertTrue("API 配置类草稿应提示无法真实调用接口", device.hasObject(By.textContains("不能真实调用接口")))
 
         val appendGuard = device.findObject(By.desc("追加防假执行提示"))
             ?: device.findObject(By.text("追加防假执行提示"))
@@ -54,7 +55,7 @@ class ToolDraftHintUiTest {
 
         assertTrue("发送后聊天流应留下工具能力证据提示", waitUntil(10_000) {
             device.hasObject(By.textContains("本轮工具能力提示")) &&
-                device.hasObject(By.textContains("可见工具执行卡"))
+                device.hasObject(By.textContains("接口/API 调用记录"))
         })
     }
 

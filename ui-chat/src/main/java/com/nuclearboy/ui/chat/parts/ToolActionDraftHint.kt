@@ -4,10 +4,12 @@ data class ToolActionDraftHint(
     val title: String,
     val summary: String,
     val semantics: String,
+    val evidenceTargets: String = "工具执行卡、文件变更卡",
+    val prohibitedActions: String = "读取、写入、运行、安装、测试或验证",
 )
 
 fun detectToolActionDraftHint(text: String): ToolActionDraftHint? {
-    val compact = text.trim()
+    val compact = text.withoutToolRealityGuard().trim()
     if (compact.length < 4) return null
 
     val lower = compact.lowercase()
@@ -26,16 +28,43 @@ fun detectToolActionDraftHint(text: String): ToolActionDraftHint? {
     }
 
     val scope = when {
-        hasExplicitFileWrite -> "写入/创建文件"
-        hasExplicitFileRead -> "读取/查看文件"
-        hasCommand -> "运行命令或脚本"
-        hasApiAction -> "调用接口/API 或远程配置"
-        else -> "执行/验证项目任务"
+        hasExplicitFileWrite -> ToolActionScope(
+            name = "写入/创建文件",
+            unavailableOutcome = "不能真实落盘或写入",
+            evidenceTargets = "工具执行卡、文件变更卡",
+            prohibitedActions = "读取、写入、运行、安装、测试或验证",
+        )
+        hasExplicitFileRead -> ToolActionScope(
+            name = "读取/查看文件",
+            unavailableOutcome = "不能真实读取文件",
+            evidenceTargets = "工具执行卡、文件读取记录或文件变更卡",
+            prohibitedActions = "读取、写入、运行、安装、测试或验证",
+        )
+        hasCommand -> ToolActionScope(
+            name = "运行命令或脚本",
+            unavailableOutcome = "不能真实运行命令、脚本或验证结果",
+            evidenceTargets = "工具执行卡、命令输出或文件变更卡",
+            prohibitedActions = "读取、写入、运行、安装、测试或验证",
+        )
+        hasApiAction -> ToolActionScope(
+            name = "调用接口/API 或远程配置",
+            unavailableOutcome = "不能真实调用接口、提交请求或修改远程配置",
+            evidenceTargets = "工具执行卡、接口/API 调用记录、远程配置变更记录或文件变更卡",
+            prohibitedActions = "读取、写入、运行、安装、测试、验证、调用接口、提交请求或修改远程配置",
+        )
+        else -> ToolActionScope(
+            name = "执行/验证项目任务",
+            unavailableOutcome = "不能真实执行或验证",
+            evidenceTargets = "工具执行卡、文件变更卡或验证结果",
+            prohibitedActions = "读取、写入、运行、安装、测试或验证",
+        )
     }
     return ToolActionDraftHint(
         title = "可能需要工具能力",
-        summary = "$scope 需要模型通过工具真实执行；若当前网关只支持聊天，发送后会只能给方案，不能真实落盘或运行。",
+        summary = "${scope.name} 需要模型通过工具真实执行；若当前网关只支持聊天，发送后会只能给方案，${scope.unavailableOutcome}。",
         semantics = "工具能力预警：当前草稿可能需要工具真实执行，请确认当前模型网关支持 tools 或 function call。",
+        evidenceTargets = scope.evidenceTargets,
+        prohibitedActions = scope.prohibitedActions,
     )
 }
 
@@ -47,7 +76,7 @@ fun appendToolRealityGuard(text: String): String {
 
 fun buildToolActionEvidenceMessage(text: String): String? {
     val hint = detectToolActionDraftHint(text) ?: return null
-    return "本轮工具能力提示：${hint.summary}\n回看时请以可见工具执行卡、文件变更卡或明确的“工具受限，未真实执行”为准；没有这些证据就不要当作已完成。"
+    return "本轮工具能力提示：${hint.summary}\n回看时请以可见${hint.evidenceTargets}或明确的“工具受限，未真实执行”为准；没有这些证据就不要当作已完成。"
 }
 
 fun buildToolActionModelGuard(text: String): String? {
@@ -55,9 +84,9 @@ fun buildToolActionModelGuard(text: String): String? {
     return """
         【本轮工具真实性约束】
         用户这轮请求已命中工具型任务风险：${hint.summary}
-        如果你没有通过真实工具调用拿到成功结果，不得声称已经读取、写入、运行、安装、测试或验证。
+        如果你没有通过真实工具调用拿到成功结果，不得声称已经${hint.prohibitedActions}。
         没有工具结果时必须明确写：工具受限，未真实执行；然后给出下一步需要的真实操作。
-        如果工具已成功执行，回复必须引用可见工具结果、文件变更或验证结果。
+        如果工具已成功执行，回复必须引用可见${hint.evidenceTargets}。
     """.trimIndent()
 }
 
@@ -68,11 +97,21 @@ fun buildToolActionMissingEvidenceReview(
 ): String? {
     val hint = detectToolActionDraftHint(userText) ?: return null
     if (hasVisibleToolEvidence || assistantDeclaresToolLimitation(assistantText)) return null
-    return "本轮结果复核：${hint.summary}\n未看到工具执行卡、文件变更卡，也未看到明确的“工具受限，未真实执行”说明；请先不要把本轮回复当作已完成结果。"
+    return "本轮结果复核：${hint.summary}\n未看到${hint.evidenceTargets}，也未看到明确的“工具受限，未真实执行”说明；请先不要把本轮回复当作已完成结果。"
 }
+
+private data class ToolActionScope(
+    val name: String,
+    val unavailableOutcome: String,
+    val evidenceTargets: String,
+    val prohibitedActions: String,
+)
 
 private fun hasRealityGuard(text: String): Boolean =
     realityGuardMarkers.any { text.contains(it, ignoreCase = true) }
+
+private fun String.withoutToolRealityGuard(): String =
+    replace(TOOL_REALITY_GUARD, "", ignoreCase = true)
 
 private fun assistantDeclaresToolLimitation(text: String): Boolean =
     toolLimitationMarkers.any { text.contains(it, ignoreCase = true) }

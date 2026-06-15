@@ -30,6 +30,8 @@ class ToolActionDraftHintTest {
 
         assertNotNull(hint)
         assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.summary.orEmpty().contains("不能真实调用接口"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("接口/API 调用记录"))
         assertTrue(hint?.semantics.orEmpty().contains("工具真实执行"))
     }
 
@@ -67,6 +69,29 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun buildEvidenceMessageForApiRequest() {
+        val evidence = buildToolActionEvidenceMessage("走 API 把这个模型配置同步到后台")
+
+        assertNotNull(evidence)
+        assertTrue(evidence.orEmpty().contains("调用接口/API"))
+        assertTrue(evidence.orEmpty().contains("接口/API 调用记录"))
+        assertTrue(evidence.orEmpty().contains("远程配置变更记录"))
+        assertTrue(evidence.orEmpty().contains("没有这些证据就不要当作已完成"))
+    }
+
+    @Test
+    fun keepApiEvidenceWhenRealityGuardAppended() {
+        val guarded = appendToolRealityGuard("你走 API 给我加进去呢")
+        val evidence = buildToolActionEvidenceMessage(guarded)
+
+        assertNotNull(evidence)
+        assertTrue(evidence.orEmpty().contains("调用接口/API"))
+        assertTrue(evidence.orEmpty().contains("接口/API 调用记录"))
+        assertTrue(evidence.orEmpty().contains("不能真实调用接口"))
+        assertTrue(!evidence.orEmpty().contains("读取/查看文件"))
+    }
+
+    @Test
     fun skipEvidenceMessageForOrdinaryChat() {
         val evidence = buildToolActionEvidenceMessage("帮我写一个睡前故事")
 
@@ -81,6 +106,16 @@ class ToolActionDraftHintTest {
         assertTrue(guard.orEmpty().contains("本轮工具真实性约束"))
         assertTrue(guard.orEmpty().contains("工具受限，未真实执行"))
         assertTrue(guard.orEmpty().contains("不得声称已经读取、写入、运行"))
+    }
+
+    @Test
+    fun buildModelGuardForApiRequest() {
+        val guard = buildToolActionModelGuard("请调用接口把模型配置同步到后台")
+
+        assertNotNull(guard)
+        assertTrue(guard.orEmpty().contains("不得声称已经读取、写入、运行、安装、测试、验证、调用接口、提交请求或修改远程配置"))
+        assertTrue(guard.orEmpty().contains("接口/API 调用记录"))
+        assertTrue(guard.orEmpty().contains("远程配置变更记录"))
     }
 
     @Test
@@ -114,6 +149,8 @@ class ToolActionDraftHintTest {
 
         assertNotNull(review)
         assertTrue(review.orEmpty().contains("调用接口/API"))
+        assertTrue(review.orEmpty().contains("接口/API 调用记录"))
+        assertTrue(review.orEmpty().contains("远程配置变更记录"))
         assertTrue(review.orEmpty().contains("未看到工具执行卡"))
     }
 
