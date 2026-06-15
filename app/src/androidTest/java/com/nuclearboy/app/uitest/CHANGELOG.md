@@ -1,3 +1,4 @@
+2026-06-14 1.1.35 ChatFailureNoticeUiTest 增加 401 鉴权失败种子会话，断言真实前端显示 API Key 和重新测试正式聊天提示。
 2026-06-14 1.1.34 新增 ChatFailureNoticeUiTest，通过 base64 debug 会话种子验证模型路由失败提示卡在真实前端可见。
 2026-06-14 1.1.33 ToolMissingEvidenceReviewUiTest 扩展断言结构化结果复核卡，要求可见标题、风险摘要、无障碍语义和工具协议下一步。
 2026-06-14 1.1.32 ToolMissingEvidenceReviewUiTest 改用非法 scheme 的快速失败调试模型，避免不可达 loopback 在设备上触发 120 秒网络超时。

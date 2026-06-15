@@ -32,6 +32,34 @@ class ChatFailureNoticeTest {
     }
 
     @Test
+    fun detectsAuthFailure() {
+        val notice = detectChatFailureNotice("处理时遇到了问题：HTTP 401: unauthorized invalid api key")
+
+        assertNotNull(notice)
+        assertEquals("鉴权失败", notice?.title)
+        assertTrue(notice?.actions.orEmpty().any { it.contains("API Key") })
+        assertTrue(notice?.semantics.orEmpty().contains("API Key"))
+    }
+
+    @Test
+    fun detectsQuotaFailure() {
+        val notice = detectChatFailureNotice("处理时遇到了问题：HTTP 429: rate limit exceeded, insufficient_quota")
+
+        assertNotNull(notice)
+        assertEquals("额度或限流不足", notice?.title)
+        assertTrue(notice?.actions.orEmpty().any { it.contains("余额") || it.contains("额度") })
+    }
+
+    @Test
+    fun detectsNetworkFailure() {
+        val notice = detectChatFailureNotice("出了一点小问题…failed to connect: timeout")
+
+        assertNotNull(notice)
+        assertEquals("网络连接失败", notice?.title)
+        assertTrue(notice?.actions.orEmpty().any { it.contains("VPN") })
+    }
+
+    @Test
     fun ignoresOrdinaryToolLimitMessage() {
         val notice = detectChatFailureNotice(
             "工具受限，未真实执行。当前第三方网关不支持工具调用协议。",

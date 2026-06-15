@@ -19,7 +19,9 @@ class ChatFailureNoticeUiTest {
     @Test
     fun persistedModelRoutingFailureShowsActionableNoticeCard() {
         grantNotificationPermissionIfPossible()
-        seedModelRoutingFailureConversation()
+        seedFailureConversation(
+            """处理时遇到了问题：HTTP 404: {"error":{"message":"No active credentials for provider: nvidia","type":"invalid_request_error","code":"model_not_found"}}""",
+        )
 
         robot.launchApp()
         dismissPermissionPrompts()
@@ -33,9 +35,24 @@ class ChatFailureNoticeUiTest {
         assertTrue("提示卡应给出模型列表下一步", device.hasObject(By.textContains("获取模型列表")))
     }
 
-    private fun seedModelRoutingFailureConversation() {
-        val assistantContent =
-            """处理时遇到了问题：HTTP 404: {"error":{"message":"No active credentials for provider: nvidia","type":"invalid_request_error","code":"model_not_found"}}"""
+    @Test
+    fun persistedAuthFailureShowsActionableNoticeCard() {
+        grantNotificationPermissionIfPossible()
+        seedFailureConversation("处理时遇到了问题：HTTP 401: unauthorized invalid api key")
+
+        robot.launchApp()
+        dismissPermissionPrompts()
+        robot.waitForChatInput(30_000)
+
+        assertTrue("聊天页应渲染鉴权失败提示卡语义", waitUntil(15_000) {
+            device.hasObject(By.descContains("鉴权失败提示"))
+        })
+        assertTrue("提示卡标题应可见", device.hasObject(By.textContains("鉴权失败")))
+        assertTrue("提示卡应提示 API Key", device.hasObject(By.textContains("API Key")))
+        assertTrue("提示卡应提示重新测试正式聊天", device.hasObject(By.textContains("重新测试正式聊天")))
+    }
+
+    private fun seedFailureConversation(assistantContent: String) {
         val result = device.executeShellCommand(
             listOf(
                 "am broadcast",
