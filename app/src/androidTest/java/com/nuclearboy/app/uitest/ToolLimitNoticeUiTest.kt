@@ -36,7 +36,7 @@ class ToolLimitNoticeUiTest {
     }
 
     private fun seedToolLimitConversation() {
-        val assistantContent = "I can only provide guidance and steps here; I can't perform actions for you, run tests, or make changes directly in the app."
+        val assistantContent = "I can't verify the fix or run the tests because I don't have a runtime environment for your app here."
         val assistantContentB64 = Base64.encodeToString(
             assistantContent.toByteArray(Charsets.UTF_8),
             Base64.NO_WRAP,

@@ -99,6 +99,18 @@ class ToolLimitNoticeTest {
     }
 
     @Test
+    fun detectModelCannotVerifyOrRunTestsDisclaimer() {
+        val notice = detectToolLimitNotice(
+            "I can't verify the fix or run the tests because I don't have a runtime environment for your app here.",
+        )
+
+        assertNotNull(notice)
+        assertTrue(notice?.summary.orEmpty().contains("没有真实发生"))
+        assertTrue(notice?.actions.orEmpty().any { it.contains("不要把本轮当作已执行") })
+        assertEquals("tool.protocol", notice?.diagnosticLabel)
+    }
+
+    @Test
     fun ignoreOrdinaryModelError() {
         val notice = detectToolLimitNotice("处理时遇到了问题：HTTP 404: model not found")
 

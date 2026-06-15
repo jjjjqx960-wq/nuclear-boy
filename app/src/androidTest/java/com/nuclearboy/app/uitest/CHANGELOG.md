@@ -1,3 +1,4 @@
+2026-06-15 1.1.45 ToolLimitNoticeUiTest 改用模型无法 verify fix/run tests 且缺少 runtime environment 的英文消息注入真实前端，验证仍渲染工具受限卡。
 2026-06-15 1.1.44 ToolLimitNoticeUiTest 改用模型只提供 guidance/steps、不能替用户执行动作或直接修改 App 的英文消息注入真实前端，验证仍渲染工具受限卡。
 2026-06-15 1.1.43 ToolLimitNoticeUiTest 改用模型自述无法操作屏幕、点击按钮、打开/安装应用和控制手机的英文消息注入真实前端，验证仍渲染工具受限卡。
 2026-06-15 1.1.42 ToolLimitNoticeUiTest 改用模型自述无法访问互联网、GitHub、服务器和 ADB/SSH 的英文消息注入真实前端，验证仍渲染工具受限卡。
