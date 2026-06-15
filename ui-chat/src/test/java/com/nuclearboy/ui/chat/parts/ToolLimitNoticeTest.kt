@@ -34,6 +34,18 @@ class ToolLimitNoticeTest {
     }
 
     @Test
+    fun detectEnglishToolLimitMessageCaseInsensitive() {
+        val notice = detectToolLimitNotice(
+            "Tool calls are NOT supported by this gateway, so I cannot READ_FILE or RUN_PYTHON. No real execution happened.",
+        )
+
+        assertNotNull(notice)
+        assertTrue(notice?.summary.orEmpty().contains("没有真实发生"))
+        assertTrue(notice?.actions.orEmpty().any { it.contains("tools/function_call") })
+        assertEquals("tool.protocol", notice?.diagnosticLabel)
+    }
+
+    @Test
     fun ignoreOrdinaryModelError() {
         val notice = detectToolLimitNotice("处理时遇到了问题：HTTP 404: model not found")
 

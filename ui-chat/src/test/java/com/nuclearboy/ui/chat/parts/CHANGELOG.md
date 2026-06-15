@@ -1,3 +1,4 @@
+2026-06-14 1.1.40 ToolLimitNoticeTest 覆盖英文工具调用不可用和大写 READ_FILE/RUN_PYTHON 场景，防止第三方网关英文错误漏识别。
 2026-06-14 1.1.39 ToolMissingEvidenceReviewNoticeTest 覆盖结果复核卡的 tool.evidence.missing 诊断指纹和正式聊天链路测试口径。
 2026-06-14 1.1.38 ToolLimitNoticeTest 覆盖工具受限卡片的 tool.protocol 诊断指纹和正式聊天链路测试口径。
 2026-06-14 1.1.37 ChatFailureNoticeTest 覆盖 verificationLabel，防止正式链路测试口径从失败卡片数据中丢失。

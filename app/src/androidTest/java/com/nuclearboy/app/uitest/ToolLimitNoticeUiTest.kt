@@ -1,5 +1,6 @@
 package com.nuclearboy.app.uitest
 
+import android.util.Base64
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -35,8 +36,13 @@ class ToolLimitNoticeUiTest {
     }
 
     private fun seedToolLimitConversation() {
+        val assistantContent = "Tool calls are NOT supported by this gateway, so I cannot READ_FILE, WRITE_FILE, or RUN_PYTHON. No real execution happened."
+        val assistantContentB64 = Base64.encodeToString(
+            assistantContent.toByteArray(Charsets.UTF_8),
+            Base64.NO_WRAP,
+        )
         val result = device.executeShellCommand(
-            "am broadcast -a com.nuclearboy.app.DEBUG_SEED_CONVERSATION -n ${robot.appPackageName}/com.nuclearboy.app.diagnostics.DebugConversationSeedReceiver",
+            "am broadcast -a com.nuclearboy.app.DEBUG_SEED_CONVERSATION -n ${robot.appPackageName}/com.nuclearboy.app.diagnostics.DebugConversationSeedReceiver --es assistant_content_b64 $assistantContentB64",
         )
         assertFalse("调试会话广播不应失败：$result", result.contains("Exception", ignoreCase = true))
         assertTrue("调试会话广播应完成：$result", result.contains("Broadcast completed"))

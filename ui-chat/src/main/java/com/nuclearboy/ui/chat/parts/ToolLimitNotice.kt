@@ -13,10 +13,10 @@ fun detectToolLimitNotice(content: String): ToolLimitNotice? {
     val text = content.trim()
     if (text.isBlank()) return null
 
-    val hasLimitMarker = TOOL_LIMIT_MARKERS.any { text.contains(it) }
+    val hasLimitMarker = text.containsAnyToolMarker(TOOL_LIMIT_MARKERS)
     if (!hasLimitMarker) return null
 
-    val needsExecution = TOOL_ACTION_MARKERS.any { text.contains(it) }
+    val needsExecution = text.containsAnyToolMarker(TOOL_ACTION_MARKERS)
     val summary = if (needsExecution) {
         "模型连接正常，但当前网关没有可用的工具调用协议；本轮读写、运行或测试没有真实发生。"
     } else {
@@ -49,6 +49,15 @@ private val TOOL_LIMIT_MARKERS = listOf(
     "没有可用工具调用协议",
     "不能调用 read_file",
     "伪造工具",
+    "tool calls are not supported",
+    "tools are not supported",
+    "tool use is disabled",
+    "tools disabled",
+    "function_call unsupported",
+    "function calling is not supported",
+    "does not support tools",
+    "no available tool",
+    "no tool calls",
 )
 
 private val TOOL_ACTION_MARKERS = listOf(
@@ -61,4 +70,14 @@ private val TOOL_ACTION_MARKERS = listOf(
     "write_file",
     "run_python",
     "工具调用",
+    "read",
+    "write",
+    "run",
+    "execute",
+    "test",
+    "validate",
+    "function_call",
 )
+
+private fun String.containsAnyToolMarker(markers: List<String>): Boolean =
+    markers.any { contains(it, ignoreCase = true) }

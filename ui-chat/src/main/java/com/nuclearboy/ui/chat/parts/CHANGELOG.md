@@ -1,3 +1,4 @@
+2026-06-14 1.1.40 ToolLimitNotice 识别规则改为大小写不敏感，并补充英文工具调用不可用、function_call 不支持和 READ_FILE/RUN_PYTHON 等网关表达。
 2026-06-14 1.1.39 ToolMissingEvidenceReviewNotice 新增 tool.evidence.missing 诊断指纹和正式聊天链路测试口径字段。
 2026-06-14 1.1.38 ToolLimitNotice 新增 tool.protocol 诊断指纹和正式聊天链路测试口径字段，用于区分工具协议受限与普通聊天失败。
 2026-06-14 1.1.37 ChatFailureNotice 新增 verificationLabel，固定输出“正式聊天 / stream=true / 工具定义”测试口径。
