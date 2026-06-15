@@ -156,6 +156,24 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun detectApiKeyRotateRequest() {
+        val hint = detectToolActionDraftHint("帮我把 API key 轮换一下")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("远程配置变更记录"))
+    }
+
+    @Test
+    fun detectCredentialRevokeRequest() {
+        val hint = detectToolActionDraftHint("把这组密钥撤销掉")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("接口/API 调用记录"))
+    }
+
+    @Test
     fun ignoreApiConceptQuestion() {
         val hint = detectToolActionDraftHint("API 是什么")
 
@@ -207,6 +225,20 @@ class ToolActionDraftHintTest {
     @Test
     fun ignoreGatewayModelDeleteLearningQuestion() {
         val hint = detectToolActionDraftHint("怎么把模型从网关删掉")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreApiKeyRotationLearningQuestion() {
+        val hint = detectToolActionDraftHint("如何轮换 API key")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreKeyValueCodeModelRequest() {
+        val hint = detectToolActionDraftHint("帮我创建一个 key-value 配置模型类")
 
         assertNull(hint)
     }
