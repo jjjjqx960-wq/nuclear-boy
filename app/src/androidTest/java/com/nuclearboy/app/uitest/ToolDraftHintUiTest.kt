@@ -70,7 +70,7 @@ class ToolDraftHintUiTest {
         robot.launchApp()
 
         robot.waitForChatInput(30_000)
-        robot.enterDraftText("怎么调用接口添加模型")
+        robot.enterDraftText("请调用接口时怎么带参数")
         Thread.sleep(1_500)
 
         assertTrue(

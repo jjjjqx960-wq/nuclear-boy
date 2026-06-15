@@ -60,6 +60,13 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun ignoreApiParameterLearningQuestion() {
+        val hint = detectToolActionDraftHint("请调用接口时怎么带参数")
+
+        assertNull(hint)
+    }
+
+    @Test
     fun detectApiExecutionEvenWhenTextMentionsHow() {
         val hint = detectToolActionDraftHint("你看看怎么走 API 给我加进去")
 

@@ -273,6 +273,7 @@ private val apiLearningQuestionMarkers = listOf(
 )
 
 private val apiExplanationMarkers = listOf(
+    "请问",
     "告诉我",
     "讲讲",
     "解释",
@@ -282,6 +283,13 @@ private val apiExplanationMarkers = listOf(
     "教程",
     "示例",
     "文档",
+    "参数",
+    "请求体",
+    "header",
+    "headers",
+    "鉴权",
+    "字段",
+    "返回值",
 )
 
 private val apiExecutionIntentMarkers = listOf(
