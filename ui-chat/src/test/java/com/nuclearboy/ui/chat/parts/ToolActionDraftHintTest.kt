@@ -138,6 +138,24 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun detectGatewayModelDeleteRequest() {
+        val hint = detectToolActionDraftHint("把这个模型从网关删掉")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("远程配置变更记录"))
+    }
+
+    @Test
+    fun detectProviderDisableRequest() {
+        val hint = detectToolActionDraftHint("帮我把 provider 停用")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("接口/API 调用记录"))
+    }
+
+    @Test
     fun ignoreApiConceptQuestion() {
         val hint = detectToolActionDraftHint("API 是什么")
 
@@ -182,6 +200,20 @@ class ToolActionDraftHintTest {
     @Test
     fun ignoreChatModelSwitchLearningQuestion() {
         val hint = detectToolActionDraftHint("怎么把聊天模型切到 deepseek")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreGatewayModelDeleteLearningQuestion() {
+        val hint = detectToolActionDraftHint("怎么把模型从网关删掉")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreOfflineNoticeWritingRequest() {
+        val hint = detectToolActionDraftHint("帮我写一段服务下线通知")
 
         assertNull(hint)
     }

@@ -298,6 +298,14 @@ private val apiMutationMarkers = listOf(
     "绑定",
     "切换",
     "删除",
+    "删掉",
+    "删除掉",
+    "移除",
+    "移出",
+    "下线",
+    "停用",
+    "禁用",
+    "关停",
 )
 
 private val apiLearningQuestionMarkers = listOf(

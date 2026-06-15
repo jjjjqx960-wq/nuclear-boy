@@ -1,3 +1,4 @@
+2026-06-15 1.1.56 ToolActionDraftHintTest 覆盖“把这个模型从网关删掉”和“帮我把 provider 停用”触发远程配置证据要求，并确认“怎么把模型从网关删掉”和“帮我写一段服务下线通知”不误报。
 2026-06-15 1.1.55 ToolActionDraftHintTest 覆盖“把聊天模型切到 deepseek”和“帮我把当前模型改用 deepseek”触发远程配置证据要求，并确认“怎么把聊天模型切到 deepseek”和“帮我创建一个用户模型类”不误报。
 2026-06-15 1.1.54 ToolActionDraftHintTest 覆盖“把默认模型设为 deepseek”和“帮我把默认模型设置成 deepseek”触发远程配置证据要求，并确认“怎么把默认模型设为 deepseek”仍不误报。
 2026-06-15 1.1.53 ToolActionDraftHintTest 覆盖“把网关模型换成 deepseek”和“请把模型路由改为 deepseek”触发远程配置证据要求，并确认“怎么把网关模型换成 deepseek”仍不误报。
