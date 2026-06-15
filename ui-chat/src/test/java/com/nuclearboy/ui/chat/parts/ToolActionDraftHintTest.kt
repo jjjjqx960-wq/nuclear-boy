@@ -120,6 +120,24 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun detectChatModelSwitchRequest() {
+        val hint = detectToolActionDraftHint("把聊天模型切到 deepseek")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("远程配置变更记录"))
+    }
+
+    @Test
+    fun detectCurrentModelUseRequest() {
+        val hint = detectToolActionDraftHint("帮我把当前模型改用 deepseek")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+        assertTrue(hint?.evidenceTargets.orEmpty().contains("接口/API 调用记录"))
+    }
+
+    @Test
     fun ignoreApiConceptQuestion() {
         val hint = detectToolActionDraftHint("API 是什么")
 
@@ -157,6 +175,20 @@ class ToolActionDraftHintTest {
     @Test
     fun ignoreDefaultModelSetLearningQuestion() {
         val hint = detectToolActionDraftHint("怎么把默认模型设为 deepseek")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreChatModelSwitchLearningQuestion() {
+        val hint = detectToolActionDraftHint("怎么把聊天模型切到 deepseek")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreBareCodeModelCreationRequest() {
+        val hint = detectToolActionDraftHint("帮我创建一个用户模型类")
 
         assertNull(hint)
     }
