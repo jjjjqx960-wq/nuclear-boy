@@ -215,6 +215,7 @@ private val apiObjectMarkers = listOf(
     "provider",
     "模型配置",
     "模型路由",
+    "默认模型",
     "路由",
 )
 
@@ -252,6 +253,13 @@ private val apiMutationMarkers = listOf(
     "改为",
     "配置",
     "配上",
+    "设为",
+    "设成",
+    "设置为",
+    "设置成",
+    "设默认",
+    "设成默认",
+    "设为默认",
     "填到",
     "填进",
     "填上",

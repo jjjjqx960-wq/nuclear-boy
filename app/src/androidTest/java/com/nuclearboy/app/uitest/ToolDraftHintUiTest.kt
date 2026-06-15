@@ -27,7 +27,7 @@ class ToolDraftHintUiTest {
         robot.launchApp()
 
         robot.waitForChatInput(30_000)
-        robot.enterDraftText("把网关模型换成 deepseek")
+        robot.enterDraftText("把默认模型设为 deepseek")
 
         assertTrue("工具型草稿应在发送前显示工具能力预警语义", waitUntil(10_000) {
             device.hasObject(By.descContains("工具能力预警")) ||
