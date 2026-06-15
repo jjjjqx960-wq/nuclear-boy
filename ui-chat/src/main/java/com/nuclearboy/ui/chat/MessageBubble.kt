@@ -43,7 +43,9 @@ import android.widget.TextView
 import androidx.compose.ui.viewinterop.AndroidView
 import com.nuclearboy.common.*
 import com.nuclearboy.ui.chat.components.ToolLimitNoticeCard
+import com.nuclearboy.ui.chat.components.ToolMissingEvidenceReviewCard
 import com.nuclearboy.ui.chat.parts.detectToolLimitNotice
+import com.nuclearboy.ui.chat.parts.detectToolMissingEvidenceReviewNotice
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -125,14 +127,28 @@ fun MessageBubble(
                     Spacer(Modifier.height(6.dp))
                 }
 
+                val missingEvidenceReview = remember(message.role, message.content) {
+                    if (message.role == MessageRole.SYSTEM) {
+                        detectToolMissingEvidenceReviewNotice(message.content)
+                    } else {
+                        null
+                    }
+                }
+                if (missingEvidenceReview != null) {
+                    ToolMissingEvidenceReviewCard(notice = missingEvidenceReview)
+                    Spacer(Modifier.height(6.dp))
+                }
+
                 // Message content (selectable text)
-                SelectionContainer {
-                    MessageContent(
-                        content = message.content,
-                        isStreaming = isStreaming,
-                        textColor = textColor,
-                        messageStatus = message.status,
-                    )
+                if (missingEvidenceReview == null) {
+                    SelectionContainer {
+                        MessageContent(
+                            content = message.content,
+                            isStreaming = isStreaming,
+                            textColor = textColor,
+                            messageStatus = message.status,
+                        )
+                    }
                 }
 
                 // File change cards

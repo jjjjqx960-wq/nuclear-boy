@@ -33,6 +33,23 @@ internal fun ToolLimitNoticeCard(
     notice: ToolLimitNotice,
     modifier: Modifier = Modifier,
 ) {
+    WarningNoticeCard(
+        title = notice.title,
+        summary = notice.summary,
+        actions = notice.actions,
+        semantics = notice.semantics,
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal fun WarningNoticeCard(
+    title: String,
+    summary: String,
+    actions: List<String>,
+    semantics: String,
+    modifier: Modifier = Modifier,
+) {
     val nc = NuclearBoyTheme.colorScheme
     val shape = RoundedCornerShape(8.dp)
 
@@ -42,7 +59,7 @@ internal fun ToolLimitNoticeCard(
             .clip(shape)
             .background(nc.warning.copy(alpha = 0.10f))
             .border(1.dp, nc.warning.copy(alpha = 0.55f), shape)
-            .semantics { contentDescription = notice.semantics }
+            .semantics { contentDescription = semantics }
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -54,7 +71,7 @@ internal fun ToolLimitNoticeCard(
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = notice.title,
+                text = title,
                 style = MaterialTheme.typography.labelMedium.copy(
                     color = nc.warning,
                     fontFamily = FontFamily.Monospace,
@@ -64,7 +81,7 @@ internal fun ToolLimitNoticeCard(
             )
         }
         Text(
-            text = notice.summary,
+            text = summary,
             style = MaterialTheme.typography.bodySmall.copy(
                 color = nc.material.onSurface,
                 lineHeight = 17.sp,
@@ -72,7 +89,7 @@ internal fun ToolLimitNoticeCard(
             ),
             modifier = Modifier.padding(top = 5.dp),
         )
-        notice.actions.forEach { action ->
+        actions.forEach { action ->
             Row(
                 modifier = Modifier.padding(top = 4.dp),
                 verticalAlignment = Alignment.Top,

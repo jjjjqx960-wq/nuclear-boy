@@ -28,9 +28,11 @@ class ToolMissingEvidenceReviewUiTest {
         )
 
         assertTrue("工具型请求缺少工具证据时应追加本轮结果复核", waitUntil(15_000) {
-            robot.device.hasObject(By.textContains("本轮结果复核")) &&
+            robot.device.hasObject(By.descContains("结果复核提示")) &&
+                robot.device.hasObject(By.textContains("本轮结果复核")) &&
                 robot.device.hasObject(By.textContains("未看到工具执行卡")) &&
-                robot.device.hasObject(By.textContains("不要把本轮回复当作已完成结果"))
+                robot.device.hasObject(By.textContains("不要把本轮回复当作已完成结果")) &&
+                robot.device.hasObject(By.textContains("tools/function_call"))
         })
     }
 

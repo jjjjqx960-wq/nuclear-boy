@@ -1,3 +1,4 @@
+2026-06-14 1.1.33 新增 ToolMissingEvidenceReviewNotice 识别零件，把后置结果复核系统消息转为标题、摘要、下一步和语义描述。
 2026-06-14 1.1.32 ToolActionDraftHint 新增 buildToolActionMissingEvidenceReview，判断工具型回复是否缺少可见执行证据。
 2026-06-14 1.1.31 ToolActionDraftHint 新增 buildToolActionModelGuard，供发送链路向模型注入本轮工具真实性约束。
 2026-06-14 1.1.30 ToolActionDraftHint 新增工具型发送证据提示文案生成，提示回看时以工具卡、文件变更卡或明确工具受限为准。

@@ -1,3 +1,4 @@
+2026-06-14 1.1.33 新增 ToolMissingEvidenceReviewNoticeTest，验证后置复核消息可转为结构化警告卡数据。
 2026-06-14 1.1.32 ToolActionDraftHintTest 覆盖后置结果复核的缺证提示、证据存在跳过、受限声明跳过和普通聊天跳过。
 2026-06-14 1.1.31 ToolActionDraftHintTest 覆盖本轮模型真实性约束生成和普通聊天不注入约束。
 2026-06-14 1.1.30 ToolActionDraftHintTest 覆盖工具型发送证据提示生成和普通聊天不插入证据提示。

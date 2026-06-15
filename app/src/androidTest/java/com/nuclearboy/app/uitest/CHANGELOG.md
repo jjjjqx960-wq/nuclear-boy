@@ -1,3 +1,4 @@
+2026-06-14 1.1.33 ToolMissingEvidenceReviewUiTest 扩展断言结构化结果复核卡，要求可见标题、风险摘要、无障碍语义和工具协议下一步。
 2026-06-14 1.1.32 ToolMissingEvidenceReviewUiTest 改用非法 scheme 的快速失败调试模型，避免不可达 loopback 在设备上触发 120 秒网络超时。
 2026-06-14 1.1.32 ChatJourneyRobot 的调试模型注入改用 base64 extras 传递 baseUrl、模型名和 Key，避免 `http://` 被 shell/广播拆坏导致正式聊天使用畸形 URL。
 2026-06-14 1.1.32 ChatJourneyRobot 移除调试模型广播里的带空格 display name，避免受限设备 shell 拆参后影响 Receiver 投递。
