@@ -58,6 +58,20 @@ class ToolLimitNoticeTest {
     }
 
     @Test
+    fun detectModelSelfDisclaimerAboutNetworkGithubAdbAndSshAccess() {
+        val notice = detectToolLimitNotice(
+            "I cannot browse the internet, access GitHub, connect to your server, or use ADB/SSH on your Android device from here.",
+        )
+
+        assertNotNull(notice)
+        assertTrue(notice?.summary.orEmpty().contains("ADB/SSH"))
+        assertTrue(notice?.summary.orEmpty().contains("没有真实发生"))
+        assertTrue(notice?.semantics.orEmpty().contains("外部操作能力"))
+        assertTrue(notice?.actions.orEmpty().any { it.contains("不要把本轮当作已执行") })
+        assertEquals("tool.protocol", notice?.diagnosticLabel)
+    }
+
+    @Test
     fun ignoreOrdinaryModelError() {
         val notice = detectToolLimitNotice("处理时遇到了问题：HTTP 404: model not found")
 

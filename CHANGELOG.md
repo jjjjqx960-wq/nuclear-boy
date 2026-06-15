@@ -1,3 +1,4 @@
+2026-06-15 1.1.42 工具受限识别扩展外部访问和设备控制自述失败：`cannot browse the internet`、`access GitHub`、`connect to your server`、`use ADB/SSH`、`无法联网/无法连接服务器/无法使用 ADB/SSH` 等会转成结构化“工具受限”卡，避免用户把网页、GitHub、服务器或手机操作误判为已执行。
 2026-06-14 1.1.41 工具受限识别扩展模型自述限制：`I don't have access to files`、`can't run commands`、`无法访问文件/不能运行命令` 等回复会转成结构化“工具受限”卡，避免用户把模型免责声明误当成真实执行结果。
 2026-06-14 1.1.40 工具受限识别扩展英文网关提示和大小写不敏感匹配：`Tool calls are not supported`、`function_call unsupported`、`READ_FILE/RUN_PYTHON` 等表达会转成同一张结构化“工具受限”卡，减少第三方网关英文错误漏识别。
 2026-06-14 1.1.39 “本轮结果复核”警告卡补齐诊断元信息：缺少工具执行证据时显示 `tool.evidence.missing` 指纹和“正式聊天 / stream=true / 工具定义”测试口径，帮助用户把文字回复与真实工具执行结果区分开。

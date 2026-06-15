@@ -36,7 +36,7 @@ class ToolLimitNoticeUiTest {
     }
 
     private fun seedToolLimitConversation() {
-        val assistantContent = "I don't have access to files or the local filesystem here, so I can't run commands, edit files, or run tests in your project."
+        val assistantContent = "I cannot browse the internet, access GitHub, connect to your server, or use ADB/SSH on your Android device from here."
         val assistantContentB64 = Base64.encodeToString(
             assistantContent.toByteArray(Charsets.UTF_8),
             Base64.NO_WRAP,

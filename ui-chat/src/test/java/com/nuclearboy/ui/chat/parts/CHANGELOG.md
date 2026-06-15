@@ -1,3 +1,4 @@
+2026-06-15 1.1.42 ToolLimitNoticeTest 覆盖模型自述无法访问互联网、GitHub、服务器、ADB/SSH 时的结构化工具受限识别。
 2026-06-14 1.1.41 ToolLimitNoticeTest 覆盖模型自述没有文件系统和命令执行访问权限时的结构化工具受限识别。
 2026-06-14 1.1.40 ToolLimitNoticeTest 覆盖英文工具调用不可用和大写 READ_FILE/RUN_PYTHON 场景，防止第三方网关英文错误漏识别。
 2026-06-14 1.1.39 ToolMissingEvidenceReviewNoticeTest 覆盖结果复核卡的 tool.evidence.missing 诊断指纹和正式聊天链路测试口径。

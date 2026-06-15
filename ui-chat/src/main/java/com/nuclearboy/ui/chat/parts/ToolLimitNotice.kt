@@ -18,7 +18,7 @@ fun detectToolLimitNotice(content: String): ToolLimitNotice? {
 
     val needsExecution = text.containsAnyToolMarker(TOOL_ACTION_MARKERS)
     val summary = if (needsExecution) {
-        "模型连接正常，但当前网关没有可用的工具调用协议；本轮读写、运行或测试没有真实发生。"
+        "模型连接正常，但当前网关没有可用的工具调用协议或外部操作能力；本轮访问网站、服务器、ADB/SSH、读写、运行或测试没有真实发生。"
     } else {
         "模型连接正常，但当前网关没有可用的工具调用协议；只能继续普通问答。"
     }
@@ -38,7 +38,7 @@ fun detectToolLimitNotice(content: String): ToolLimitNotice? {
         title = "工具受限",
         summary = summary,
         actions = actions,
-        semantics = "工具受限提示：模型连接正常，但当前网关工具调用协议不可用，本轮未真实执行。",
+        semantics = "工具受限提示：模型连接正常，但当前网关工具调用协议或外部操作能力不可用，本轮未真实执行。",
     )
 }
 
@@ -72,12 +72,46 @@ private val TOOL_LIMIT_MARKERS = listOf(
     "cannot execute commands",
     "can't execute code",
     "cannot execute code",
+    "can't browse the internet",
+    "cannot browse the internet",
+    "can't browse the web",
+    "cannot browse the web",
+    "can't access the internet",
+    "cannot access the internet",
+    "can't access external websites",
+    "cannot access external websites",
+    "can't access github",
+    "cannot access github",
+    "no internet access",
+    "no browser access",
+    "can't connect to your server",
+    "cannot connect to your server",
+    "can't use ssh",
+    "cannot use ssh",
+    "can't ssh",
+    "cannot ssh",
+    "can't use adb",
+    "cannot use adb",
     "无法访问文件",
     "不能访问文件",
     "无法运行命令",
     "不能运行命令",
     "无法执行代码",
     "不能执行代码",
+    "无法联网",
+    "无法访问互联网",
+    "不能访问互联网",
+    "无法浏览网页",
+    "不能浏览网页",
+    "无法访问网站",
+    "不能访问网站",
+    "无法访问外部网站",
+    "无法连接服务器",
+    "不能连接服务器",
+    "无法使用 ssh",
+    "不能使用 ssh",
+    "无法使用 adb",
+    "不能使用 adb",
 )
 
 private val TOOL_ACTION_MARKERS = listOf(
@@ -104,6 +138,28 @@ private val TOOL_ACTION_MARKERS = listOf(
     "files",
     "filesystem",
     "file system",
+    "browse",
+    "internet",
+    "network",
+    "web",
+    "website",
+    "url",
+    "github",
+    "server",
+    "ssh",
+    "adb",
+    "device",
+    "android",
+    "联网",
+    "互联网",
+    "网络",
+    "网页",
+    "网站",
+    "接口",
+    "github",
+    "服务器",
+    "手机",
+    "设备",
 )
 
 private fun String.containsAnyToolMarker(markers: List<String>): Boolean =
