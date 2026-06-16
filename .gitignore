@@ -32,6 +32,7 @@ deepseek api key get/
 
 # Secrets
 **/secrets.properties
+**/android-test-secrets.properties
 **/google-services.json
 
 # Python

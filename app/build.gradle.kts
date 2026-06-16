@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     alias(libs.plugins.kotlin.android)
@@ -8,6 +10,36 @@ plugins {
     alias(libs.plugins.chaquopy)
 }
 
+fun String?.trimToNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
+
+val androidTestSecretProperties = Properties().apply {
+    val defaultSecretFiles = listOf(
+        rootProject.file("android-test-secrets.properties"),
+        project.file("android-test-secrets.properties"),
+    )
+    val overrideSecretFile = providers.gradleProperty("nbAndroidTestSecretsFile")
+        .orNull
+        ?.trimToNull()
+        ?.let { rootProject.file(it) }
+    (defaultSecretFiles + listOfNotNull(overrideSecretFile))
+        .distinctBy { it.absolutePath }
+        .filter { it.isFile }
+        .forEach { file -> file.inputStream().use(::load) }
+}
+
+fun secretPropertyOrEnv(propertyName: String, vararg envNames: String): String? =
+    envNames.asSequence()
+        .mapNotNull { providers.environmentVariable(it).orNull.trimToNull() }
+        .firstOrNull()
+        ?: androidTestSecretProperties.getProperty(propertyName).trimToNull()
+
+val localAndroidTestRunnerArgs = mapOf(
+    "nbBaseUrl" to secretPropertyOrEnv("nbBaseUrl", "NB_TEST_BASE_URL"),
+    "nbModel" to secretPropertyOrEnv("nbModel", "NB_TEST_MODEL", "NB_TEST_MODEL_NAME"),
+    "nbApiKey" to secretPropertyOrEnv("nbApiKey", "NB_TEST_API_KEY"),
+    "nbEndpointMode" to secretPropertyOrEnv("nbEndpointMode", "NB_TEST_ENDPOINT_MODE"),
+).mapNotNull { (key, value) -> value?.let { key to it } }.toMap()
+
 android {
     namespace = "com.nuclearboy.app"
     compileSdk = 35
@@ -16,10 +48,11 @@ android {
         applicationId = "com.nuclearboy.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 170
-        versionName = "1.1.60"
+        versionCode = 172
+        versionName = "1.1.62"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments.putAll(localAndroidTestRunnerArgs)
 
         vectorDrawables {
             useSupportLibrary = true

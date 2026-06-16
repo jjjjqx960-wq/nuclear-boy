@@ -12,7 +12,7 @@
 
 ## 禁止事项
 
-不要在装配日志中输出完整工具参数、明文密钥或个人数据。新增跨模块能力时先在低层模块提供稳定接口。
+不要在装配日志中输出完整工具参数、明文密钥或个人数据。真机 instrumentation 需要调试模型参数时，优先从未跟踪的 `android-test-secrets.properties`、`NB_TEST_*` 环境变量或 `nbAndroidTestSecretsFile` 指向的本地文件注入，不要把 API Key 写进命令参数、源码或 Release 文本。新增跨模块能力时先在低层模块提供稳定接口。
 
 ## 常用命令
 

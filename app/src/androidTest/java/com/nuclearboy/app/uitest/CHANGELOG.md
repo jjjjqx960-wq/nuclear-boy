@@ -1,3 +1,4 @@
+2026-06-15 1.1.61 UIAutomator 门禁文档改为密钥走 Gradle 本地安全来源，debug-only Receiver 的 base64 extras 仅用于非敏感长文案和可公开配置，避免把 API Key 编码进命令；ToolDraftHintUiTest 临时写入不可达模型后会恢复原 active model/config，防止后续真实聊天门禁误用本机假地址。
 2026-06-15 1.1.60 ToolDraftHintUiTest 改用“帮我把这个订单取消掉”真实输入路径，验证订单履约/客服远程操作类草稿仍触发远程配置工具能力预警。
 2026-06-15 1.1.59 ToolDraftHintUiTest 改用“帮我给这个账号开管理员权限”真实输入路径，验证账号安全/权限远程操作类草稿仍触发远程配置工具能力预警。
 2026-06-15 1.1.58 ToolDraftHintUiTest 改用“帮我给这个账号充值”真实输入路径，验证计费远程操作类草稿仍触发远程配置工具能力预警。

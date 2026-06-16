@@ -854,7 +854,7 @@ class ChatViewModel @Inject constructor(
                 android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() ToolExecution toolName=${event.toolName} status=${event.status} toolCallId=${event.toolCallId}")
                 val record = ToolCallRecord(
                     toolName = event.toolName,
-                    input = "",
+                    input = event.input,
                     status = event.status,
                     toolCallId = event.toolCallId,
                 )

@@ -27,6 +27,7 @@ sealed class AgentEvent {
         val toolName: String,
         val status: ToolCallStatus,
         val toolCallId: String = "",
+        val input: String = "",
     ) : AgentEvent()
 
     /** The result of a tool execution. */
@@ -427,6 +428,7 @@ class AgentEngine(
                                     toolName = toolName,
                                     status = ToolCallStatus.RUNNING,
                                     toolCallId = toolCall.id,
+                                    input = toolCall.function.arguments,
                                 )
                             )
 
@@ -440,6 +442,7 @@ class AgentEngine(
                                     toolName = toolName,
                                     status = status,
                                     toolCallId = toolCall.id,
+                                    input = toolCall.function.arguments,
                                 )
                             )
                             emit(

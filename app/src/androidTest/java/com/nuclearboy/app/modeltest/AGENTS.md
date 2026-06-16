@@ -4,7 +4,7 @@
 
 ## 边界
 
-这里只做发布门槛级设备端模型连通性验证，不实现 UI 旅程、模型协议细节或 Agent 编排。connected test 可能重装并清空 App 数据，允许通过 `nbBaseUrl`、`nbModel`、`nbApiKey`、`nbEndpointMode` instrumentation 参数在测试启动时注入当前调试模型配置。
+这里只做发布门槛级设备端模型连通性验证，不实现 UI 旅程、模型协议细节或 Agent 编排。connected test 可能重装并清空 App 数据，允许通过 `nbBaseUrl`、`nbModel`、`nbApiKey`、`nbEndpointMode` instrumentation 参数在测试启动时注入当前调试模型配置；这些参数应由 Gradle DSL 从未跟踪的 `android-test-secrets.properties`、`NB_TEST_*` 环境变量或 `nbAndroidTestSecretsFile` 本地文件读取，不要把密钥放到命令行。
 
 ## 允许依赖
 
@@ -12,7 +12,7 @@
 
 ## 禁止事项
 
-不要在断言、日志或命令输出中打印 API Key、Authorization 头、完整请求体或用户隐私内容。失败信息只能包含脱敏端点、模型名、错误类型和短诊断片段。文档和命令示例里的密钥只能写 `<REDACTED_API_KEY>`。
+不要在断言、日志或命令输出中打印 API Key、Authorization 头、完整请求体或用户隐私内容。失败信息只能包含脱敏端点、模型名、错误类型和短诊断片段。文档和命令示例里的密钥只能写 `<REDACTED_API_KEY>`，不要写可还原字符数组、Base64 或拼接片段。
 
 ## 常用命令
 
@@ -20,4 +20,4 @@
 
 ## 验证方式
 
-发布前涉及模型配置或聊天链路时，先运行轻量连通性测试确认当前选中自定义模型能完成最小 ping，再运行 `uitest` 的正式聊天旅程，不能用轻量 ping 代替前端正式聊天。若设备刚被 connected test 重装，必须用 instrumentation 参数重新注入模型配置，而不是假设旧 App 数据仍存在。
+发布前涉及模型配置或聊天链路时，先运行轻量连通性测试确认当前选中自定义模型能完成最小 ping，再运行 `uitest` 的正式聊天旅程，不能用轻量 ping 代替前端正式聊天。若设备刚被 connected test 重装，必须用本地安全来源注入 instrumentation 模型配置，而不是假设旧 App 数据仍存在，也不能把 API Key 放在 Gradle 命令参数里。
