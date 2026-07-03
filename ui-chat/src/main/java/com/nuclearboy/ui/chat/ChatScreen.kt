@@ -187,7 +187,8 @@ fun ChatScreen(
     ) { uri ->
         uri?.let {
             android.util.Log.e("NuclearBoy", "[ChatScreen] filePicker selected uri=$uri")
-            copyAttachedFile(context, it, viewModel)
+            // 移到后台线程执行文件 IO，避免主线程阻塞
+            scope.launch { copyAttachedFile(context, it, viewModel) }
         }
     }
 
@@ -1588,7 +1589,7 @@ private fun shareFile(context: Context, path: String) {
     }
 }
 
-private fun copyAttachedFile(context: Context, uri: Uri, viewModel: ChatViewModel) {
+private suspend fun copyAttachedFile(context: Context, uri: Uri, viewModel: ChatViewModel) {
     try {
         val cr = context.contentResolver
         var fileName = "attachment"
@@ -1600,15 +1601,16 @@ private fun copyAttachedFile(context: Context, uri: Uri, viewModel: ChatViewMode
         }
         val target = java.io.File(viewModel.getProjectRoot(), fileName)
         android.util.Log.e("NuclearBoy", "[ChatScreen] copyAttachedFile() fileName=$fileName target=${target.absolutePath}")
-        cr.openInputStream(uri)?.use { input ->
-            target.outputStream().use { out -> input.copyTo(out) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            cr.openInputStream(uri)?.use { input ->
+                target.outputStream().use { out -> input.copyTo(out) }
+            }
         }
         viewModel.refreshProjectFiles(viewModel.browseDir.value)
         android.util.Log.e("NuclearBoy", "[ChatScreen] copyAttachedFile() success: $fileName size=${target.length()}")
-        Toast.makeText(context, "已添加: $fileName", Toast.LENGTH_SHORT).show()
-        android.util.Log.e("NuclearBoy", "附件已添加: ${target.absolutePath}")
+        android.widget.Toast.makeText(context, "已添加: $fileName", android.widget.Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
         android.util.Log.e("NuclearBoy", "[ChatScreen] copyAttachedFile() error: ${e.message}", e)
-        Toast.makeText(context, "添加失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(context, "添加失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
     }
 }

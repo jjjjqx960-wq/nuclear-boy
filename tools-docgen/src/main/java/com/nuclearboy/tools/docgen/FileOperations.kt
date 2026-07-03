@@ -172,7 +172,6 @@ class FileOperations(
         try {
             val file = resolvePath(path)
             android.util.Log.e("NuclearBoy", "[FileOps] deleteFile() path=$path resolved=${file.absolutePath} exists=${file.exists()}")
-            android.util.Log.e("NuclearBoy", "🗑️ deleteFile: path=$path resolved=${file.absolutePath} exists=${file.exists()}")
 
             if (!file.exists()) {
                 return@withContext AppResult.failure(
@@ -190,8 +189,7 @@ class FileOperations(
             }
 
             val deleted = file.deleteRecursively()
-            android.util.Log.e("NuclearBoy", "[FileOps] deleteFile() result=$deleted")
-            android.util.Log.e("NuclearBoy", "🗑️ deleteRecursively result=$deleted for ${file.absolutePath}")
+            android.util.Log.e("NuclearBoy", "[FileOps] deleteFile() result=$deleted for ${file.absolutePath}")
 
             if (!deleted) {
                 return@withContext AppResult.failure(
