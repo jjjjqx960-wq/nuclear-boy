@@ -413,7 +413,7 @@ class AgentEngine(
 
                         // Execute each tool and add results
                         for ((toolIdx, toolCall) in toolCalls.withIndex()) {
-                            val toolName = toolCall.function.name
+                            val toolName = toolCall.function.name.trim()  // 防止模型偶尔生成带空白的工具名导致找不到
                             val toolStartMs = System.currentTimeMillis()
                             android.util.Log.e("NuclearBoy", "[AgentEngine] run() executing tool[$toolIdx] name=$toolName id=${toolCall.id} argsLen=${toolCall.function.arguments.length}")
                             val params = try {
