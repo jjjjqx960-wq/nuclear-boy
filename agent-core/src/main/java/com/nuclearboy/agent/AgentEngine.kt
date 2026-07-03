@@ -286,7 +286,7 @@ class AgentEngine(
         val toolCallLoopGuard = ToolCallLoopGuard()
         val retryableErrorGate = RetryableErrorGate()
 
-        while (finalResponse == null && currentCoroutineContext().isActive) {
+        while (finalResponse == null && currentCoroutineContext().isActive && iteration < MAX_TOOL_ITERATIONS) {
             iteration++
             val iterStartMs = System.currentTimeMillis()
             android.util.Log.e("NuclearBoy", "[AgentEngine] run() iteration=$iteration contextUsed=${contextManager.budget.value.totalUsed}")
@@ -1007,5 +1007,7 @@ class AgentEngine(
         private const val MAX_TOOL_OUTPUT_CHARS = 12_000
         /** 发送前对话负载的真实 token 上限 */
         private const val MAX_PAYLOAD_TOKENS = 96_000L
+        /** 工具调用循环的绝对最大轮次，防止模型无限调工具循环 */
+        private const val MAX_TOOL_ITERATIONS = 20
     }
 }
