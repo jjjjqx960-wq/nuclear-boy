@@ -606,14 +606,20 @@ class AgentEngine(
      * reasoning_content 不计入（出站本就被 sanitize 剥离）。返回被丢弃的消息条数。
      */
     private fun trimMessagesForPayload(messages: MutableList<MessageDto>): Int {
-        fun estimate(): Long = messages.sumOf {
-            ((it.content?.length ?: 0) +
-                (it.toolCalls?.sumOf { tc -> tc.function.arguments.length } ?: 0)) / 3L
-        }
-        if (estimate() <= maxPayloadTokens) return 0
+        fun MessageDto.tokenEstimate(): Long =
+            ((content?.length ?: 0) +
+                (toolCalls?.sumOf { tc -> tc.function.arguments.length } ?: 0)) / 3L
+
+        // Fix 5: compute once, update incrementally rather than re-scanning on every iteration
+        var currentEstimate = messages.sumOf { it.tokenEstimate() }
+        if (currentEstimate <= maxPayloadTokens) return 0
+
+        // Fix 6: pre-collect tool-call group starts once to avoid per-iteration linear tail-scan
+        val toolGroupMessages = messages.filter { it.role == "assistant" && !it.toolCalls.isNullOrEmpty() }
+        var toolGroupIdx = 0
 
         var removed = 0
-        while (estimate() > maxPayloadTokens) {
+        while (currentEstimate > maxPayloadTokens) {
             val startIdx = messages.indexOfFirst {
                 it.role == "assistant" && !it.toolCalls.isNullOrEmpty()
             }
@@ -621,12 +627,16 @@ class AgentEngine(
             var endIdx = startIdx
             while (endIdx + 1 <= messages.lastIndex && messages[endIdx + 1].role == "tool") endIdx++
             // 若这已是最后一组工具往返，保留它（模型需要最近上下文继续），停止
-            val hasLaterGroup = (endIdx + 1..messages.lastIndex).any {
-                messages[it].role == "assistant" && !messages[it].toolCalls.isNullOrEmpty()
-            }
+            // Fix 6: O(1) check using pre-built list instead of O(n) tail-scan each iteration
+            val hasLaterGroup = toolGroupIdx + 1 < toolGroupMessages.size
             if (!hasLaterGroup) break
-            repeat(endIdx - startIdx + 1) { messages.removeAt(startIdx) }
+            // Fix 5: subtract removed tokens before clearing
+            val removedTokens = messages.subList(startIdx, endIdx + 1).sumOf { it.tokenEstimate() }
+            // Fix 4: remove whole range atomically in O(n) instead of O(n²) repeated removeAt
+            messages.subList(startIdx, endIdx + 1).clear()
+            currentEstimate -= removedTokens
             removed += endIdx - startIdx + 1
+            toolGroupIdx++
         }
         return removed
     }
@@ -654,7 +664,10 @@ class AgentEngine(
         var historyCallIdx = 0
 
         // Iterate from most recent to oldest
-        for (msg in history.reversed()) {
+        // Fix 7: use forEachIndexed so the index is available without O(n) indexOf() call
+        val reversedHistory = history.reversed()
+        for ((reversedIdx, msg) in reversedHistory.withIndex()) {
+            val originalIdx = history.lastIndex - reversedIdx
             // Skip standalone TOOL messages — tool results are now generated from
             // assistant messages' toolCalls below. Old conversations may have both,
             // which causes "Duplicate tool_call_id" errors from the API.
@@ -674,7 +687,7 @@ class AgentEngine(
             val reasoningTokens = ((msg.reasoningContent?.length ?: 0) / 3L)
 
             if (tokensUsed + contentTokens > tokenBudget) {
-                android.util.Log.e("NuclearBoy", "[AgentEngine] buildHistoryMessages() budget exceeded, truncating at msg ${history.indexOf(msg)} tokensUsed=$tokensUsed budget=$tokenBudget")
+                android.util.Log.e("NuclearBoy", "[AgentEngine] buildHistoryMessages() budget exceeded, truncating at msg $originalIdx tokensUsed=$tokensUsed budget=$tokenBudget")
                 break
             }
 
@@ -684,9 +697,12 @@ class AgentEngine(
                 // Deduplicate tool calls by toolCallId — AgentEngine emits two ToolExecution
                 // events per call (RUNNING + COMPLETED), and ChatViewModel appends a new
                 // record each time. We keep the LAST one (usually COMPLETED with output).
-                val uniqueCalls = msg.toolCalls
-                    .groupBy { it.toolCallId ?: it.toolName }
-                    .map { (_, calls) -> calls.last() }
+                // Fix 8: single-pass LinkedHashMap with put/overwrite instead of groupBy + intermediate map
+                val deduped = LinkedHashMap<String, ToolCallRecord>(msg.toolCalls.size)
+                for (tc in msg.toolCalls) {
+                    deduped[tc.toolCallId ?: tc.toolName] = tc
+                }
+                val uniqueCalls = deduped.values.toList()
                 val completedCalls = uniqueCalls.filter { it.output != null && it.toolCallId != null }
                 // 工具调用全部未完成（如取消中断遗留）且无文本 → 会变成空 assistant，跳过避免 API 400
                 if (completedCalls.isEmpty() && msg.content.isBlank()) {

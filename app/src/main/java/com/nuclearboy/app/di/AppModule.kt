@@ -27,12 +27,16 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+
+    private val memoryFileMutex = Mutex()
 
     // ── DeepSeek API ──────────────────────────────────
 
@@ -602,14 +606,16 @@ else:
                 val category = p["content"] ?: "偏好"
                 val memFile = java.io.File(fileOps.getWorkspaceRoot(), "__general__/.agent/memory.json")
                 memFile.parentFile?.mkdirs()
-                val memories: MutableList<Map<String, String>> = try {
-                    memoryReadJson.decodeFromString<List<Map<String, String>>>(memFile.readText()).toMutableList()
-                } catch (_: Exception) { mutableListOf() }
-                memories.add(mapOf("value" to value, "category" to category, "time" to java.time.Instant.now().toString()))
-                // 只保留最近 50 条
-                val trimmed = memories.takeLast(50)
-                memFile.writeText(memoryWriteJson.encodeToString(kotlinx.serialization.serializer(), trimmed))
-                android.util.Log.e("NuclearBoy", "[DI] remember saved to ${memFile.absolutePath} total=${trimmed.size}")
+                memoryFileMutex.withLock {
+                    val memories: MutableList<Map<String, String>> = try {
+                        memoryReadJson.decodeFromString<List<Map<String, String>>>(memFile.readText()).toMutableList()
+                    } catch (_: Exception) { mutableListOf() }
+                    memories.add(mapOf("value" to value, "category" to category, "time" to java.time.Instant.now().toString()))
+                    // 只保留最近 50 条
+                    val trimmed = memories.takeLast(50)
+                    memFile.writeText(memoryWriteJson.encodeToString(kotlinx.serialization.serializer(), trimmed))
+                    android.util.Log.e("NuclearBoy", "[DI] remember saved to ${memFile.absolutePath} total=${trimmed.size}")
+                }
                 ToolResult(true, "已记住: $value")
             }),
     )

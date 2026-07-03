@@ -832,7 +832,10 @@ class ChatViewModel @Inject constructor(
     private suspend fun handleAgentEvent(event: AgentEvent, thinkingId: String) {
         when (event) {
             is AgentEvent.Thinking -> {
-                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() Thinking msgLen=${event.message.length}")
+                // 每500字才打一次日志，避免流式思考阶段每token都触发 Log.e
+                if (event.message.length % 500 < 20) {
+                    android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() Thinking msgLen=${event.message.length}")
+                }
                 _streamingState.update { current ->
                     (current ?: StreamingState(thinkingId)).copy(
                         isThinking = true,
@@ -848,7 +851,10 @@ class ChatViewModel @Inject constructor(
             }
 
             is AgentEvent.StreamContent -> {
-                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() StreamContent textLen=${event.text.length}")
+                // 每500字才打一次日志，避免流式输出阶段每token都触发 Log.e
+                if (event.text.length % 500 < 20) {
+                    android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() StreamContent textLen=${event.text.length}")
+                }
                 _streamingState.update { current ->
                     (current ?: StreamingState(thinkingId)).copy(
                         isThinking = false,

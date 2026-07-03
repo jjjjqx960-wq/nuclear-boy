@@ -1720,7 +1720,10 @@ internal fun sanitizeChatMessagesForProvider(
             )
         }
 
-        val sanitized = message.copy(
+        // Skip allocation when no fields actually change
+        val noChange = message.reasoningContent == null &&
+            (!omitToolProtocol || (message.toolCalls == null && message.toolCallId == null && message.name == null))
+        val sanitized = if (noChange) message else message.copy(
             // DeepSeek 官方规则：输入 messages 含 reasoning_content 会返回 400，
             // 所有协议（含官方 DeepSeek）一律剥离后再发送。
             reasoningContent = null,
@@ -1753,23 +1756,24 @@ internal const val COMPATIBILITY_TOOL_FINAL_NOTICE =
 
 private fun List<MessageDto>.withCompatibilityToolLimitNotice(): List<MessageDto> {
     val firstSystemIndex = indexOfFirst { it.role == "system" }
-    if (firstSystemIndex >= 0) {
-        return mapIndexed { index, message ->
+    return buildList(size + 2) {
+        if (firstSystemIndex < 0) {
+            add(MessageDto(role = "system", content = COMPATIBILITY_TOOL_LIMIT_NOTICE))
+        }
+        for ((index, message) in this@withCompatibilityToolLimitNotice.withIndex()) {
             if (index == firstSystemIndex) {
-                message.copy(
+                add(message.copy(
                     content = listOfNotNull(
                         message.content?.takeIf { it.isNotBlank() },
                         COMPATIBILITY_TOOL_LIMIT_NOTICE,
                     ).joinToString("\n\n"),
-                )
+                ))
             } else {
-                message
+                add(message)
             }
-        } + MessageDto(role = "user", content = COMPATIBILITY_TOOL_FINAL_NOTICE)
+        }
+        add(MessageDto(role = "user", content = COMPATIBILITY_TOOL_FINAL_NOTICE))
     }
-    return listOf(MessageDto(role = "system", content = COMPATIBILITY_TOOL_LIMIT_NOTICE)) +
-        this +
-        MessageDto(role = "user", content = COMPATIBILITY_TOOL_FINAL_NOTICE)
 }
 
 data class ProviderTestResult(
