@@ -41,8 +41,10 @@ class NuclearBoyApp : Application() {
             android.util.Log.e("NuclearBoy", "[App] onCreate — Python init FAILED: ${e.message}")
         }
 
-        // Copy built-in skills from assets to internal storage
-        copyBuiltinSkills()
+        // Copy built-in skills from assets to internal storage（IO 操作，移到后台避免 ANR）
+        appScope.launch {
+            copyBuiltinSkills()
+        }
 
         // 后台检查更新
         val updateManager = UpdateManager(this)

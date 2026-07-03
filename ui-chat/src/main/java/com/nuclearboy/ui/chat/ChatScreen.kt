@@ -915,14 +915,17 @@ private fun ProjectFilePanel(
                         "json", "xml", "yaml", "yml", "gradle", "properties", "csv",
                         "html", "css", "sh", "bat", "ps1", "sql", "toml", "cfg", "ini", "log")
                     if (ext in textExtensions) {
-                        try {
-                            previewContent = java.io.File(file.path).readText()
-                        } catch (e: Exception) {
+                        // 切到 IO 线程读文件，避免阻塞 UI
+                        previewContent = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                             try {
-                                previewContent = java.io.File("${projectRoot}/${file.path}").readText()
-                            } catch (e2: Exception) {
-                                android.util.Log.e("NuclearBoy", "[ChatScreen] preview read error: ${e2.message}")
-                                previewContent = null
+                                java.io.File(file.path).readText()
+                            } catch (e: Exception) {
+                                try {
+                                    java.io.File("${projectRoot}/${file.path}").readText()
+                                } catch (e2: Exception) {
+                                    android.util.Log.e("NuclearBoy", "[ChatScreen] preview read error: ${e2.message}")
+                                    null
+                                }
                             }
                         }
                     }
