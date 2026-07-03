@@ -165,6 +165,9 @@ class AgentEngine(
     }
 
     @Volatile private var scopeJob = SupervisorJob()
+    // scopeJob 的替换必须在 synchronized 块里执行：cancel() + SupervisorJob() 两步不是原子的，
+    // 并发调用会导致新建的 job 被另一次 cancel 取消，后续 processMessage 的 flow 立即结束。
+    private val scopeLock = Any()
     private val scope get() = CoroutineScope(scopeJob + Dispatchers.IO)
 
     /** 单个工具结果注入对话的最大字符数；超出截断（读大文件/长目录列表的主要膨胀源）。 */
@@ -960,8 +963,10 @@ class AgentEngine(
      * Triggers onCancel callback to interrupt running operations (e.g. Python).
      */
     fun cancel() {
-        scopeJob.cancel()
-        scopeJob = SupervisorJob()  // Re-create so subsequent runs work
+        synchronized(scopeLock) {
+            scopeJob.cancel()
+            scopeJob = SupervisorJob()
+        }
         onCancel?.invoke()
     }
 
