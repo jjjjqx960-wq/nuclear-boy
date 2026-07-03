@@ -162,6 +162,8 @@ class ChatViewModel @Inject constructor(
             catch (e: Exception) { android.util.Log.e("NuclearBoy", "加载历史失败: ${e.message}"); emptyList() }
         android.util.Log.e("NuclearBoy", "[ChatVM] setProject() messagesLoaded=${loaded.size} root=${root.absolutePath}")
         _messages.value = loaded
+        // 恢复最后一条用户消息，否则切换项目后直接点"重新生成"会因 lastUserMessage 为 null 失效
+        lastUserMessage = loaded.findLast { it.role == MessageRole.USER }
         refreshProjectFiles()
         if (loaded.isNotEmpty()) _scrollToBottom.value++
         if (projectId != "__general__") {
