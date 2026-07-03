@@ -151,6 +151,8 @@ class ChatViewModel @Inject constructor(
 
     fun setProject(projectId: String) {
         android.util.Log.e("NuclearBoy", "[ChatVM] setProject() projectId=$projectId previousId=$currentProjectId currentDir=${fileOperations.currentProjectDir}")
+        // 切换项目前取消当前任务，避免旧项目的流式结果写入新项目的消息列表
+        if (_isProcessing.value) cancelCurrentOperation()
         // currentProjectDir 由外部 selectProject() 设置（UUID → 目录名的转换）
         // 此处不覆盖，信任外部已设置正确
         currentProjectId = projectId
