@@ -86,6 +86,9 @@ data class FilesystemPermissions(
     fun canWrite(path: String): Boolean = write.any { matchesGlob(path, it) }
 
     companion object {
+        // 缓存已编译的 glob → Regex，避免每次路径匹配重复编译（skill 调用热路径）
+        private val regexCache = java.util.concurrent.ConcurrentHashMap<String, Regex>()
+
         /**
          * Minimal glob matching supporting `**` and single `*`.
          */
@@ -100,9 +103,10 @@ data class FilesystemPermissions(
                 return normalizedPath.startsWith("workspace/") || normalizedPath == "workspace"
             }
 
-            // Convert glob to regex
-            val regex = buildRegex(normalizedPattern)
-            return Regex(regex).matches(normalizedPath)
+            // Convert glob to regex（结果缓存，避免每次路径匹配重复编译）
+            val regexStr = buildRegex(normalizedPattern)
+            val compiled = regexCache.getOrPut(normalizedPattern) { Regex(regexStr) }
+            return compiled.matches(normalizedPath)
         }
 
         private fun buildRegex(pattern: String): String {
