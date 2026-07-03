@@ -170,13 +170,13 @@ class AgentEngine(
     private val scope get() = CoroutineScope(scopeJob + Dispatchers.IO)
 
     /** 单个工具结果注入对话的最大字符数；超出截断（读大文件/长目录列表的主要膨胀源）。 */
-    private val maxToolOutputChars = 12_000
+    private val maxToolOutputChars get() = MAX_TOOL_OUTPUT_CHARS
 
     /**
      * 发送前对话负载的真实 token 上限（保守值，给回复留余量）。
      * 注意：这是面向真实模型窗口的硬保护，与 ContextWindowManager 的 UI 计数无关。
      */
-    private val maxPayloadTokens = 96_000L
+    private val maxPayloadTokens get() = MAX_PAYLOAD_TOKENS
 
     // ── Public API ───────────────────────────────────────
 
@@ -986,4 +986,10 @@ class AgentEngine(
         }
     }
 
+    companion object {
+        /** 单个工具结果注入对话的最大字符数 */
+        private const val MAX_TOOL_OUTPUT_CHARS = 12_000
+        /** 发送前对话负载的真实 token 上限 */
+        private const val MAX_PAYLOAD_TOKENS = 96_000L
+    }
 }
