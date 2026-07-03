@@ -849,10 +849,14 @@ if result is not None:
 
         val zipFile = File(destDir, "download.zip")
 
-        connection.inputStream.use { input ->
-            BufferedInputStream(input).use { bis ->
-                zipFile.outputStream().use { output -> bis.copyTo(output) }
+        try {
+            connection.inputStream.use { input ->
+                BufferedInputStream(input).use { bis ->
+                    zipFile.outputStream().use { output -> bis.copyTo(output) }
+                }
             }
+        } finally {
+            connection.disconnect()
         }
         android.util.Log.e("NuclearBoy", "[SkillMgr] downloadAndExtract() downloadSize=${zipFile.length()} bytes")
 
