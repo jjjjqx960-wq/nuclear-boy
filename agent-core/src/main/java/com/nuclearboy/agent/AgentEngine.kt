@@ -225,8 +225,7 @@ class AgentEngine(
             else -> RouteDecision(ModelTier.V4_FLASH, ThinkingMode.DISABLED, "聊天模式")
         }
         android.util.Log.e("NuclearBoy", "[AgentEngine] run() modelRouting tier=${routeDecision.modelTier} thinking=${routeDecision.thinkingMode} reason=${routeDecision.reason}")
-
-        emit(AgentEvent.Thinking("模型路由: ${routeDecision.reason}"))
+        // 路由信息只写日志，不 emit 给 UI——用户在 ThinkingBar 看到"模型路由: 复杂度: 0/10"很迷惑
 
         // Build initial messages list
         val messages = mutableListOf<MessageDto>()
