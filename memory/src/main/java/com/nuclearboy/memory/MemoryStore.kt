@@ -697,7 +697,7 @@ class MemoryStore(context: Context) {
                 for (match in matches) {
                     rememberProjectDetail(
                         projectId = projectId,
-                        key = "command_${match.value.take(30).replace(Regex("""[^\w]"""), "_")}",
+                        key = "command_${match.value.take(30).replace(NON_WORD_REGEX, "_")}",
                         value = match.value,
                         category = "command",
                     )
@@ -743,6 +743,8 @@ class MemoryStore(context: Context) {
             Regex("""(gradle|maven|npm|yarn|pnpm|cargo|go|make)\s+\S+"""),
             Regex("""(python|python3|pip|pip3)\s+\S+"""),
         )
+        // 命令名清理：去掉非单词字符用于生成 key，避免每次 autoExtractMemories 重新编译
+        val NON_WORD_REGEX = Regex("""[^\w]""")
         val STYLE_HINTS = listOf(
             "缩进" to "code_style",
             "indent" to "code_style",

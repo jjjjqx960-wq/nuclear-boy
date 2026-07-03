@@ -431,6 +431,12 @@ object AppModule {
             .build()
     }
 
+    // web_fetch HTML 清洗正则——编译一次，每次调用复用
+    private val scriptTagRegex = Regex("<script[^>]*>[\\s\\S]*?</script>", setOf(RegexOption.IGNORE_CASE))
+    private val styleTagRegex  = Regex("<style[^>]*>[\\s\\S]*?</style>",  setOf(RegexOption.IGNORE_CASE))
+    private val anyTagRegex    = Regex("<[^>]+>")
+    private val whitespaceRegex = Regex("\\s+")
+
     private fun buildWebTools(sandbox: PythonSandbox) = listOf(
         ToolDefinition("web_search", "搜索互联网获取最新信息。DuckDuckGo+Bing双引擎，自动回退。使用场景：1) 用户询问最新新闻或实时信息；2) 需要查找技术资料；3) 需要了解某个话题。参数 query 是搜索关键词，max_results控制条数(1-8)。示例：web_search(query=\"Python 3.13 新特性\")",
             listOf(ToolParameter("path", "string", "搜索关键词。建议2-5个核心词，中文搜索加英文术语辅助。示例：Kotlin协程、Android 16 API变更", true),
@@ -562,9 +568,11 @@ else:
                     val body = resp.body?.string() ?: ""
                     resp.close()
                     // 优先用 BeautifulSoup 提取正文（如果可用），否则回退到简单正则
-                    val text = body.replace(Regex("<script[^>]*>[\\s\\S]*?</script>", RegexOption.IGNORE_CASE), "")
-                        .replace(Regex("<style[^>]*>[\\s\\S]*?</style>", RegexOption.IGNORE_CASE), "")
-                        .replace(Regex("<[^>]+>"), " ").replace(Regex("\\s+"), " ").trim().take(8000)
+                    val text = scriptTagRegex.replace(body, "")
+                        .let { styleTagRegex.replace(it, "") }
+                        .let { anyTagRegex.replace(it, " ") }
+                        .let { whitespaceRegex.replace(it, " ") }
+                        .trim().take(8000)
                     android.util.Log.e("NuclearBoy", "[DI] web_fetch SUCCESS — url=$url, bodyLen=${body.length}, textLen=${text.length}")
                     ToolResult(true, output = text)
                 } catch (e: Exception) {

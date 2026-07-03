@@ -1568,6 +1568,9 @@ class DeepSeekApiClient(
     companion object {
         internal const val MAX_RETRY_AFTER_DELAY_MS = 30_000L
 
+        // 预编译：URL 路径版本号检测（如 /v1、/v2），避免每次构建端点时重复编译
+        private val versionedPathRegex = Regex(""".*/v\d+$""")
+
         internal fun parseRetryAfterMillis(raw: String?): Long? {
             val seconds = raw?.trim()?.toLongOrNull() ?: return null
             return seconds
@@ -1613,7 +1616,7 @@ class DeepSeekApiClient(
             val baseUrl = normalizeOpenAiBaseUrl(raw).trimEnd('/')
             if (baseUrl.isBlank()) return ""
             val lower = baseUrl.lowercase()
-            val hasVersionedPath = Regex(""".*/v\d+$""").matches(lower)
+            val hasVersionedPath = versionedPathRegex.matches(lower)
             return if (hasVersionedPath) {
                 "$baseUrl/chat/completions"
             } else {
@@ -1641,7 +1644,7 @@ class DeepSeekApiClient(
             }
             val baseUrl = normalizeOpenAiBaseUrl(sanitizedRaw).trimEnd('/')
             if (baseUrl.isBlank()) return ""
-            return if (Regex(""".*/v\d+$""").matches(baseUrl.lowercase())) {
+            return if (versionedPathRegex.matches(baseUrl.lowercase())) {
                 "$baseUrl/models"
             } else {
                 "$baseUrl/v1/models"
