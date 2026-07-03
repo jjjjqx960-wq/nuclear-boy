@@ -546,6 +546,14 @@ class AgentEngine(
         }
 
         // Emit the final response if we have one
+        // 若达到工具循环上限且仍无最终回复，合成一条友好提示
+        if (finalResponse == null && iteration >= MAX_TOOL_ITERATIONS) {
+            finalResponse = ChatMessage(
+                role = MessageRole.ASSISTANT,
+                content = "已连续执行 $MAX_TOOL_ITERATIONS 轮工具调用，超出单次任务上限，自动停止。如果任务未完成，可以继续追问我或用 /loop 继续推进。",
+                status = MessageStatus.COMPLETE,
+            )
+        }
         finalResponse?.let { response ->
             android.util.Log.e("NuclearBoy", "[AgentEngine] run() emitting final response status=${response.status} contentLen=${response.content.length} reasoningLen=${response.reasoningContent?.length ?: 0}")
             emit(AgentEvent.Response(response))
