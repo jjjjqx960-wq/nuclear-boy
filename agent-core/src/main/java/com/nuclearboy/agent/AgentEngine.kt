@@ -422,7 +422,6 @@ class AgentEngine(
                                 android.util.Log.e("NuclearBoy", "[AgentEngine] run() tool[$toolIdx] parseToolParams FAILED: ${e.message}")
                                 emptyMap()
                             }
-                            android.util.Log.e("NuclearBoy", "[AgentEngine] run() tool[$toolIdx] parsedParams count=${params.size} keys=${params.keys}")
 
                             emit(
                                 AgentEvent.ToolExecution(
