@@ -6,7 +6,10 @@ import com.nuclearboy.common.SkillInfo
 object SystemPromptBuilder {
 
     // Android 版本字符串在运行期不变，缓存一次，避免每次构建 System Prompt 重读系统 API
-    private val androidRelease: String by lazy { android.os.Build.VERSION.RELEASE }
+    // 单测时 Build.VERSION.RELEASE 为 null，用 "unknown" 兜底
+    private val androidRelease: String by lazy {
+        try { android.os.Build.VERSION.RELEASE ?: "unknown" } catch (_: Throwable) { "unknown" }
+    }
 
     fun build(
         userProfile: UserProfile,
