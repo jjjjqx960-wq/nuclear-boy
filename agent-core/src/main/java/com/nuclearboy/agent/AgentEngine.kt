@@ -205,7 +205,6 @@ class AgentEngine(
 
         // 记忆上下文由 ChatViewModel 在调用前注入到 projectContext.memoryContext
         val memoryContext = projectContext.memoryContext
-        android.util.Log.e("NuclearBoy", "[AgentEngine] run() memoryContext length=${memoryContext.length}")
 
         // Build system prompt
         val systemPrompt = SystemPromptBuilder.build(
@@ -216,7 +215,6 @@ class AgentEngine(
             memoryContext = memoryContext,
             customInstructions = projectContext.customInstructions,
         )
-        android.util.Log.e("NuclearBoy", "[AgentEngine] run() systemPrompt built, length=${systemPrompt.length} tokens~=${systemPrompt.length / 3}")
 
         // User manual mode: 0=Chat(Flash+NonThink) 1=Think(Pro+High) 2=Expert(Pro+Max)
         val routeDecision = when (userMode) {
@@ -224,8 +222,8 @@ class AgentEngine(
             2 -> RouteDecision(ModelTier.V4_PRO, ThinkingMode.MAX, "专家模式")
             else -> RouteDecision(ModelTier.V4_FLASH, ThinkingMode.DISABLED, "聊天模式")
         }
-        android.util.Log.e("NuclearBoy", "[AgentEngine] run() modelRouting tier=${routeDecision.modelTier} thinking=${routeDecision.thinkingMode} reason=${routeDecision.reason}")
-        // 路由信息只写日志，不 emit 给 UI——用户在 ThinkingBar 看到"模型路由: 复杂度: 0/10"很迷惑
+        // 合并 setup 阶段日志为一条；路由信息只写日志不 emit 给 UI（避免 ThinkingBar 显示内部调试）
+        android.util.Log.e("NuclearBoy", "[AgentEngine] run() setup memoryLen=${memoryContext.length} systemPromptLen=${systemPrompt.length} route=${routeDecision.modelTier}/${routeDecision.thinkingMode}(${routeDecision.reason})")
 
         // Build initial messages list
         val messages = mutableListOf<MessageDto>()
