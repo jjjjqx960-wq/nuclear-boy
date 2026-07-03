@@ -889,10 +889,14 @@ if result is not None:
 
     private fun parseEntryPoint(entryPoint: String): Pair<String, String> {
         val parts = entryPoint.split(":", limit = 2)
-        val moduleName = parts.getOrElse(0) { "main" }
-        val functionName = parts.getOrElse(1) { "run" }
+        val moduleName = parts.getOrElse(0) { "main" }.sanitizePythonIdentifier()
+        val functionName = parts.getOrElse(1) { "run" }.sanitizePythonIdentifier()
         return moduleName to functionName
     }
+
+    /** 只保留合法的 Python 模块/函数名字符（字母、数字、下划线、点），防止 entry_point 注入代码。 */
+    private fun String.sanitizePythonIdentifier(): String =
+        filter { it.isLetterOrDigit() || it == '_' || it == '.' }.ifBlank { "main" }
 
     // ──────────────────────────────────────────────
     //  Internal types
