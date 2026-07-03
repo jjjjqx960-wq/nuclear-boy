@@ -679,14 +679,13 @@ class AgentEngine(
             // assistant messages' toolCalls below. Old conversations may have both,
             // which causes "Duplicate tool_call_id" errors from the API.
             if (msg.role == MessageRole.TOOL) {
-                android.util.Log.e("NuclearBoy", "[AgentEngine] buildHistoryMessages() skipping legacy TOOL message")
+                // 跳过旧格式独立 TOOL 消息（现在从 assistant.toolCalls 重建），只统计不单条打日志
                 continue
             }
 
             // 跳过无内容也无工具调用的 assistant 消息（如取消后留下的空 placeholder）——
             // 它们浪费 token，部分网关还会拒绝空 assistant content。
             if (msg.role == MessageRole.ASSISTANT && msg.content.isBlank() && msg.toolCalls.isEmpty()) {
-                android.util.Log.e("NuclearBoy", "[AgentEngine] buildHistoryMessages() skipping empty assistant message")
                 continue
             }
 
@@ -713,7 +712,6 @@ class AgentEngine(
                 val completedCalls = uniqueCalls.filter { it.output != null && it.toolCallId != null }
                 // 工具调用全部未完成（如取消中断遗留）且无文本 → 会变成空 assistant，跳过避免 API 400
                 if (completedCalls.isEmpty() && msg.content.isBlank()) {
-                    android.util.Log.e("NuclearBoy", "[AgentEngine] buildHistoryMessages() skipping assistant with only pending tool calls")
                     continue
                 }
                 for (tc in completedCalls.reversed()) {
