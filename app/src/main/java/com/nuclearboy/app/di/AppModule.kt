@@ -384,7 +384,8 @@ object AppModule {
                     android.util.Log.e("NuclearBoy", "[DI] search_files — query=$query")
                     when (val result = kotlinx.coroutines.runBlocking { fileOps.searchFiles(query) }) {
                         is AppResult.Success -> {
-                            val listing = result.data.joinToString("\n") { "📄 ${it.path}" }
+                            // 只输出文件名（不含绝对路径），避免设备内部路径暴露给模型造成混淆
+                            val listing = result.data.joinToString("\n") { "📄 ${it.name}  ${it.path}" }
                             android.util.Log.e("NuclearBoy", "[DI] search_files SUCCESS — found=${result.data.size}")
                             ToolResult(success = true, output = listing.ifEmpty { "未找到匹配的文件" })
                         }

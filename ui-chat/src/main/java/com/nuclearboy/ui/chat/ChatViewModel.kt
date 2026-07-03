@@ -768,7 +768,8 @@ class ChatViewModel @Inject constructor(
         repeat(n) {
             val idx = msgs.indexOfLast { it.role == MessageRole.USER }
             if (idx < 0) return@repeat
-            while (msgs.size > idx) msgs.removeAt(msgs.size - 1)
+            // subList + clear 比逐条 removeAt(size-1) 更直接
+            msgs.subList(idx, msgs.size).clear()
             removed++
         }
         if (removed == 0) {
