@@ -919,7 +919,9 @@ class ChatViewModel @Inject constructor(
                         }
                         if (matches) {
                             call.copy(
-                                output = event.result.output,
+                                // 截断超长输出，避免大型工具结果撑大内存和持久化文件
+                                output = event.result.output.takeIf { it.length <= MAX_TOOL_OUTPUT_DISPLAY_CHARS }
+                                    ?: (event.result.output.take(MAX_TOOL_OUTPUT_DISPLAY_CHARS) + "\n…（输出过长已截断，完整结果已注入对话上下文）"),
                                 status = if (event.result.success) ToolCallStatus.COMPLETED
                                     else ToolCallStatus.FAILED,
                                 completedAt = System.currentTimeMillis(),
@@ -1140,6 +1142,9 @@ class ChatViewModel @Inject constructor(
         /** /compact 压缩时单条消息和整体文本的截断长度 */
         private const val COMPACT_PER_MESSAGE_CHARS = 2_000
         private const val COMPACT_TRANSCRIPT_CHARS = 60_000
+
+        /** 工具执行结果在 UI 卡片里的最大显示字符数（超出截断，完整结果仍注入对话） */
+        private const val MAX_TOOL_OUTPUT_DISPLAY_CHARS = 8_000
 
         /** conversation.json 最多持久化的消息条数 */
         private const val MAX_PERSISTED_MESSAGES = 50
