@@ -924,11 +924,24 @@ private fun ProjectFilePanel(
                     if (ext in textExtensions) {
                         // 切到 IO 线程读文件，避免阻塞 UI
                         previewContent = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            val MAX_PREVIEW_BYTES = 102_400L
+                            fun readCapped(f: java.io.File): String {
+                                if (!f.exists()) return ""
+                                return if (f.length() > MAX_PREVIEW_BYTES) {
+                                    val buf = ByteArray(MAX_PREVIEW_BYTES.toInt())
+                                    val read = f.inputStream().use { it.read(buf) }
+                                    buf.copyOf(read).toString(Charsets.UTF_8) + "\n…（文件过大，仅显示前 100KB）"
+                                } else {
+                                    f.readText()
+                                }
+                            }
                             try {
-                                java.io.File(file.path).readText()
+                                readCapped(java.io.File(file.path))
+                                    .takeIf { it.isNotEmpty() }
                             } catch (e: Exception) {
                                 try {
-                                    java.io.File("${projectRoot}/${file.path}").readText()
+                                    readCapped(java.io.File("${projectRoot}/${file.path}"))
+                                        .takeIf { it.isNotEmpty() }
                                 } catch (e2: Exception) {
                                     android.util.Log.e("NuclearBoy", "[ChatScreen] preview read error: ${e2.message}")
                                     null
