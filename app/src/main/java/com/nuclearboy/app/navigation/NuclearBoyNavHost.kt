@@ -32,7 +32,8 @@ object NavRoutes {
     const val TERMINAL = "terminal"
 
     fun chatRoute(projectId: String, initialMessage: String = "") =
-        "chat/$projectId" + if (initialMessage.isNotEmpty()) "?initialMessage=$initialMessage" else ""
+        "chat/$projectId" + if (initialMessage.isNotEmpty())
+            "?initialMessage=${java.net.URLEncoder.encode(initialMessage, "UTF-8")}" else ""
 }
 
 @Composable
