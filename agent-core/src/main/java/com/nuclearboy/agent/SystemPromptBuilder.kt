@@ -5,6 +5,9 @@ import com.nuclearboy.common.SkillInfo
 
 object SystemPromptBuilder {
 
+    // Android 版本字符串在运行期不变，缓存一次，避免每次构建 System Prompt 重读系统 API
+    private val androidRelease: String by lazy { android.os.Build.VERSION.RELEASE }
+
     fun build(
         userProfile: UserProfile,
         project: Project? = null,
@@ -161,7 +164,7 @@ object SystemPromptBuilder {
             // ═══════════════════════════════════════════════
             // ENVIRONMENT
             // ═══════════════════════════════════════════════
-            appendLine("环境：Android ${android.os.Build.VERSION.RELEASE}，Python 3.11 (Chaquopy)，预装python-docx/openpyxl/Pillow/chardet/python-pptx/requests/beautifulsoup4。")
+            appendLine("环境：Android $androidRelease，Python 3.11 (Chaquopy)，预装python-docx/openpyxl/Pillow/chardet/python-pptx/requests/beautifulsoup4。")
             appendLine("文件操作使用相对路径，默认在当前项目目录下。生成Word/Excel用run_python+python-docx/openpyxl。")
             appendLine("read_file 不支持目录，只能读文件。先list_directory看结构。")
             appendLine()
