@@ -70,17 +70,22 @@ class NuclearBoyApp : Application() {
     private fun copyBuiltinSkills() {
         try {
             val skillsDir = java.io.File(filesDir, "skills")
+            // 用 versionCode 做版本标记：升级后会覆盖重新复制，确保内置 skill 跟随 APK 更新
+            val currentVersionCode = try {
+                packageManager.getPackageInfo(packageName, 0).versionCode
+            } catch (_: Exception) { -1 }
             val markerFile = java.io.File(skillsDir, ".builtin_installed")
-            if (markerFile.exists()) {
-                android.util.Log.e("NuclearBoy", "[App] copyBuiltinSkills — marker exists, skipping")
-                return // Already copied
+            val installedVersionCode = if (markerFile.exists()) markerFile.readText().trim().toIntOrNull() ?: -1 else -1
+            if (installedVersionCode == currentVersionCode) {
+                android.util.Log.e("NuclearBoy", "[App] copyBuiltinSkills — versionCode=$currentVersionCode already installed, skipping")
+                return
             }
 
             val assetSkills = assets.list("skills") ?: run {
                 android.util.Log.e("NuclearBoy", "[App] copyBuiltinSkills — no skills in assets")
                 return
             }
-            android.util.Log.e("NuclearBoy", "[App] copyBuiltinSkills — found ${assetSkills.size} skills in assets")
+            android.util.Log.e("NuclearBoy", "[App] copyBuiltinSkills — found ${assetSkills.size} skills in assets (versionCode=$currentVersionCode)")
             for (skillName in assetSkills) {
                 val skillDir = java.io.File(skillsDir, skillName)
                 skillDir.mkdirs()
@@ -94,8 +99,9 @@ class NuclearBoyApp : Application() {
                 android.util.Log.e("NuclearBoy", "[App] copyBuiltinSkills — copied skill '$skillName' (${skillFiles.size} files)")
                 Timber.d("Installed built-in skill: $skillName")
             }
-            markerFile.createNewFile()
-            android.util.Log.e("NuclearBoy", "[App] copyBuiltinSkills — marker created, skillsDir=${skillsDir.absolutePath}")
+            // 写入当前 versionCode，下次同版本启动跳过，升级后重新复制
+            markerFile.writeText(currentVersionCode.toString())
+            android.util.Log.e("NuclearBoy", "[App] copyBuiltinSkills — marker updated to versionCode=$currentVersionCode")
             Timber.d("Built-in skills installed to: ${skillsDir.absolutePath}")
         } catch (e: Exception) {
             Timber.e(e, "Failed to copy built-in skills")

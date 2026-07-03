@@ -310,9 +310,6 @@ object AppModule {
                             ToolResult(
                                 success = true,
                                 output = result.data.content ?: "(空文件)",
-                                fileChanges = listOf(
-                                    FileChange(path, ChangeType.MODIFIED, null)
-                                ),
                             )
                         }
                         is AppResult.Failure -> {
