@@ -86,29 +86,21 @@ class TokenTracker {
             val tps = (1000.0 * tokensInCurrentStream / (now - startTimeMs + 1))
             android.util.Log.e("NuclearBoy", "[TokenTracker] onStreamToken() milestone token=$tokensInCurrentStream isReasoning=$isReasoning tps=${"%.1f".format(tps)}")
         }
+
+        // 每 10 个 token 才触发一次 StateFlow 更新，避免流式阶段全量重组（~20-60次/秒 → ~3-6次/秒）
+        if (tokensInCurrentStream % 10 != 0L) return
+
         val elapsed = (now - lastUpdateTimeMs).coerceAtLeast(1)
 
         _snapshot.update { current ->
-            // reasoning token 只计入推理计数，不能混进 completion，否则思考模式 HUD 数字虚高
-            val newCompletion = if (isReasoning) {
-                current.completionTokensThisRequest
-            } else {
-                current.completionTokensThisRequest + 1
-            }
-            val newReasoning = if (isReasoning) {
-                current.reasoningTokensThisRequest + 1
-            } else {
-                current.reasoningTokensThisRequest
-            }
-
+            val tps = (1000.0 * tokensInCurrentStream / (now - startTimeMs + 1))
             current.copy(
-                completionTokensThisRequest = newCompletion,
-                reasoningTokensThisRequest = newReasoning,
-                tokensPerSecond = if (isReasoning) current.tokensPerSecond
-                    else (1000.0 * tokensInCurrentStream / (now - startTimeMs + 1)),
-                reasoningTokensPerSecond = if (isReasoning)
-                    (1000.0 * tokensInCurrentStream / (now - startTimeMs + 1))
-                    else current.reasoningTokensPerSecond,
+                completionTokensThisRequest = if (isReasoning) current.completionTokensThisRequest
+                    else current.completionTokensThisRequest + 10,
+                reasoningTokensThisRequest = if (isReasoning) current.reasoningTokensThisRequest + 10
+                    else current.reasoningTokensThisRequest,
+                tokensPerSecond = if (isReasoning) current.tokensPerSecond else tps,
+                reasoningTokensPerSecond = if (isReasoning) tps else current.reasoningTokensPerSecond,
             )
         }
         lastUpdateTimeMs = now
