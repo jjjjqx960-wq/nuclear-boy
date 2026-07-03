@@ -268,7 +268,6 @@ object AppModule {
         toolRegistry: ToolRegistry,
         contextManager: ContextWindowManager,
         tokenTracker: TokenTracker,
-        modelRouter: ModelRouter,
         memoryStore: MemoryStore,
         pcBridgeClient: PcBridgeClient,
     ): AgentEngine {
@@ -278,7 +277,6 @@ object AppModule {
             toolRegistry = toolRegistry,
             contextManager = contextManager,
             tokenTracker = tokenTracker,
-            modelRouter = modelRouter,
             memoryStore = memoryStore,
         )
         // 用户取消对话时的清理回调

@@ -154,7 +154,6 @@ class AgentEngine(
     private val toolRegistry: ToolRegistry,
     private val contextManager: ContextWindowManager,
     private val tokenTracker: TokenTracker,
-    private val modelRouter: ModelRouter = ModelRouter(),
     var memoryStore: com.nuclearboy.memory.MemoryStore? = null,
 ) {
 

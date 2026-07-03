@@ -220,7 +220,7 @@ class ChatViewModel @Inject constructor(
             // 直接用 workspaceRoot + projectId 构建路径，不依赖 currentProjectDir
             val dir = java.io.File(fileOperations.getWorkspaceRoot(), "$pid/.agent")
             dir.mkdirs()
-            val data = Json.encodeToString(serializer(), _messages.value.takeLast(50))
+            val data = Json.encodeToString(serializer(), _messages.value.takeLast(MAX_PERSISTED_MESSAGES))
             val file = java.io.File(dir, "conversation.json")
             file.writeText(data)
             android.util.Log.e("NuclearBoy", "[ChatVM] saveMessages() saved to ${file.absolutePath}")
@@ -1136,6 +1136,9 @@ class ChatViewModel @Inject constructor(
         /** /compact 压缩时单条消息和整体文本的截断长度 */
         private const val COMPACT_PER_MESSAGE_CHARS = 2_000
         private const val COMPACT_TRANSCRIPT_CHARS = 60_000
+
+        /** conversation.json 最多持久化的消息条数 */
+        private const val MAX_PERSISTED_MESSAGES = 50
 
         /**
          * 文件面板/附件角标不展示的内部状态目录与开发缓存/VCS 噪音。
