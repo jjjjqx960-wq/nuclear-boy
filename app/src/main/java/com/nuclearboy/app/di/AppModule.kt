@@ -231,8 +231,9 @@ object AppModule {
             android.util.Log.e("NuclearBoy", "[DI] skillsExecutor called — skillName=$name, paramKeys=${params.keys}")
             when (val r = skillManager.executeSkill(name, params)) {
                 is AppResult.Success -> {
-                    android.util.Log.e("NuclearBoy", "[DI] skillsExecutor — skill '$name' OK")
-                    ToolResult(true, "OK")
+                    val output = r.data.stdout.ifBlank { "OK" }
+                    android.util.Log.e("NuclearBoy", "[DI] skillsExecutor — skill '$name' OK outputLen=${r.data.stdout.length}")
+                    ToolResult(true, output)
                 }
                 is AppResult.Failure -> {
                     android.util.Log.e("NuclearBoy", "[DI] skillsExecutor — skill '$name' FAILED: ${r.error.humanMessage}")
