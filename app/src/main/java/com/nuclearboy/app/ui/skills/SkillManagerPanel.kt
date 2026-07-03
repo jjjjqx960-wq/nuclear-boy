@@ -38,13 +38,21 @@ fun SkillManagerPanel(
     var selectedSkill by remember { mutableStateOf<SkillInfo?>(null) }
     var selectedFile by remember { mutableStateOf<File?>(null) }
     var fileContent by remember { mutableStateOf<String?>(null) }
+    // 当前选中 skill 的文件列表——用 LaunchedEffect 异步加载，避免 Composable body 里同步读磁盘
+    var skillFiles by remember { mutableStateOf<List<File>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
-    fun getSkillFiles(skillName: String): List<File> {
-        val dir = File(skillManager.skillsDir, skillName)
-        return if (dir.exists() && dir.isDirectory)
-            dir.walkTopDown().filter { it.isFile }.toList()
-        else emptyList()
+    LaunchedEffect(selectedSkill) {
+        val skill = selectedSkill
+        if (skill == null) {
+            skillFiles = emptyList()
+        } else {
+            skillFiles = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val dir = File(skillManager.skillsDir, skill.name)
+                if (dir.exists() && dir.isDirectory) dir.walkTopDown().filter { it.isFile }.toList()
+                else emptyList()
+            }
+        }
     }
 
     Scaffold(
@@ -107,7 +115,7 @@ fun SkillManagerPanel(
                 Spacer(Modifier.height(8.dp))
                 Text("📄 Skill 文件", color = Color(0xFF838896), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
-                val files = getSkillFiles(currentSkill.name)
+                val files = skillFiles
                 if (files.isEmpty()) {
                     Text("  无可用文件", color = Color(0xFF4E515B), fontSize = 11.sp)
                 } else {
