@@ -1540,7 +1540,8 @@ class DeepSeekApiClient(
     }
 
     private fun retryDelayMillis(attempt: Int, exception: Exception): Long {
-        val exponentialMs = AppConstants.RETRY_BASE_DELAY_MS * (1 shl (attempt - 1))
+        // coerceIn(0,30) 防止 attempt 极大时 shl 溢出（Long 最大位移 63，Int 最大位移 31）
+        val exponentialMs = AppConstants.RETRY_BASE_DELAY_MS * (1L shl attempt.coerceIn(0, 30).minus(1))
         val retryAfterMs = (exception as? DeepSeekHttpException)?.retryAfterMillis ?: 0L
         val boundedRetryAfterMs = retryAfterMs.coerceAtMost(MAX_RETRY_AFTER_DELAY_MS)
         return maxOf(exponentialMs, boundedRetryAfterMs) + random.nextInt(500).toLong()
