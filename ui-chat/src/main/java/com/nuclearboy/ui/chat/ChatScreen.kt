@@ -1559,8 +1559,7 @@ private fun showNotification(context: Context, msg: String, project: String?) {
 private fun shareFile(context: Context, path: String) {
     try {
         val file = java.io.File(path)
-        android.util.Log.e("NuclearBoy", "[ChatScreen] shareFile() path=$path")
-        android.util.Log.e("NuclearBoy", "📎 shareFile path=$path exists=${file.exists()} abs=${file.absolutePath}")
+        android.util.Log.e("NuclearBoy", "[ChatScreen] shareFile() path=$path exists=${file.exists()}")
         if (!file.exists()) {
             Toast.makeText(context, "文件不存在: ${file.name}", Toast.LENGTH_SHORT).show()
             return
