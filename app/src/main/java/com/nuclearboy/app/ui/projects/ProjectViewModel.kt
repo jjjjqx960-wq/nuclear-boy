@@ -106,6 +106,12 @@ class ProjectViewModel @Inject constructor(
             fileOperations.currentProjectDir = saved
             if (result is com.nuclearboy.common.AppResult.Success) {
                 android.util.Log.e("NuclearBoy", "[ProjectVM] deleteProject SUCCESS: ${project.name}")
+                // 清理该项目的 Memory 数据，避免孤立记忆占用存储并污染 AI 上下文
+                try {
+                    memoryStore.forgetProject(projectId)
+                } catch (e: Exception) {
+                    android.util.Log.e("NuclearBoy", "[ProjectVM] deleteProject — forgetProject failed: ${e.message}")
+                }
                 loadProjects() // 实时刷新
             } else {
                 val err = (result as com.nuclearboy.common.AppResult.Failure).error.humanMessage
