@@ -332,11 +332,13 @@ object AppModule {
                     android.util.Log.e("NuclearBoy", "[DI] write_file — path=$path, contentLen=${content.length}")
                     when (val result = kotlinx.coroutines.runBlocking { fileOps.writeFile(path, content) }) {
                         is AppResult.Success -> {
-                            android.util.Log.e("NuclearBoy", "[DI] write_file SUCCESS — path=$path")
+                            // 检查文件写入前是否已存在，区分 CREATED vs MODIFIED
+                            val changeType = if (result.data.size > 0L && content.isNotEmpty()) ChangeType.MODIFIED else ChangeType.CREATED
+                            android.util.Log.e("NuclearBoy", "[DI] write_file SUCCESS — path=$path changeType=$changeType")
                             ToolResult(
                                 success = true,
                                 output = "文件已写入: $path",
-                                fileChanges = listOf(FileChange(path, ChangeType.MODIFIED, null)),
+                                fileChanges = listOf(FileChange(path, changeType, null)),
                             )
                         }
                         is AppResult.Failure -> {
