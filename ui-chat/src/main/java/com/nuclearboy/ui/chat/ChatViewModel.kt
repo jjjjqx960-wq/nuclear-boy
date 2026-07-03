@@ -974,7 +974,8 @@ class ChatViewModel @Inject constructor(
             }
 
             is AgentEvent.TokenUpdate -> {
-                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() TokenUpdate prompt=${event.usage.promptTokens} completion=${event.usage.completionTokens} total=${event.usage.totalTokens}")
+                // TokenUpdate 每 10 token 触发一次（TokenTracker 已节流），日志只打最终值
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() TokenUpdate total=${event.usage.totalTokens}")
                 currentAssistantMsgId?.let { id ->
                     updateAssistantMessage(id) { msg ->
                         msg.copy(tokenUsage = event.usage)
