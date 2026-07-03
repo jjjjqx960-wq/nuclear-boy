@@ -476,6 +476,7 @@ class ApiKeyManager(context: Context) {
         )
     }
 
+    @Synchronized
     private fun refreshState() {
         val primary = primaryKey
         val backup = backupKey
