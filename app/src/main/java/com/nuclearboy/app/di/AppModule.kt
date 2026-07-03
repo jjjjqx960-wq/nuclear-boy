@@ -558,6 +558,9 @@ else:
             listOf(ToolParameter("path", "string", "网页完整URL，必须以 https:// 开头。示例：https://example.com", true)),
             executor = { p ->
                 val url = p["path"] ?: p["url"] ?: p["link"] ?: p["query"] ?: return@ToolDefinition ToolResult(false, error = "缺少 path 参数。示例：path=\"https://example.com\"")
+                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                    return@ToolDefinition ToolResult(false, error = "URL 必须以 http:// 或 https:// 开头，收到: ${url.take(80)}")
+                }
                 android.util.Log.e("NuclearBoy", "[DI] web_fetch — url=$url")
                 try {
                     val req = okhttp3.Request.Builder().url(url)
