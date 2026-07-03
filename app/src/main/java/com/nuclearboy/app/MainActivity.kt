@@ -130,12 +130,14 @@ private fun NuclearBoyMainScreen() {
     }
 
     fun createAndNavigate(name: String) {
-        scope.launch { drawerState.close() }
-        projectViewModel.createProject(name)
-        projectViewModel.selectProject(name) // 设置 currentProjectDir
-        navController.navigate(NavRoutes.chatRoute(name)) {
-            popUpTo(NavRoutes.chatRoute("__general__")) { inclusive = false }
-            launchSingleTop = true
+        scope.launch {
+            drawerState.close()
+            val projectId = projectViewModel.createProjectAwait(name) ?: name
+            projectViewModel.selectProject(projectId)
+            navController.navigate(NavRoutes.chatRoute(projectId)) {
+                popUpTo(NavRoutes.chatRoute("__general__")) { inclusive = false }
+                launchSingleTop = true
+            }
         }
     }
 

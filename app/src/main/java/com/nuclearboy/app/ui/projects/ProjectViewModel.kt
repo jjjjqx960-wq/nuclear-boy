@@ -64,6 +64,29 @@ class ProjectViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Suspending variant: awaits filesystem creation and list refresh, then returns the new
+     * project's id, or null on failure. Used by callers that need to navigate only after the
+     * project is fully ready (e.g. createAndNavigate in MainActivity).
+     */
+    suspend fun createProjectAwait(name: String): String? {
+        android.util.Log.e("NuclearBoy", "[ProjectVM] createProjectAwait — name=$name")
+        return when (val result = withContext(Dispatchers.IO) {
+            fileOperations.createProject(name)
+        }) {
+            is com.nuclearboy.common.AppResult.Success -> {
+                val project = result.data
+                android.util.Log.e("NuclearBoy", "[ProjectVM] createProjectAwait SUCCESS — id=${project.id}, name=${project.name}")
+                loadProjects() // 实时刷新
+                project.id
+            }
+            is com.nuclearboy.common.AppResult.Failure -> {
+                android.util.Log.e("NuclearBoy", "[ProjectVM] createProjectAwait FAILED — ${result.error.humanMessage}")
+                null
+            }
+        }
+    }
+
     fun renameProject(projectId: String, newName: String) {
         val project = _projects.value.find { it.id == projectId } ?: return
         if (newName.isBlank() || newName.trim() == project.name) return
