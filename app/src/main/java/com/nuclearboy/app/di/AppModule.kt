@@ -422,6 +422,10 @@ object AppModule {
         )
     }
 
+    // remember 工具读/写 memory.json 用的 Json 实例——提升为字段避免每次工具调用重建
+    private val memoryReadJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; isLenient = true }
+    private val memoryWriteJson = kotlinx.serialization.json.Json { encodeDefaults = true }
+
     // 共享的轻量 HTTP 客户端（web_fetch 专用），复用连接池避免每次调用重建线程资源
     private val webFetchClient: okhttp3.OkHttpClient by lazy {
         okhttp3.OkHttpClient.Builder()
@@ -596,14 +600,12 @@ else:
                 val memFile = java.io.File(fileOps.getWorkspaceRoot(), "__general__/.agent/memory.json")
                 memFile.parentFile?.mkdirs()
                 val memories: MutableList<Map<String, String>> = try {
-                    val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; isLenient = true }
-                    json.decodeFromString<List<Map<String, String>>>(memFile.readText()).toMutableList()
+                    memoryReadJson.decodeFromString<List<Map<String, String>>>(memFile.readText()).toMutableList()
                 } catch (_: Exception) { mutableListOf() }
                 memories.add(mapOf("value" to value, "category" to category, "time" to java.time.Instant.now().toString()))
                 // 只保留最近 50 条
                 val trimmed = memories.takeLast(50)
-                val json = kotlinx.serialization.json.Json { encodeDefaults = true }
-                memFile.writeText(json.encodeToString(kotlinx.serialization.serializer(), trimmed))
+                memFile.writeText(memoryWriteJson.encodeToString(kotlinx.serialization.serializer(), trimmed))
                 android.util.Log.e("NuclearBoy", "[DI] remember saved to ${memFile.absolutePath} total=${trimmed.size}")
                 ToolResult(true, "已记住: $value")
             }),
