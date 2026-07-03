@@ -791,17 +791,16 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                         Spacer(Modifier.height(8.dp))
-                        var autoSwitch by remember { mutableStateOf(apiKeyState.autoSwitchEnabled) }
+                        // 直接用 state 值驱动 Checkbox，避免本地 var 与 state 脱节
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = autoSwitch, onCheckedChange = {
-                                autoSwitch = it; viewModel.setAutoSwitch(it)
+                            Checkbox(checked = apiKeyState.autoSwitchEnabled, onCheckedChange = {
+                                viewModel.setAutoSwitch(it)
                             })
                             Text("自动选择模型", style = MaterialTheme.typography.bodyMedium)
                         }
-                        var simpleFlash by remember { mutableStateOf(apiKeyState.simpleTasksUseFlash) }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = simpleFlash, onCheckedChange = {
-                                simpleFlash = it; viewModel.setSimpleTasksUseFlash(it)
+                            Checkbox(checked = apiKeyState.simpleTasksUseFlash, onCheckedChange = {
+                                viewModel.setSimpleTasksUseFlash(it)
                             })
                             Text("简单任务用 Flash", style = MaterialTheme.typography.bodyMedium)
                         }
