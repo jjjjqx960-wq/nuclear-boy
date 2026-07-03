@@ -152,26 +152,30 @@ class ProjectViewModel @Inject constructor(
                 is com.nuclearboy.common.AppResult.Success -> {
                     val projectDirs = result.data.filter { it.isDirectory && it.name != "__general__" && !it.name.startsWith(".") }
                     android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — found ${projectDirs.size} directories")
-                    _projects.value = projectDirs.mapNotNull { dir ->
-                        // Try to load persisted project metadata
-                        val meta = loadProjectMeta(dir.name)
-                        if (meta != null) {
-                            android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — loaded meta for '${dir.name}', id=${meta.id}")
-                            meta.copy(
-                                rootPath = dir.path,
-                                lastOpenedAt = dir.lastModified,
-                            )
-                        } else {
-                            // Legacy project without metadata — create it now
-                            val project = Project(
-                                name = dir.name,
-                                rootPath = dir.path,
-                                lastOpenedAt = dir.lastModified,
-                                fileCount = 0,
-                            )
-                            android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — legacy project '${dir.name}', created meta id=${project.id}")
-                            persistProjectMeta(project)
-                            project
+                    // loadProjectMeta and persistProjectMeta perform blocking file I/O; run
+                    // the entire mapping on the IO dispatcher to avoid blocking the main thread.
+                    _projects.value = withContext(Dispatchers.IO) {
+                        projectDirs.mapNotNull { dir ->
+                            // Try to load persisted project metadata
+                            val meta = loadProjectMeta(dir.name)
+                            if (meta != null) {
+                                android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — loaded meta for '${dir.name}', id=${meta.id}")
+                                meta.copy(
+                                    rootPath = dir.path,
+                                    lastOpenedAt = dir.lastModified,
+                                )
+                            } else {
+                                // Legacy project without metadata — create it now
+                                val project = Project(
+                                    name = dir.name,
+                                    rootPath = dir.path,
+                                    lastOpenedAt = dir.lastModified,
+                                    fileCount = 0,
+                                )
+                                android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — legacy project '${dir.name}', created meta id=${project.id}")
+                                persistProjectMeta(project)
+                                project
+                            }
                         }
                     }
                     android.util.Log.e("NuclearBoy", "[ProjectVM] loadProjects — final count=${_projects.value.size}")

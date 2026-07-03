@@ -23,6 +23,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
@@ -81,6 +83,12 @@ class ChatViewModel @Inject constructor(
 
     /** 复用的 JSON 解析器（读记忆文件等），避免每轮 executeTurn 重建 Json 配置 */
     private val memoryJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
+    /**
+     * Guards the isProcessing-check + list-write pair in deleteMessage so they
+     * are never split by a concurrent streaming job (finding 4 — TOCTOU).
+     */
+    private val messageEditMutex = Mutex()
 
     @Volatile private var agentJob: Job? = null
     private var lastUserMessage: ChatMessage? = null
@@ -427,27 +435,39 @@ class ChatViewModel @Inject constructor(
     fun editAndResend(messageId: String): String? {
         if (_isProcessing.value) return null
         val result = com.nuclearboy.common.ChatEditing.prepareEdit(_messages.value, messageId) ?: return null
-        _messages.value = result.remaining
+        // Use update to avoid dropping a streamed chunk that arrived between prepareEdit
+        // and the list assignment (finding 3).
+        _messages.update { result.remaining }
         saveMessages()
         return result.content
     }
 
     /** 删除单条消息（处理中不允许，避免与流式写入冲突）。 */
     fun deleteMessage(messageId: String) {
-        if (_isProcessing.value) return
-        _messages.value = com.nuclearboy.common.ChatEditing.removeMessage(_messages.value, messageId)
-        saveMessages()
+        // Guard check and list write run inside a mutex so a streaming job cannot
+        // flip _isProcessing to true in the gap between the two steps (finding 4 — TOCTOU).
+        viewModelScope.launch {
+            val deleted = messageEditMutex.withLock {
+                if (_isProcessing.value) return@withLock false
+                _messages.update { com.nuclearboy.common.ChatEditing.removeMessage(it, messageId) }
+                true
+            }
+            if (deleted) saveMessages()
+        }
     }
 
     fun retryLastMessage() {
         android.util.Log.e("NuclearBoy", "[ChatVM] retryLastMessage() entry isProcessing=${_isProcessing.value}")
         if (_isProcessing.value) return
         val lastUser = lastUserMessage ?: return
-        val currentMessages = _messages.value.toMutableList()
-        val lastUserIndex = currentMessages.indexOfLast { it.id == lastUser.id }
-        if (lastUserIndex >= 0 && lastUserIndex < currentMessages.lastIndex) {
-            currentMessages.subList(lastUserIndex + 1, currentMessages.size).clear()
-            _messages.value = currentMessages
+        // Use update so we never silently drop a streamed chunk that arrived between
+        // the snapshot copy and the assignment (finding 2).
+        _messages.update { currentMessages ->
+            val lastUserIndex = currentMessages.indexOfLast { it.id == lastUser.id }
+            if (lastUserIndex >= 0 && lastUserIndex < currentMessages.lastIndex)
+                currentMessages.subList(0, lastUserIndex + 1)
+            else
+                currentMessages
         }
         sendMessage(lastUser.content)
     }
@@ -716,7 +736,9 @@ class ChatViewModel @Inject constructor(
                     content = "📦 对话已压缩，以下是之前内容的摘要：\n\n$summary",
                     status = MessageStatus.COMPLETE,
                 )
-                _messages.value = listOf(summaryMsg)
+                // Atomic replacement — avoids erasing chunks that arrived between
+                // the streaming guard check and this write (finding 1).
+                _messages.update { listOf(summaryMsg) }
                 contextManager.reset()
                 lastUserMessage = null
                 saveMessages()

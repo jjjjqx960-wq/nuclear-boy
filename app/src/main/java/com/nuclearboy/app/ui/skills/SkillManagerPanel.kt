@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.sp
 import com.nuclearboy.common.SkillInfo
 import com.nuclearboy.skills.SkillManager
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +38,7 @@ fun SkillManagerPanel(
     var selectedSkill by remember { mutableStateOf<SkillInfo?>(null) }
     var selectedFile by remember { mutableStateOf<File?>(null) }
     var fileContent by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     fun getSkillFiles(skillName: String): List<File> {
         val dir = File(skillManager.skillsDir, skillName)
@@ -56,14 +60,16 @@ fun SkillManagerPanel(
             )
         },
     ) { padding ->
-        if (selectedFile != null && fileContent != null) {
+        val currentFile = selectedFile
+        val currentSkill = selectedSkill
+        if (currentFile != null && fileContent != null) {
             // MD 文件预览
             Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
                     IconButton(onClick = { selectedFile = null; fileContent = null }) {
                         Icon(Icons.Filled.ArrowBack, "返回", tint = Color(0xFF00E676))
                     }
-                    Text(selectedFile!!.name, color = Color(0xFFE3E5E8), fontWeight = FontWeight.Bold)
+                    Text(currentFile.name, color = Color(0xFFE3E5E8), fontWeight = FontWeight.Bold)
                 }
                 HorizontalDivider(color = Color(0xFF1E2230))
                 Spacer(Modifier.height(8.dp))
@@ -81,7 +87,7 @@ fun SkillManagerPanel(
                     }
                 }
             }
-        } else if (selectedSkill != null) {
+        } else if (currentSkill != null) {
             // Skill 详情
             Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
@@ -89,11 +95,11 @@ fun SkillManagerPanel(
                         Icon(Icons.Filled.ArrowBack, "返回", tint = Color(0xFF00E676))
                     }
                     Column {
-                        Text(selectedSkill!!.name, color = Color(0xFF00E676), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(selectedSkill!!.description, color = Color(0xFF838896), fontSize = 11.sp)
+                        Text(currentSkill.name, color = Color(0xFF00E676), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(currentSkill.description, color = Color(0xFF838896), fontSize = 11.sp)
                     }
                 }
-                if (selectedSkill!!.isProjectSkill) {
+                if (currentSkill.isProjectSkill) {
                     Text("📁 项目级 Skill", color = Color(0xFF0A84FF), fontSize = 11.sp)
                 }
                 Spacer(Modifier.height(12.dp))
@@ -101,15 +107,20 @@ fun SkillManagerPanel(
                 Spacer(Modifier.height(8.dp))
                 Text("📄 Skill 文件", color = Color(0xFF838896), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
-                val files = getSkillFiles(selectedSkill!!.name)
+                val files = getSkillFiles(currentSkill.name)
                 if (files.isEmpty()) {
                     Text("  无可用文件", color = Color(0xFF4E515B), fontSize = 11.sp)
                 } else {
                     files.take(20).forEach { file ->
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable {
-                                try { fileContent = file.readText() } catch (_: Exception) { fileContent = "(无法读取)" }
-                                selectedFile = file
+                                scope.launch {
+                                    val text = try {
+                                        withContext(Dispatchers.IO) { file.readText() }
+                                    } catch (_: Exception) { "(无法读取)" }
+                                    fileContent = text
+                                    selectedFile = file
+                                }
                             }.padding(vertical = 6.dp, horizontal = 8.dp),
                         ) {
                             Icon(if (file.extension == "md") Icons.Filled.Description else Icons.Filled.InsertDriveFile,

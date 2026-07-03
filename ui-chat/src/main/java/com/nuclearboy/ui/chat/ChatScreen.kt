@@ -195,18 +195,25 @@ fun ChatScreen(
     LaunchedEffect(uiState.scrollToBottom) {
         if (uiState.messages.isNotEmpty() && (forceNextScrollToBottom || followChatScroll)) {
             listState.requestScrollToItem(uiState.messages.lastIndex)
-            forceNextScrollToBottom = false
         }
+        // Reset unconditionally so clearing the conversation while scrollToBottom fires
+        // does not leak `true` into the next conversation (finding 11).
+        forceNextScrollToBottom = false
     }
-    // Follow new messages only while the user is already reading the latest turn.
-    LaunchedEffect(uiState.messages.size) {
+    // Consolidated scroll trigger: animate when a new message is appended, snap (instant)
+    // when only content length changed (streaming chunks).  Having two separate
+    // LaunchedEffects with different scroll calls caused the instant snap to cancel the
+    // in-flight animation every time streaming started, producing a jarring jump (finding 10).
+    val prevMessageCount = remember { mutableIntStateOf(uiState.messages.size) }
+    LaunchedEffect(uiState.messages.size, lastMessageContentLength) {
         if (uiState.messages.isNotEmpty() && followChatScroll) {
-            listState.animateScrollToItem(uiState.messages.lastIndex)
-        }
-    }
-    LaunchedEffect(lastMessageContentLength) {
-        if (uiState.messages.isNotEmpty() && followChatScroll) {
-            listState.requestScrollToItem(uiState.messages.lastIndex)
+            val countChanged = uiState.messages.size != prevMessageCount.intValue
+            prevMessageCount.intValue = uiState.messages.size
+            if (countChanged) {
+                listState.animateScrollToItem(uiState.messages.lastIndex)
+            } else {
+                listState.requestScrollToItem(uiState.messages.lastIndex)
+            }
         }
     }
 
@@ -1399,7 +1406,10 @@ private fun ChatInputBar(
                     if (command.submitImmediately) {
                         onTextChange("")
                         focusManager.clearFocus()
-                        if (command.commandText == "/stop") onCancel() else onSend(command.commandText)
+                        // Guard against commands with empty commandText bypassing the
+                        // canSend check and dispatching a blank message (finding 15).
+                        if (command.commandText == "/stop") onCancel()
+                        else if (command.commandText.isNotBlank()) onSend(command.commandText)
                     } else {
                         onTextChange(command.commandText)
                         focusRequester.requestFocus()
@@ -1469,6 +1479,7 @@ private fun ChatInputBar(
                             onSend(text); onTextChange(""); focusManager.clearFocus()
                         }
                     },
+                    enabled = canSend,
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)

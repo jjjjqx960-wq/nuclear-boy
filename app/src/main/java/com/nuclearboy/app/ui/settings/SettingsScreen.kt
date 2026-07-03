@@ -646,6 +646,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val composableScope = rememberCoroutineScope()
     val apiKeyState by viewModel.apiKeyState.collectAsState()
     val modelTestState by viewModel.modelTestState.collectAsState()
     val modelListProbeState by viewModel.modelListProbeState.collectAsState()
@@ -1694,7 +1695,7 @@ fun SettingsScreen(
                             onClick = {
                                 updateChecking = true
                                 updateResult = null
-                                kotlinx.coroutines.MainScope().launch {
+                                composableScope.launch {
                                     val um = UpdateManager(context)
                                     updateResult = um.checkForUpdate(force = true)
                                     updateChecking = false
