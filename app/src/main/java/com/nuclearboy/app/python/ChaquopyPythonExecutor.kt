@@ -18,6 +18,12 @@ import java.util.concurrent.ConcurrentHashMap
 class ChaquopyPythonExecutor : PythonExecutor {
 
     private val installedPackages = ConcurrentHashMap.newKeySet<String>()
+    // builtins 模块引用缓存：Chaquopy 每次 getModule() 都创建新引用对象，
+    // run() 是热路径，缓存后避免重复查找
+    @Volatile private var cachedBuiltins: com.chaquo.python.PyObject? = null
+
+    private fun builtins(): com.chaquo.python.PyObject =
+        cachedBuiltins ?: Python.getInstance().getModule("builtins").also { cachedBuiltins = it }
 
     override fun start(context: Context) {
         android.util.Log.e("NuclearBoy", "[Chaquopy] start — entry")
@@ -115,10 +121,10 @@ class ChaquopyPythonExecutor : PythonExecutor {
 
             android.util.Log.e("NuclearBoy", "[Chaquopy] run — wrappedScript size=${wrappedScript.length} chars")
 
-            val locals = py.getModule("builtins").callAttr("dict")
+            val locals = builtins().callAttr("dict")
             locals.callAttr("__setitem__", "__name__", "__main__")  // Fix: exec() runs as __main__
             locals.callAttr("__setitem__", "_nb_user_script", script)  // Raw script — no source rewriting
-            py.getModule("builtins").callAttr("exec", wrappedScript, locals)
+            builtins().callAttr("exec", wrappedScript, locals)
 
             val exitCode = (locals.callAttr("get", "_nb_exit_code", 0) as? Int) ?: 0
 
