@@ -20,8 +20,13 @@ fun detectToolActionDraftHint(text: String): ToolActionDraftHint? {
     val hasToolObject = toolObjectMarkers.any { compact.contains(it) || lower.contains(it) }
     val hasApiObject = apiObjectMarkers.any { compact.contains(it) || lower.contains(it) }
     val hasApiMutation = apiMutationMarkers.any { compact.contains(it) || lower.contains(it) }
+    // Bare English HTTP verbs (post/put/patch/delete) are extremely common in ordinary UI/coding
+    // requests ("delete the extra padding", "put a divider"), so they only count as a real API
+    // action when an API/endpoint object is also present — otherwise they cause false positives.
+    val hasApiHttpMethod = apiHttpMethodMarkers.any { lower.contains(it) }
     val hasApiAction = apiActionMarkers.any { compact.contains(it) || lower.contains(it) } ||
-        (hasApiObject && hasApiMutation)
+        (hasApiObject && hasApiMutation) ||
+        (hasApiObject && hasApiHttpMethod)
 
     if (shouldSkipApiLearningQuestion(compact, lower, hasApiObject, hasApiAction)) {
         return null
@@ -310,11 +315,17 @@ private val apiActionMarkers = listOf(
     "接口请求",
     "发请求",
     "发起请求",
+    "curl ",
+)
+
+// HTTP method verbs that only imply an API call when paired with an API/endpoint object.
+// Kept separate from [apiActionMarkers] because as bare English words they appear constantly
+// in ordinary UI/coding requests and must not trigger the tool-capability warning on their own.
+private val apiHttpMethodMarkers = listOf(
     "post ",
     "put ",
     "patch ",
     "delete ",
-    "curl ",
 )
 
 private val apiMutationMarkers = listOf(

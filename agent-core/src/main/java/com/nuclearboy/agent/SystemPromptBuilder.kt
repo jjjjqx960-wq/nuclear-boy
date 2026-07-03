@@ -97,7 +97,7 @@ object SystemPromptBuilder {
             appendLine("b.setContentTitle('标题')")
             appendLine("b.setContentText('内容')")
             appendLine("b.setSmallIcon(ctx.getApplicationInfo().icon)")
-            appendLine("b.setAutoCancel(jclass('java.lang').Boolean(True))")
+            appendLine("b.setAutoCancel(jboolean(True))")
             appendLine("nm.notify(999, b.build())")
             appendLine("```")
             appendLine()

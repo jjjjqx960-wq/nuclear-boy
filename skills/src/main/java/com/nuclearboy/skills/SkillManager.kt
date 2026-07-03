@@ -49,7 +49,7 @@ class SkillManager(
     val activeSkills: StateFlow<List<SkillInfo>> = _activeSkills.asStateFlow()
 
     private var currentProjectSkillsDir: File? = null
-    private val projectSkillNames = mutableSetOf<String>()
+    private val projectSkillNames = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
 
     private val json = Json {
         ignoreUnknownKeys = true

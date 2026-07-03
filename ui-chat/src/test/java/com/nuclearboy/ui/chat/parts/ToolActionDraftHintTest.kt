@@ -395,6 +395,28 @@ class ToolActionDraftHintTest {
     }
 
     @Test
+    fun ignoreEnglishUiStylingDeleteRequest() {
+        val hint = detectToolActionDraftHint("delete the extra padding in the header")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun ignoreEnglishUiLayoutPutRequest() {
+        val hint = detectToolActionDraftHint("put a divider between the two cards")
+
+        assertNull(hint)
+    }
+
+    @Test
+    fun detectHttpMethodWithApiObjectRequest() {
+        val hint = detectToolActionDraftHint("send a delete request to the api endpoint for this user")
+
+        assertNotNull(hint)
+        assertTrue(hint?.summary.orEmpty().contains("调用接口/API"))
+    }
+
+    @Test
     fun detectApiExecutionEvenWhenTextMentionsHow() {
         val hint = detectToolActionDraftHint("你看看怎么走 API 给我加进去")
 

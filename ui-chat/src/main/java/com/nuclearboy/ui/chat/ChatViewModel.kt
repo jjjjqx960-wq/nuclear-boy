@@ -227,7 +227,7 @@ class ChatViewModel @Inject constructor(
             val file = java.io.File(fileOperations.getWorkspaceRoot(), "$projectId/.agent/conversation.json")
             android.util.Log.e("NuclearBoy", "[ChatVM] loadPersistedMessages() path=${file.absolutePath} exists=${file.exists()}")
             if (file.exists()) {
-                val loaded = Json.decodeFromString(serializer<List<ChatMessage>>(), file.readText())
+                val loaded = memoryJson.decodeFromString(serializer<List<ChatMessage>>(), file.readText())
                 android.util.Log.e("NuclearBoy", "[ChatVM] loadPersistedMessages() loaded=${loaded.size}")
                 loaded
             } else emptyList()
@@ -428,6 +428,7 @@ class ChatViewModel @Inject constructor(
         if (_isProcessing.value) return null
         val result = com.nuclearboy.common.ChatEditing.prepareEdit(_messages.value, messageId) ?: return null
         _messages.value = result.remaining
+        saveMessages()
         return result.content
     }
 
@@ -435,6 +436,7 @@ class ChatViewModel @Inject constructor(
     fun deleteMessage(messageId: String) {
         if (_isProcessing.value) return
         _messages.value = com.nuclearboy.common.ChatEditing.removeMessage(_messages.value, messageId)
+        saveMessages()
     }
 
     fun retryLastMessage() {
@@ -473,6 +475,7 @@ class ChatViewModel @Inject constructor(
         contextManager.reset()
         currentThinkingId = null
         currentAssistantMsgId = null
+        saveMessages()
     }
 
     // ── Slash Commands（/loop /goal /compact /rewind 等）──────────────────
@@ -1011,7 +1014,8 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun finalizeProcessing(thinkingId: String, clearAgentJob: Boolean = true) {
-        _isProcessing.value = false
+        // /loop 模式下 clearAgentJob=false：轮间不重置 _isProcessing，防止用户消息插入循环间隙
+        if (clearAgentJob) _isProcessing.value = false
         if (clearAgentJob) agentJob = null
         // Mark thinking placeholder as COMPLETE
         updateAssistantMessage(thinkingId) { msg ->
