@@ -101,6 +101,14 @@ object UpdateDownloader {
         }
     }
 
+    /** Android 13+ 需要 POST_NOTIFICATIONS 权限才能发通知；没权限则静默跳过而不崩溃。 */
+    private fun canPostNotifications(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.POST_NOTIFICATIONS
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
     // ── 下载完成广播 ────────────────────────────────
 
     private class DownloadCompleteReceiver(
@@ -161,6 +169,6 @@ object UpdateDownloader {
             .build()
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(NOTIFICATION_ID + 1, notification)
+        if (canPostNotifications(context)) nm.notify(NOTIFICATION_ID + 1, notification)
     }
 }
