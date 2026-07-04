@@ -81,9 +81,6 @@ class TokenTracker {
     fun onStreamToken(isReasoning: Boolean = false) {
         val now = System.currentTimeMillis()
         tokensInCurrentStream++
-        if (tokensInCurrentStream % 100 == 0L) {
-            val tps = (1000.0 * tokensInCurrentStream / (now - startTimeMs + 1))
-        }
 
         // 每 10 个 token 才触发一次 StateFlow 更新，避免流式阶段全量重组（~20-60次/秒 → ~3-6次/秒）
         if (tokensInCurrentStream % 10 != 0L) return

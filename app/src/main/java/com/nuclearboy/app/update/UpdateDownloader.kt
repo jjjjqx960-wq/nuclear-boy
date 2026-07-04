@@ -35,6 +35,13 @@ object UpdateDownloader {
 
     /** 开始下载 APK */
     fun download(context: Context, url: String, version: String): Long {
+        // 强制 HTTPS：APK 会被直接拉起系统安装器，属于高信任路径。app 的
+        // network_security_config 为了兼容用户自建模型网关放开了明文流量，
+        // 但更新包绝不能走明文——否则可被中间人替换成任意 APK。
+        if (!url.trim().startsWith("https://", ignoreCase = true)) {
+            Log.e(TAG, "$TAG_D 拒绝非 HTTPS 更新下载地址: $url")
+            return -1L
+        }
         createNotificationChannel(context)
 
         val fileName = "nuclear-boy-v$version.apk"
@@ -58,8 +65,10 @@ object UpdateDownloader {
 
         Log.e(TAG, "$TAG_D 开始下载: id=$downloadId, url=$url, dest=${file.absolutePath}")
 
-        // 注册下载完成广播
-        val receiver = DownloadCompleteReceiver(file, version)
+        // 注册下载完成广播。ACTION_DOWNLOAD_COMPLETE 是系统级广播，本 App 里其它下载
+        // （或未来新增的下载）完成时也会触发这个 receiver——必须带上本次的 downloadId，
+        // onReceive 里核对后才处理，否则会错在别的下载上、或提前 unregister 漏掉本次安装。
+        val receiver = DownloadCompleteReceiver(downloadId, file, version)
         context.registerReceiver(
             receiver,
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
@@ -112,11 +121,17 @@ object UpdateDownloader {
     // ── 下载完成广播 ────────────────────────────────
 
     private class DownloadCompleteReceiver(
+        private val expectedId: Long,
         private val file: File,
         private val version: String,
     ) : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+            // 不是我们这次 enqueue 的下载：忽略，且绝不 unregister（否则会漏掉本次的完成广播）
+            if (downloadId != expectedId) {
+                Log.e(TAG, "$TAG_D 忽略无关下载完成广播: id=$downloadId (期待=$expectedId)")
+                return
+            }
             Log.e(TAG, "$TAG_D 下载完成广播: id=$downloadId")
 
             // 检查下载状态

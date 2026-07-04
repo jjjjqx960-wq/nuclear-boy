@@ -570,8 +570,10 @@ private fun parseUnifiedDiff(diff: String): List<DiffHunk> {
 
                 val match = hunkHeaderRegex.find(line)
                 if (match != null) {
-                    oldLineNum = match.groupValues[1].toInt()
-                    newLineNum = match.groupValues[3].toInt()
+                    // toIntOrNull：畸形/超大行号（工具或模型生成的 diff 不可信）不能让整个
+                    // diff 视图崩溃，解析失败时保留上一次的行号继续往下走。
+                    oldLineNum = match.groupValues[1].toIntOrNull() ?: oldLineNum
+                    newLineNum = match.groupValues[3].toIntOrNull() ?: newLineNum
                 }
             }
             // Metadata: --- or +++
