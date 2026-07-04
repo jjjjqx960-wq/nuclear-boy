@@ -331,7 +331,6 @@ class ChatViewModel @Inject constructor(
         _messages.update { current ->
             if (toolEvidenceMessage == null) current + userMessage else current + userMessage + toolEvidenceMessage
         }
-        android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() userMessage created id=${userMessage.id}")
         lastUserMessage = userMessage
         saveMessages()
         _scrollToBottom.value++
@@ -346,7 +345,6 @@ class ChatViewModel @Inject constructor(
             content = "", status = MessageStatus.THINKING,
         )
         _messages.update { it + placeholder }
-        android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() assistant placeholder created id=$assistantId")
         _streamingState.value = StreamingState(messageId = assistantId, isThinking = true)
         _scrollToBottom.value++
 
@@ -383,7 +381,6 @@ class ChatViewModel @Inject constructor(
                 turnGuard = toolModelGuard,
             ),
         )
-        android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() projectContext built: project=${projectContext.project?.name} files=${projectContext.currentFiles.size} skills=${projectContext.activeSkills.size}")
 
         notificationCallback?.invoke("thinking", currentProjectId)
 
@@ -406,7 +403,6 @@ class ChatViewModel @Inject constructor(
             ).collect { event ->
                 handleAgentEvent(event, assistantId)
             }
-            android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() flow completed normally")
         } catch (e: CancellationException) {
             android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() cancelled")
             updateAssistantMessage(assistantId) { msg ->
@@ -418,7 +414,6 @@ class ChatViewModel @Inject constructor(
             android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() error: ${e.message}", e)
             handleAgentError(e, assistantId)
         } finally {
-            android.util.Log.e("NuclearBoy", "[ChatVM] executeTurn() entering finally block")
             finalizeProcessing(assistantId, clearAgentJob = clearAgentJobOnFinalize)
         }
         return _messages.value.findLast { it.role == MessageRole.ASSISTANT }?.content ?: ""
