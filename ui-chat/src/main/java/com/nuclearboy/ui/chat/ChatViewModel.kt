@@ -64,7 +64,11 @@ class ChatViewModel @Inject constructor(
     private val appSettings: com.nuclearboy.common.AppSettingsStore,
 ) : ViewModel() {
 
-    // 用户画像内存缓存：exportUserProfile 每次都查Room DB，每轮对话缓存一次
+    // memory.json 内容缓存：避免每轮对话都从磁盘重读 memory.json
+    // remember 工具写入后会在 invalidateMemoryCache() 中清空
+    @Volatile private var cachedMemoryCtx: String? = null
+
+    private fun invalidateMemoryCache() { cachedMemoryCtx = null }
     // remember 工具写入新记忆后 autoExtractMemories 会更新 DB，下轮会重新加载
     @Volatile private var cachedUserProfile: com.nuclearboy.common.UserProfile? = null
 
@@ -358,14 +362,18 @@ class ChatViewModel @Inject constructor(
         _streamingState.value = StreamingState(messageId = assistantId, isThinking = true)
         _scrollToBottom.value++
 
-        // 读记忆文件
-        val memFile = java.io.File(fileOperations.getWorkspaceRoot(), "__general__/.agent/memory.json")
-        val memoryCtx = if (memFile.exists()) {
-            try {
-                val memories = memoryJson.decodeFromString<List<Map<String, String>>>(memFile.readText())
-                memories.takeLast(10).joinToString("\n") { "- ${it["value"]} [${it["category"]}]" }
-            } catch (_: Exception) { "" }
-        } else ""
+        // 读记忆文件（优先内存缓存，避免每轮对话都磁盘读取）
+        val memoryCtx = cachedMemoryCtx ?: run {
+            val memFile = java.io.File(fileOperations.getWorkspaceRoot(), "__general__/.agent/memory.json")
+            val ctx = if (memFile.exists()) {
+                try {
+                    val memories = memoryJson.decodeFromString<List<Map<String, String>>>(memFile.readText())
+                    memories.takeLast(10).joinToString("\n") { "- ${it["value"]} [${it["category"]}]" }
+                } catch (_: Exception) { "" }
+            } else ""
+            cachedMemoryCtx = ctx
+            ctx
+        }
 
         // /goal 设定的会话目标注入上下文
         val goal = sessionGoal
@@ -1108,8 +1116,9 @@ class ChatViewModel @Inject constructor(
                     android.util.Log.e("NuclearBoy", "[ChatVM] memoryWrite total_conversations=$convCount result=$r2")
                     val r3 = memoryStore.autoExtractMemories(projectId, lastUser, lastAi)
                     android.util.Log.e("NuclearBoy", "[ChatVM] memoryWrite autoExtractMemories result=$r3")
-                    // 记忆已更新，使用户画像缓存失效，下次对话重新从 DB 加载
+                    // 记忆已更新，使两个内存缓存都失效，下次对话重新从磁盘/DB 加载
                     invalidateUserProfileCache()
+                    invalidateMemoryCache()
                 } catch (e: Exception) {
                     android.util.Log.e("NuclearBoy", "[ChatVM] memoryWrite FAILED: ${e.message}", e)
                 }
