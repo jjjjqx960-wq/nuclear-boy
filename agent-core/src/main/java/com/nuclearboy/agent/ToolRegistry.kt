@@ -267,116 +267,39 @@ class ToolRegistry {
     // ── Default Tools ────────────────────────────────────
 
     /**
-     * Register the standard set of built-in tools (file operations, etc.).
-     * Call this once during AgentEngine initialization.
+     * Register the `run_python` tool.
+     *
+     * Its real implementation is wired in later via [pythonExecutor] (set by the
+     * app module after Hilt DI finishes), so this must run before that — the
+     * executor closure below reads the field lazily on each call, not at
+     * registration time. Note: `read_file`/`write_file`/`search_files`/
+     * `list_directory`/`web_search`/`web_fetch` used to have placeholder
+     * registrations here too, but the app module always re-registers those
+     * under the same names with real implementations right after this call —
+     * `ToolRegistry.register`/`registerAll` overwrite by name, so the
+     * placeholders here were pure dead weight and have been removed.
      */
     suspend fun registerDefaultTools() {
         android.util.Log.e("NuclearBoy", "[ToolReg] registerDefaultTools() entry")
-        registerAll(
-            listOf(
-                // --- File Read ---
-                ToolDefinition(
-                    name = "read_file",
-                    description = "读取指定文件的内容。支持文本文件和代码文件，自动检测编码。",
-                    parameters = listOf(
-                        ToolParameter("filePath", "string", "文件的完整路径", required = true),
-                        ToolParameter("offset", "integer", "从第几行开始读取（0-based）", required = false, default = "0"),
-                        ToolParameter("limit", "integer", "最多读取多少行", required = false, default = "500"),
-                    ),
-                    executor = { params ->
-                        val path = params["filePath"] ?: ""
-                        ToolResult.failure("read_file 需要外部文件系统实现 — 路径: $path")
-                    },
+        register(
+            ToolDefinition(
+                name = "run_python",
+                description = "在 Python 3.11 执行器中直接运行 Python 代码并返回执行结果。你可以用它来运行脚本、测试代码、处理数据、生成文档等。",
+                parameters = listOf(
+                    ToolParameter("path", "string", "要执行的 Python 代码（完整脚本）", required = true),
+                    ToolParameter("workingDir", "string", "工作目录", required = false, default = "."),
+                    ToolParameter("timeout", "integer", "超时秒数（默认 120）", required = false, default = "120"),
                 ),
-
-                // --- File Write ---
-                ToolDefinition(
-                    name = "write_file",
-                    description = "创建或覆盖一个文件。会自动创建父目录。",
-                    parameters = listOf(
-                        ToolParameter("filePath", "string", "文件的完整路径", required = true),
-                        ToolParameter("content", "string", "要写入的内容", required = true),
-                    ),
-                    requiresConfirmation = true,
-                    executor = { params ->
-                        val path = params["filePath"] ?: ""
-                        ToolResult.failure("write_file 需要外部文件系统实现 — 路径: $path")
-                    },
-                ),
-
-                // --- File Search ---
-                ToolDefinition(
-                    name = "search_files",
-                    description = "在项目中搜索文件。支持 glob 模式匹配。",
-                    parameters = listOf(
-                        ToolParameter("pattern", "string", "搜索模式，如 **/*.kt", required = true),
-                        ToolParameter("directory", "string", "搜索的根目录", required = false, default = "."),
-                    ),
-                    executor = { params ->
-                        val pattern = params["pattern"] ?: "*"
-                        ToolResult.success("搜索完成: 模式 \"$pattern\"（需要外部文件系统实现）")
-                    },
-                ),
-
-                // --- List Directory ---
-                ToolDefinition(
-                    name = "list_directory",
-                    description = "列出目录中的文件和子目录。",
-                    parameters = listOf(
-                        ToolParameter("path", "string", "目录路径", required = true),
-                    ),
-                    executor = { params ->
-                        val path = params["path"] ?: "."
-                        ToolResult.success("目录列表: $path（需要外部文件系统实现）")
-                    },
-                ),
-
-                // --- Run Python Script ---
-                ToolDefinition(
-                    name = "run_python",
-                    description = "在 Python 3.11 执行器中直接运行 Python 代码并返回执行结果。你可以用它来运行脚本、测试代码、处理数据、生成文档等。",
-                    parameters = listOf(
-                        ToolParameter("path", "string", "要执行的 Python 代码（完整脚本）", required = true),
-                        ToolParameter("workingDir", "string", "工作目录", required = false, default = "."),
-                        ToolParameter("timeout", "integer", "超时秒数（默认 120）", required = false, default = "120"),
-                    ),
-                    requiresConfirmation = false,
-                    executor = { params ->
-                        // Attempt Python executor if available
-                        pythonExecutor?.let { exec ->
-                            exec("run_python", params)
-                        } ?: ToolResult.failure("Python 运行时未初始化")
-                    },
-                ),
-
-                // --- Web Search ---
-                ToolDefinition(
-                    name = "web_search",
-                    description = "搜索网络获取最新信息。",
-                    parameters = listOf(
-                        ToolParameter("query", "string", "搜索查询", required = true),
-                    ),
-                    executor = { params ->
-                        val query = params["query"] ?: ""
-                        ToolResult.failure("web_search 需要网络搜索实现 — 查询: $query")
-                    },
-                ),
-
-                // --- Web Fetch ---
-                ToolDefinition(
-                    name = "web_fetch",
-                    description = "获取指定 URL 的内容。",
-                    parameters = listOf(
-                        ToolParameter("url", "string", "要获取的 URL", required = true),
-                    ),
-                    executor = { params ->
-                        val url = params["url"] ?: ""
-                        ToolResult.failure("web_fetch 需要网络实现 — URL: $url")
-                    },
-                ),
+                requiresConfirmation = false,
+                executor = { params ->
+                    // Attempt Python executor if available
+                    pythonExecutor?.let { exec ->
+                        exec("run_python", params)
+                    } ?: ToolResult.failure("Python 运行时未初始化")
+                },
             )
         )
-        android.util.Log.e("NuclearBoy", "[ToolReg] registerDefaultTools() registered read_file, write_file, search_files, list_directory, run_python, web_search, web_fetch")
+        android.util.Log.e("NuclearBoy", "[ToolReg] registerDefaultTools() registered run_python")
     }
 
     // ── Private ──────────────────────────────────────────

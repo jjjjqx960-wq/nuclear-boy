@@ -158,7 +158,7 @@ fun SkillManagerPanel(
                             .background(Color(0xFF0A0C10)),
                     ) {
                         LazyColumn(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(skills) { skill ->
+                            items(skills, key = { it.name }) { skill ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()

@@ -52,39 +52,6 @@ class ContextWindowManagerTest {
     }
 
     @Test
-    fun `compress conversation reduces budget`() {
-        manager.updateAllocation(conversationHistory = 250_000)
-        val result = manager.compressConversation(20)
-
-        assertTrue(result.tokensSaved > 0)
-        assertTrue(manager.budget.value.conversationHistory < 250_000)
-        assertTrue(result.message.contains("压缩"))
-    }
-
-    @Test
-    fun `compress does nothing if under threshold`() {
-        manager.updateAllocation(conversationHistory = 30_000) // 低于压缩阈值(50K)
-        val result = manager.compressConversation(10)
-
-        assertEquals(0, result.tokensSaved)
-        assertEquals(30_000, manager.budget.value.conversationHistory)
-    }
-
-    @Test
-    fun `emergency compress aggressively reduces`() {
-        manager.updateAllocation(
-            conversationHistory = 400_000,
-            attachedFiles = 300_000,
-            projectContext = 200_000,
-        )
-        val before = manager.budget.value.totalUsed
-        val result = manager.emergencyCompress()
-
-        assertTrue(result.tokensSaved > 0)
-        assertTrue(manager.budget.value.totalUsed < before)
-    }
-
-    @Test
     fun `estimate tokens is reasonable`() {
         val tokens = manager.estimateTokens("Hello, world!")
         assertTrue(tokens in 1..10)

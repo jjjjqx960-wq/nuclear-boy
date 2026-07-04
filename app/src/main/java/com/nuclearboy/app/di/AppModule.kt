@@ -14,6 +14,7 @@ import com.nuclearboy.app.service.PcTaskNotifier
 import com.nuclearboy.memory.MemoryStore
 import com.nuclearboy.python.PythonExecutor
 import com.nuclearboy.python.PythonSandbox
+import com.nuclearboy.python.SandboxPolicy
 import com.nuclearboy.remotepc.PcBridgeClient
 import com.nuclearboy.remotepc.PcBridgeConfigStore
 import com.nuclearboy.skills.SkillManager
@@ -59,13 +60,6 @@ object AppModule {
     fun provideContextWindowManager(): ContextWindowManager {
         android.util.Log.e("NuclearBoy", "[DI] provideContextWindowManager")
         return ContextWindowManager()
-    }
-
-    @Provides
-    @Singleton
-    fun provideModelRouter(): ModelRouter {
-        android.util.Log.e("NuclearBoy", "[DI] provideModelRouter")
-        return ModelRouter()
     }
 
     @Provides
@@ -224,7 +218,7 @@ object AppModule {
             if (scriptCode == null) ToolResult(false, "", error = "缺少 path 参数。示例：path=\"print('hello')\"")
             else {
                 val wd = params["workingDir"]?.takeIf { it != "." } ?: fileOperations.projectRoot().absolutePath
-                val r = pythonSandbox.execute(scriptCode, wd)
+                val r = pythonSandbox.execute(scriptCode, wd, policy = SandboxPolicy.standard(wd))
                 android.util.Log.e("NuclearBoy", "[DI] pythonExecutor result — exitCode=${r.exitCode}, stdoutLen=${r.stdout.length}, stderrLen=${r.stderr.length}")
                 ToolResult(success = r.exitCode == 0, output = r.stdout, error = r.stderr.ifBlank { null })
             }

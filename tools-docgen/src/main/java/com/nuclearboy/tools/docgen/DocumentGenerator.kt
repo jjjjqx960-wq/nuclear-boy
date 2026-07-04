@@ -5,6 +5,7 @@ import com.nuclearboy.common.AppResult
 import com.nuclearboy.common.FileInfo
 import com.nuclearboy.python.PythonResult
 import com.nuclearboy.python.PythonSandbox
+import com.nuclearboy.python.SandboxPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -46,7 +47,18 @@ class DocumentGenerator(
                 buildWordFromScratchScript(outputPath, title, content)
             }
 
-            val result = pythonSandbox.execute(pythonScript, "")
+            val readDirs = listOfNotNull(
+                outputFile.parentFile?.absolutePath,
+                template?.let { File(it).parentFile?.absolutePath },
+            )
+            val policy = SandboxPolicy(
+                allowedReadPaths = readDirs,
+                allowedWritePaths = listOfNotNull(outputFile.parentFile?.absolutePath),
+                networkAllowed = false,
+                allowedPackages = listOf("python-docx", "docx", "Pillow", "PIL", "json", "csv", "re", "os", "sys", "io", "math", "collections", "pathlib"),
+                shellAllowed = false,
+            )
+            val result = pythonSandbox.execute(pythonScript, "", policy = policy)
 
             if (result.exitCode != 0) {
                 return@withContext AppResult.failure(
@@ -92,7 +104,11 @@ class DocumentGenerator(
 
             val pythonScript = buildExcelScript(outputPath, sheets)
 
-            val result = pythonSandbox.execute(pythonScript, "")
+            val result = pythonSandbox.execute(
+                pythonScript,
+                "",
+                policy = SandboxPolicy.documentGeneration(outputFile.parentFile?.absolutePath ?: outputPath),
+            )
 
             if (result.exitCode != 0) {
                 return@withContext AppResult.failure(
@@ -142,7 +158,11 @@ class DocumentGenerator(
                     )
                 }
 
-                val result = pythonSandbox.execute(pythonScript, "")
+                val result = pythonSandbox.execute(
+                    pythonScript,
+                    "",
+                    policy = SandboxPolicy.documentGeneration(file.parentFile?.absolutePath ?: filePath),
+                )
 
                 if (result.exitCode != 0) {
                     return@withContext AppResult.failure(

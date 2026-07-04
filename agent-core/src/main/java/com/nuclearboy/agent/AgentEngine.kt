@@ -60,6 +60,13 @@ sealed class AgentEvent {
 
     /** The agent is retrying after an error. */
     data class Retrying(val attempt: Int, val reason: String) : AgentEvent()
+
+    /**
+     * The current response is being re-streamed from scratch after a mid-stream
+     * failure. UI layers must discard any partial content/reasoning shown for the
+     * in-progress assistant message before more [StreamContent]/[Thinking] arrive.
+     */
+    data object ContentReset : AgentEvent()
 }
 
 // ── Project Context ─────────────────────────────────────
@@ -75,6 +82,13 @@ data class ProjectContext(
     val memoryContext: String = "",
     /** 用户在设置里自定义的附加指令（自定义人设/规则），追加进系统提示 */
     val customInstructions: String = "",
+)
+
+/** The model tier + thinking mode selected for a run, and why. */
+data class RouteDecision(
+    val modelTier: ModelTier,
+    val thinkingMode: ThinkingMode,
+    val reason: String,
 )
 
 // ── Tool Call Accumulator ───────────────────────────────
@@ -161,12 +175,6 @@ class AgentEngine(
         isLenient = true
         encodeDefaults = false
     }
-
-    @Volatile private var scopeJob = SupervisorJob()
-    // scopeJob 的替换必须在 synchronized 块里执行：cancel() + SupervisorJob() 两步不是原子的，
-    // 并发调用会导致新建的 job 被另一次 cancel 取消，后续 processMessage 的 flow 立即结束。
-    private val scopeLock = Any()
-    private val scope get() = CoroutineScope(scopeJob + Dispatchers.IO)
 
     /** 单个工具结果注入对话的最大字符数；超出截断（读大文件/长目录列表的主要膨胀源）。 */
     private val maxToolOutputChars get() = MAX_TOOL_OUTPUT_CHARS
@@ -365,6 +373,10 @@ class AgentEngine(
                         is StreamEvent.Error -> {
                             android.util.Log.e("NuclearBoy", "[AgentEngine] run() Stream Error appError=${streamEvent.appError} detailLen=${streamEvent.technicalDetail?.length ?: 0}")
                             emit(AgentEvent.Error(streamEvent.appError, streamEvent.technicalDetail))
+                        }
+                        is StreamEvent.ContentReset -> {
+                            android.util.Log.e("NuclearBoy", "[AgentEngine] run() ContentReset — mid-stream retry, discarding partial content")
+                            emit(AgentEvent.ContentReset)
                         }
                     }
                 }
@@ -883,9 +895,23 @@ class AgentEngine(
                         android.util.Log.e("NuclearBoy", "[AgentEngine] callApiStreaming() Error appError=${event.appError} detailLen=${event.technicalDetail?.length ?: 0}")
                         emit(event)
                     }
+                    is StreamEvent.ContentReset -> {
+                        // The underlying HTTP request is being retried from scratch —
+                        // wipe everything accumulated for this (failed) attempt so the
+                        // retried stream doesn't get appended after duplicate content.
+                        responseContent.setLength(0)
+                        reasoningContent.setLength(0)
+                        accumulator.clear()
+                        emit(event)
+                    }
                 }
             }
             android.util.Log.e("NuclearBoy", "[AgentEngine] callApiStreaming() EXIT events=$eventCount content=$contentCount thinking=$thinkingCount")
+        } catch (e: CancellationException) {
+            // 取消必须向上传播（绝不吞）：与 run() 的取消处理保持一致，否则用户"停止"后
+            // 这层收集逻辑会把取消误判成普通错误，流不会被真正中断。
+            android.util.Log.e("NuclearBoy", "[AgentEngine] callApiStreaming() CancellationException — propagating, eventsSoFar=$eventCount")
+            throw e
         } catch (e: Exception) {
             android.util.Log.e("NuclearBoy", "[AgentEngine] callApiStreaming() EXCEPTION type=${e.javaClass.simpleName} message=${e.message} eventsSoFar=$eventCount")
             emit(StreamEvent.Error(classifyException(e), e.message))
@@ -968,14 +994,13 @@ class AgentEngine(
     }
 
     /**
-     * Cancel any in-progress agent run.
-     * Triggers onCancel callback to interrupt running operations (e.g. Python).
+     * Notify the engine that the in-progress agent run's collecting coroutine has
+     * been cancelled by the caller (e.g. ChatViewModel cancels its own Job). This
+     * doesn't cancel anything itself — it just triggers [onCancel] to interrupt
+     * running side-effects (e.g. Python execution, remote PC tasks) that would
+     * otherwise keep running to completion after the flow collection stops.
      */
     fun cancel() {
-        synchronized(scopeLock) {
-            scopeJob.cancel()
-            scopeJob = SupervisorJob()
-        }
         onCancel?.invoke()
     }
 

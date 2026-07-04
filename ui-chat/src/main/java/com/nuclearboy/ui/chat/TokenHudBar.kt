@@ -17,8 +17,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nuclearboy.api.deepseek.ContextBudget
-import com.nuclearboy.api.deepseek.ContextWarningLevel
 
 @Composable
 fun TokenHudBar(

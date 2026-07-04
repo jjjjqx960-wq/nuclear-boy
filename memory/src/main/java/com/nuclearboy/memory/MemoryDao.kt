@@ -148,27 +148,6 @@ interface MemoryDao {
     suspend fun searchSemanticMemories(query: String, limit: Int = 20): List<SemanticMemoryEntity>
 
     /**
-     * Multi-term search: find memories that match any of the given terms.
-     * Each term is OR'd together, with more specific matches ranked higher.
-     */
-    @Query(
-        """
-        SELECT * FROM semantic_memories
-        WHERE (content LIKE '%' || :term0 || '%' OR summary LIKE '%' || :term0 || '%' OR category LIKE '%' || :term0 || '%')
-           OR (content LIKE '%' || :term1 || '%' OR summary LIKE '%' || :term1 || '%' OR category LIKE '%' || :term1 || '%')
-           OR (content LIKE '%' || :term2 || '%' OR summary LIKE '%' || :term2 || '%' OR category LIKE '%' || :term2 || '%')
-           OR (content LIKE '%' || :term3 || '%' OR summary LIKE '%' || :term3 || '%' OR category LIKE '%' || :term3 || '%')
-           OR (content LIKE '%' || :term4 || '%' OR summary LIKE '%' || :term4 || '%' OR category LIKE '%' || :term4 || '%')
-        ORDER BY recallCount DESC, lastRecalledAt DESC
-        LIMIT :limit
-        """
-    )
-    suspend fun searchSemanticMemoriesMultiTerm(
-        term0: String, term1: String, term2: String,
-        term3: String, term4: String, limit: Int = 20,
-    ): List<SemanticMemoryEntity>
-
-    /**
      * 动态多词 OR-LIKE 语义搜索：词条数量不定（中文 bigram 扩展会产生多词），
      * 由 [MemoryStore] 构建参数化 SQL（SimpleSQLiteQuery）。无 schema 改动、全 API 通用。
      */
@@ -208,16 +187,4 @@ interface MemoryDao {
         pruneStaleMemories()
     }
 
-    companion object {
-        /**
-         * Build a multi-term WHERE clause for semantic memory search.
-         * Generates: content LIKE '%' || :term0 || '%' OR summary LIKE '%' || :term0 || '%' ...
-         */
-        private fun buildMultiTermWhere(termCount: Int): String {
-            val terms = (0 until termCount).joinToString(" OR ") { i ->
-                "(content LIKE '%' || :term$i || '%' OR summary LIKE '%' || :term$i || '%' OR category LIKE '%' || :term$i || '%')"
-            }
-            return terms
-        }
-    }
 }

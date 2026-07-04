@@ -292,15 +292,6 @@ class ApiKeyManager(context: Context) {
         return getActiveCustomModel()?.modelName?.let(::sanitizeProviderModelName)?.takeIf { it.isNotBlank() }
     }
 
-    // ── Legacy Python isolation toggle ─────────────────
-
-    fun isSandboxEnabled(): Boolean = false
-
-    fun setSandboxEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_SANDBOX_ENABLED, false).apply()
-        refreshState()
-    }
-
     /**
      * Store and validate the primary API key.
      */
@@ -526,7 +517,6 @@ class ApiKeyManager(context: Context) {
         private const val KEY_BACKUP = "api_key_backup"
         private const val KEY_AUTO_SWITCH = "auto_switch_enabled"
         private const val KEY_SIMPLE_FLASH = "simple_tasks_use_flash"
-        private const val KEY_SANDBOX_ENABLED = "sandbox_enabled"
         const val OFFICIAL_MODEL_ID = "deepseek_official"
         private const val LEGACY_CUSTOM_MODEL_ID = "custom_legacy"
         private const val KEY_ACTIVE_MODEL_ID = "active_model_id"

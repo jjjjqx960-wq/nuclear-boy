@@ -291,8 +291,13 @@ def __sandbox_check_path(path, allowed_list, operation):
             return True
     raise PermissionError("沙箱" + operation + ": " + str(path))
 
-# Wrap builtins.open
-__original_open = __sb_builtins.open
+# Wrap builtins.open — always rewrap from the pristine original, never from a
+# previously-installed sandbox wrapper, so repeated executions in this shared
+# interpreter don't nest wrappers indefinitely. ChaquopyPythonExecutor restores
+# the pristine open after every run, so this is mainly a defense-in-depth guard.
+if not hasattr(__sb_builtins, '_nb_pristine_open'):
+    __sb_builtins._nb_pristine_open = __sb_builtins.open
+__original_open = __sb_builtins._nb_pristine_open
 def __sandbox_open(file, mode='r', *args, **kwargs):
     if isinstance(file, int):
         return __original_open(file, mode, *args, **kwargs)
@@ -310,9 +315,16 @@ if not __SANDBOX_SHELL_ALLOWED:
     def __sb_no_shell(*a, **kw):
         raise PermissionError("Shell 访问被沙箱禁止")
     import subprocess as __sp
+    if not hasattr(__sp, '_nb_pristine_call'):
+        __sp._nb_pristine_call = __sp.call
+        __sp._nb_pristine_run = __sp.run
+        __sp._nb_pristine_popen = __sp.Popen
     __sp.call = __sb_no_shell
     __sp.run = __sb_no_shell
     __sp.Popen = __sb_no_shell
+    if not hasattr(__sb_os, '_nb_pristine_system'):
+        __sb_os._nb_pristine_system = __sb_os.system
+        __sb_os._nb_pristine_popen = __sb_os.popen
     __sb_os.system = __sb_no_shell
     __sb_os.popen = __sb_no_shell
 
@@ -322,16 +334,69 @@ if not __SANDBOX_NETWORK_ALLOWED:
         raise PermissionError("网络访问被沙箱禁止")
     try:
         import socket as __socket
+        if not hasattr(__socket, '_nb_pristine_socket'):
+            __socket._nb_pristine_socket = __socket.socket
         __socket.socket = __sb_no_net
     except Exception:
         pass
     try:
         import requests as __requests
+        if not hasattr(__requests, '_nb_pristine_get'):
+            __requests._nb_pristine_get = __requests.get
+            __requests._nb_pristine_post = __requests.post
+            __requests._nb_pristine_request = __requests.request
         __requests.get = __sb_no_net
         __requests.post = __sb_no_net
         __requests.request = __sb_no_net
     except Exception:
         pass
+        """.trimIndent()
+    }
+
+    companion object {
+        /**
+         * Python snippet that undoes every monkey-patch [buildPolicyPreamble] may have
+         * installed (open/subprocess/os.system/socket/requests), restoring pristine
+         * originals if present. Must run unconditionally after EVERY script execution
+         * (sandboxed or not) so restrictions from one run never leak into the next in
+         * this shared, long-lived Chaquopy interpreter.
+         */
+        val RESTORE_SNIPPET: String = """
+try:
+    import builtins as __nb_restore_builtins
+    if hasattr(__nb_restore_builtins, '_nb_pristine_open'):
+        __nb_restore_builtins.open = __nb_restore_builtins._nb_pristine_open
+except Exception:
+    pass
+try:
+    import subprocess as __nb_restore_sp
+    if hasattr(__nb_restore_sp, '_nb_pristine_call'):
+        __nb_restore_sp.call = __nb_restore_sp._nb_pristine_call
+        __nb_restore_sp.run = __nb_restore_sp._nb_pristine_run
+        __nb_restore_sp.Popen = __nb_restore_sp._nb_pristine_popen
+except Exception:
+    pass
+try:
+    import os as __nb_restore_os
+    if hasattr(__nb_restore_os, '_nb_pristine_system'):
+        __nb_restore_os.system = __nb_restore_os._nb_pristine_system
+        __nb_restore_os.popen = __nb_restore_os._nb_pristine_popen
+except Exception:
+    pass
+try:
+    import socket as __nb_restore_socket
+    if hasattr(__nb_restore_socket, '_nb_pristine_socket'):
+        __nb_restore_socket.socket = __nb_restore_socket._nb_pristine_socket
+except Exception:
+    pass
+try:
+    import requests as __nb_restore_requests
+    if hasattr(__nb_restore_requests, '_nb_pristine_get'):
+        __nb_restore_requests.get = __nb_restore_requests._nb_pristine_get
+        __nb_restore_requests.post = __nb_restore_requests._nb_pristine_post
+        __nb_restore_requests.request = __nb_restore_requests._nb_pristine_request
+except Exception:
+    pass
         """.trimIndent()
     }
 
@@ -499,12 +564,6 @@ if not __SANDBOX_NETWORK_ALLOWED:
      * Uses canonical path resolution to prevent path traversal attacks.
      */
     private fun isPathWithinAllowed(path: String, allowedPaths: List<String>): Boolean {
-        // Special case: empty allowed list means path checking is disabled
-        if (allowedPaths.isEmpty() && allowedPaths is List<*>) {
-            // For read: we want to be strict. For write in relaxed mode: all allowed.
-            // We check this at the caller level.
-        }
-
         val resolved: String = try {
             File(path).canonicalPath
         } catch (e: Exception) {

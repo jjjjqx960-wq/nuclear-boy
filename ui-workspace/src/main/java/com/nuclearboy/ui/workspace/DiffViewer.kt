@@ -375,6 +375,11 @@ private fun SideBySideDiffView(
     lineNumberColor: Color,
 ) {
     val scrollState = rememberLazyListState()
+    // Precomputed once per `hunks` reference — without this, pairLines() re-ran for
+    // every hunk on every recomposition of this composable (e.g. a theme/color change),
+    // not just when the diff content itself changed, since it lived directly inside
+    // LazyColumn's non-composable content lambda instead of a remembered scope.
+    val pairedByHunk = remember(hunks) { hunks.associateWith { pairLines(it.lines) } }
 
     LazyColumn(
         state = scrollState,
@@ -406,7 +411,7 @@ private fun SideBySideDiffView(
             }
 
             // Side-by-side pairs: group additions next to deletions
-            val paired = pairLines(hunk.lines)
+            val paired = pairedByHunk[hunk] ?: emptyList()
 
             items(
                 items = paired,

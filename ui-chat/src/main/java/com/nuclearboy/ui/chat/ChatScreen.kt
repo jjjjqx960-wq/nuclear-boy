@@ -3,7 +3,6 @@ package com.nuclearboy.ui.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
@@ -97,7 +96,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import java.io.File
 import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -118,7 +116,13 @@ fun ChatScreen(
         }
     }
 
-    val uiState by viewModel.uiState.collectAsState()
+    // 分开订阅而不是合并成一个 uiState：这几个字段的更新频率差很多
+    // （streamingState 每个流式 chunk 都变，isProcessing/scrollToBottom 一轮才变一次），
+    // 合并成一个对象会让任意一个字段变化都触发整个 ChatScreen 里所有读到该字段的地方重组。
+    val messages by viewModel.messages.collectAsState()
+    val isProcessing by viewModel.isProcessing.collectAsState()
+    val streamingState by viewModel.streamingState.collectAsState()
+    val scrollToBottom by viewModel.scrollToBottom.collectAsState()
     val apiKeyState by viewModel.apiKeyState.collectAsState()
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -139,11 +143,11 @@ fun ChatScreen(
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var matchPointer by remember { mutableIntStateOf(0) }
-    val searchMatches = remember(searchQuery, uiState.messages) {
-        MessageSearch.find(uiState.messages, searchQuery)
+    val searchMatches = remember(searchQuery, messages) {
+        MessageSearch.find(messages, searchQuery)
     }
     val currentMatchId = searchMatches.getOrNull(matchPointer)
-        ?.let { uiState.messages.getOrNull(it)?.id }
+        ?.let { messages.getOrNull(it)?.id }
     LaunchedEffect(matchPointer, searchMatches) {
         searchMatches.getOrNull(matchPointer)?.let { listState.animateScrollToItem(it) }
     }
@@ -176,7 +180,7 @@ fun ChatScreen(
             )
         }
     }
-    val lastMessageContentLength = uiState.messages.lastOrNull()?.content?.length ?: 0
+    val lastMessageContentLength = messages.lastOrNull()?.content?.length ?: 0
     LaunchedEffect(projectId) {
         forceNextScrollToBottom = true
     }
@@ -193,9 +197,9 @@ fun ChatScreen(
     }
 
     // Instant scroll to bottom on project switch (first load)
-    LaunchedEffect(uiState.scrollToBottom) {
-        if (uiState.messages.isNotEmpty() && (forceNextScrollToBottom || followChatScroll)) {
-            listState.requestScrollToItem(uiState.messages.lastIndex)
+    LaunchedEffect(scrollToBottom) {
+        if (messages.isNotEmpty() && (forceNextScrollToBottom || followChatScroll)) {
+            listState.requestScrollToItem(messages.lastIndex)
         }
         // Reset unconditionally so clearing the conversation while scrollToBottom fires
         // does not leak `true` into the next conversation (finding 11).
@@ -205,15 +209,15 @@ fun ChatScreen(
     // when only content length changed (streaming chunks).  Having two separate
     // LaunchedEffects with different scroll calls caused the instant snap to cancel the
     // in-flight animation every time streaming started, producing a jarring jump (finding 10).
-    val prevMessageCount = remember { mutableIntStateOf(uiState.messages.size) }
-    LaunchedEffect(uiState.messages.size, lastMessageContentLength) {
-        if (uiState.messages.isNotEmpty() && followChatScroll) {
-            val countChanged = uiState.messages.size != prevMessageCount.intValue
-            prevMessageCount.intValue = uiState.messages.size
+    val prevMessageCount = remember { mutableIntStateOf(messages.size) }
+    LaunchedEffect(messages.size, lastMessageContentLength) {
+        if (messages.isNotEmpty() && followChatScroll) {
+            val countChanged = messages.size != prevMessageCount.intValue
+            prevMessageCount.intValue = messages.size
             if (countChanged) {
-                listState.animateScrollToItem(uiState.messages.lastIndex)
+                listState.animateScrollToItem(messages.lastIndex)
             } else {
-                listState.requestScrollToItem(uiState.messages.lastIndex)
+                listState.requestScrollToItem(messages.lastIndex)
             }
         }
     }
@@ -277,7 +281,7 @@ fun ChatScreen(
                     Spacer(Modifier.weight(1f))
                     // 新对话（清空当前对话，带确认）
                     IconButton(
-                        onClick = { if (uiState.messages.isNotEmpty()) showClearConfirm = true },
+                        onClick = { if (messages.isNotEmpty()) showClearConfirm = true },
                         modifier = Modifier.size(44.dp),
                     ) {
                         Icon(
@@ -391,11 +395,11 @@ fun ChatScreen(
             ChatInputBar(
                 text = inputDraft,
                 onTextChange = { inputDraft = it },
-                isProcessing = uiState.isProcessing,
+                isProcessing = isProcessing,
                 onSend = { text -> viewModel.sendMessage(text) },
                 onCancel = { viewModel.cancelCurrentOperation() },
                 fileCount = viewModel.projectFiles.collectAsState().value.size,
-                hasMessages = uiState.messages.any { it.role != MessageRole.SYSTEM },
+                hasMessages = messages.any { it.role != MessageRole.SYSTEM },
                 focusRequest = inputFocusRequest,
                 placeholder = if (projectId == "__general__") "和核弹男孩对话…" else "输入指令…",
                 showToolActionDraftHint = true,
@@ -406,7 +410,7 @@ fun ChatScreen(
             )
         },
     ) { paddingValues ->
-        if (uiState.messages.isEmpty()) {
+        if (messages.isEmpty()) {
             EmptyChatView(
                 modifier = Modifier.fillMaxSize().padding(paddingValues),
                 onSuggestionClick = { text -> viewModel.sendMessage(text) },
@@ -420,7 +424,7 @@ fun ChatScreen(
                     verticalArrangement = Arrangement.spacedBy(1.dp),
                 ) {
                     // General Agent 欢迎卡片
-                    if (projectId == "__general__" && uiState.messages.isEmpty()) {
+                    if (projectId == "__general__" && messages.isEmpty()) {
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -444,10 +448,10 @@ fun ChatScreen(
                             }
                         }
                     }
-                    val lastMessageId = uiState.messages.lastOrNull()?.id
-                    items(items = uiState.messages, key = { it.id }) { message ->
+                    val lastMessageId = messages.lastOrNull()?.id
+                    items(items = messages, key = { it.id }) { message ->
                         val isLast = message.id == lastMessageId
-                        val isStreaming = isLast && uiState.streamingState?.isStreaming == true
+                        val isStreaming = isLast && streamingState?.isStreaming == true
 
                         MessageBubble(
                             message = message,
@@ -475,8 +479,8 @@ fun ChatScreen(
                     visible = showJumpToBottom,
                     onClick = {
                         scope.launch {
-                            if (uiState.messages.isNotEmpty()) {
-                                listState.animateScrollToItem(uiState.messages.lastIndex)
+                            if (messages.isNotEmpty()) {
+                                listState.animateScrollToItem(messages.lastIndex)
                             }
                         }
                     },
@@ -1102,42 +1106,6 @@ private fun extIcon(ext: String): String = when (ext.lowercase()) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  File access — share path or open via FileProvider
-// ═══════════════════════════════════════════════════════════════════════
-
-private fun openSystemFileManager(context: Context, path: String) {
-    try {
-        val dir = File(path)
-        val targetDir = if (dir.isDirectory) dir else dir.parentFile ?: return
-
-        // Use our own FileProvider — works because files are in our app directory
-        try {
-            val authority = "${context.packageName}.fileprovider"
-            val uri = androidx.core.content.FileProvider.getUriForFile(context, authority, targetDir)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "resource/folder")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            val resolved = intent.resolveActivity(context.packageManager)
-            if (resolved != null) {
-                context.startActivity(intent)
-                return
-            }
-        } catch (_: Exception) {}
-
-        // Fallback: share the path as text so user can paste into file manager
-        val share = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "项目目录")
-            putExtra(Intent.EXTRA_TEXT, targetDir.absolutePath)
-        }
-        context.startActivity(Intent.createChooser(share, "复制路径后粘贴到文件管理器"))
-    } catch (e: Exception) {
-        Toast.makeText(context, "无法访问: ${e.message}", Toast.LENGTH_SHORT).show()
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
 //  Empty State — Terminal/Hacker aesthetic
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -1526,34 +1494,6 @@ private fun ChatInputBar(
 private fun copyToClipboard(context: Context, text: String) {
     (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
         .setPrimaryClip(ClipData.newPlainText("NUCLEAR BOY", text))
-}
-
-private fun showNotification(context: Context, msg: String, project: String?) {
-    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-        val ch = android.app.NotificationChannel("nb_agent", "AI状态", android.app.NotificationManager.IMPORTANCE_LOW)
-        nm.createNotificationChannel(ch)
-    }
-    val intent = Intent(context, context.javaClass).apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-    }
-    val pending = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-    val isThinking = msg == "thinking"
-    val title = if (project != null) "核弹男孩 · $project" else "核弹男孩"
-    val notification = if (isThinking) {
-        androidx.core.app.NotificationCompat.Builder(context, "nb_agent")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(title).setContentText("正在思考…")
-            .setOngoing(true).setPriority(androidx.core.app.NotificationCompat.PRIORITY_LOW).build()
-    } else {
-        androidx.core.app.NotificationCompat.Builder(context, "nb_agent")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("$title — 回复已就绪").setContentText(msg.take(120))
-            .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(msg.take(500)))
-            .setContentIntent(pending).setAutoCancel(true)
-            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT).build()
-    }
-    nm.notify(4201, notification)
 }
 
 private fun shareFile(context: Context, path: String) {

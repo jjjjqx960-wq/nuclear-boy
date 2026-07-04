@@ -243,6 +243,7 @@ class DeepSeekApiClient(
                 )) {
                     providerCompatibilityMode = true
                     android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() custom provider tool request failed; retrying without tool protocol")
+                    emit(StreamEvent.ContentReset)
                     emit(StreamEvent.Thinking("当前网关在工具调用下持续失败，已切换兼容聊天模式重试…"))
                     continue
                 }
@@ -254,6 +255,10 @@ class DeepSeekApiClient(
                 retryCount++
                 val delayMs = retryDelayMillis(retryCount, e)
                 android.util.Log.e("NuclearBoy", "[ApiClient] streamChat() retrying attempt=$retryCount delayMs=$delayMs")
+                // The next attempt re-issues the whole request and re-streams from byte
+                // zero — any content/reasoning/tool-call fragments already emitted for
+                // this (failed) attempt must be discarded by collectors before we continue.
+                emit(StreamEvent.ContentReset)
                 emit(StreamEvent.Thinking("重试第 ${retryCount} 次，约 ${(delayMs + 999) / 1000} 秒…"))
                 delay(delayMs)
             }
@@ -1814,6 +1819,15 @@ sealed class StreamEvent {
     data class ToolCallDelta(val deltas: List<ToolCallDeltaDto>) : StreamEvent()
     data class Complete(val usage: UsageDto) : StreamEvent()
     data class Error(val appError: AppError, val technicalDetail: String?) : StreamEvent()
+
+    /**
+     * The in-flight HTTP request failed mid-stream and is being retried from
+     * scratch (new request, new SSE stream). Collectors must discard any
+     * content/reasoning/tool-call state accumulated so far for this response —
+     * otherwise the retried stream's re-emitted events get appended after the
+     * partial content from the failed attempt, duplicating the reply.
+     */
+    data object ContentReset : StreamEvent()
 }
 
 class DeepSeekHttpException(

@@ -506,23 +506,36 @@ private fun RichContentText(content: String, defaultColor: Color) {
     }
 }
 
+// Markwon holds no per-message state — it's a stateless configured renderer — so a
+// single shared instance (built once, from the application context) is reused across
+// every message/segment instead of each MarkdownText() call site rebuilding its own
+// (including plugin init) whenever a LazyColumn item is recomposed from scratch.
+private object SharedMarkwon {
+    @Volatile private var instance: io.noties.markwon.Markwon? = null
+
+    fun get(context: android.content.Context): io.noties.markwon.Markwon =
+        instance ?: synchronized(this) {
+            instance ?: io.noties.markwon.Markwon.builder(context.applicationContext)
+                .usePlugin(io.noties.markwon.ext.tables.TablePlugin.create(context.applicationContext))
+                .usePlugin(io.noties.markwon.ext.tasklist.TaskListPlugin.create(context.applicationContext))
+                .usePlugin(io.noties.markwon.ext.strikethrough.StrikethroughPlugin.create())
+                .build()
+                .also { instance = it }
+        }
+}
+
+private val MATH_BLOCK_REGEX = Regex("\\$\\$([\\s\\S]*?)\\$\\$")
+
 /** Renders markdown text using Markwon with table/strikethrough/tasklist support */
 @Composable
 private fun MarkdownText(text: String, defaultColor: Color) {
     val context = LocalContext.current
     val nc = NuclearBoyTheme.colorScheme
 
-    val markwon = remember {
-        io.noties.markwon.Markwon.builder(context)
-            .usePlugin(io.noties.markwon.ext.tables.TablePlugin.create(context))
-            .usePlugin(io.noties.markwon.ext.tasklist.TaskListPlugin.create(context))
-            .usePlugin(io.noties.markwon.ext.strikethrough.StrikethroughPlugin.create())
-            .build()
-    }
+    val markwon = remember(context) { SharedMarkwon.get(context) }
 
     // Split text by $$...$$ math blocks
-    val mathRegex = remember { Regex("\\$\\$([\\s\\S]*?)\\$\\$") }
-    val parts = mathRegex.findAll(text).toList()
+    val parts = remember(text) { MATH_BLOCK_REGEX.findAll(text).toList() }
 
     if (parts.isEmpty()) {
         // No math — just Markwon
@@ -586,68 +599,6 @@ private fun createMarkwonTextView(ctx: android.content.Context, nc: NuclearColor
         setPadding(0, 4, 0, 4)
         setTextIsSelectable(true)
     }
-}
-
-/** Legacy manual parser — kept for streaming/compat. Not used for final rendering. */
-@Composable
-private fun LegacyMarkdownText(text: String, defaultColor: Color) {
-    val nc = NuclearBoyTheme.colorScheme
-    val annotated = buildAnnotatedString {
-        var i = 0
-        while (i < text.length) {
-            when {
-                text.startsWith("**", i) -> {
-                    val end = text.indexOf("**", i + 2)
-                    if (end > i) {
-                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = nc.material.primary)) {
-                            append(text.substring(i + 2, end))
-                        }
-                        i = end + 2
-                    } else { append(text[i]); i++ }
-                }
-                text.startsWith("*", i) && i + 1 < text.length && text[i + 1] != ' ' -> {
-                    val end = text.indexOf("*", i + 1)
-                    if (end > i) {
-                        withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-                            append(text.substring(i + 1, end))
-                        }
-                        i = end + 1
-                    } else { append(text[i]); i++ }
-                }
-                // Inline code: `code`
-                text.startsWith("`", i) -> {
-                    val end = text.indexOf("`", i + 1)
-                    if (end > i) {
-                        withStyle(SpanStyle(
-                            fontFamily = FontFamily.Monospace, fontSize = 13.sp,
-                            color = nc.material.primary,
-                            background = nc.codeBlockBackground,
-                        )) { append(text.substring(i + 1, end)) }
-                        i = end + 1
-                    } else { append(text[i]); i++ }
-                }
-                // Heading: ### text
-                (text.startsWith("### ", i) || text.startsWith("## ", i) || text.startsWith("# ", i)) && (i == 0 || text[i - 1] == '\n') -> {
-                    val level = if (text.startsWith("### ", i)) 3 else if (text.startsWith("## ", i)) 2 else 1
-                    val start = i + level + 1
-                    val end = text.indexOf('\n', start).let { if (it < 0) text.length else it }
-                    appendLine()
-                    withStyle(SpanStyle(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = (18 - level * 2).sp,
-                        color = nc.material.primary,
-                    )) { append(text.substring(start, end)) }
-                    appendLine()
-                    i = end
-                }
-                else -> {
-                    withStyle(SpanStyle(color = defaultColor)) { append(text[i]) }
-                    i++
-                }
-            }
-        }
-    }
-    Text(text = annotated, style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp))
 }
 
 @Composable
@@ -868,11 +819,6 @@ private data class BubbleAppearance(
     val alignment: Arrangement.Horizontal, val bubbleColor: Color,
     val textColor: Color, val cornerShape: RoundedCornerShape,
 )
-
-private fun formatTokenCount(count: Int): String = when {
-    count >= 1000 -> "${"%.1f".format(count / 1000.0)}k"
-    else -> count.toString()
-}
 
 private val MessageRole.label: String
     get() = when (this) {

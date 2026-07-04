@@ -5,10 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.nuclearboy.agent.AgentEngine
 import com.nuclearboy.agent.AgentEvent
 import com.nuclearboy.agent.ProjectContext
-import com.nuclearboy.api.deepseek.ContextBudget
 import com.nuclearboy.api.deepseek.ContextWindowManager
-import com.nuclearboy.api.deepseek.TokenSnapshot
-import com.nuclearboy.api.deepseek.TokenTracker
 import com.nuclearboy.common.*
 import com.nuclearboy.common.AppConstants
 import com.nuclearboy.common.AppResult
@@ -20,11 +17,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
@@ -42,19 +41,9 @@ data class StreamingState(
     val isStreaming: Boolean = false,
 )
 
-data class ChatUiState(
-    val messages: List<ChatMessage> = emptyList(),
-    val isProcessing: Boolean = false,
-    val tokenSnapshot: TokenSnapshot = TokenSnapshot(),
-    val contextBudget: ContextBudget = ContextBudget(),
-    val streamingState: StreamingState? = null,
-    val scrollToBottom: Long = 0L, // Incremented to trigger scroll
-)
-
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val agentEngine: AgentEngine,
-    private val tokenTracker: TokenTracker,
     private val contextManager: ContextWindowManager,
     private val apiKeyManager: com.nuclearboy.api.deepseek.ApiKeyManager,
     private val apiClient: com.nuclearboy.api.deepseek.DeepSeekApiClient,
@@ -272,24 +261,6 @@ class ChatViewModel @Inject constructor(
     fun getProjectRoot(): String = fileOperations.projectRoot().absolutePath
 
     fun getActiveSkillCount(): Int = skillManager.activeSkills.value.size
-
-    val uiState: StateFlow<ChatUiState> = combine(
-        combine(_messages, _isProcessing, tokenTracker.snapshot) { msgs, processing, tokens ->
-            Triple(msgs, processing, tokens)
-        },
-        combine(contextManager.budget, _streamingState, _scrollToBottom) { budget, streaming, scroll ->
-            Triple(budget, streaming, scroll)
-        },
-    ) { (msgs, processing, tokens), (budget, streaming, scroll) ->
-        ChatUiState(
-            messages = msgs,
-            isProcessing = processing,
-            tokenSnapshot = tokens,
-            contextBudget = budget,
-            streamingState = streaming,
-            scrollToBottom = scroll,
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
     // ── Public actions ──────────────────────────────────────────────────
 
@@ -742,6 +713,9 @@ class ChatViewModel @Inject constructor(
                             if (!event.isReasoning) summary.append(event.text)
                         is com.nuclearboy.api.deepseek.StreamEvent.Error ->
                             throw RuntimeException(event.appError.humanMessage)
+                        // Mid-stream retry restarts the request from scratch — discard
+                        // whatever partial summary text the failed attempt already streamed.
+                        is com.nuclearboy.api.deepseek.StreamEvent.ContentReset -> summary.setLength(0)
                         else -> {}
                     }
                 }
@@ -1035,6 +1009,19 @@ class ChatViewModel @Inject constructor(
                     msg.copy(status = MessageStatus.THINKING)
                 }
             }
+
+            is AgentEvent.ContentReset -> {
+                // Mid-stream retry: the request is being re-sent from scratch, so any
+                // content/reasoning streamed for the failed attempt must be wiped —
+                // otherwise the retried stream's text gets appended after the duplicate.
+                android.util.Log.e("NuclearBoy", "[ChatVM] handleAgentEvent() ContentReset")
+                _streamingState.update { current ->
+                    current?.copy(responseText = "", thinkingText = "")
+                }
+                updateAssistantMessage(thinkingId) { msg ->
+                    msg.copy(content = "", reasoningContent = null, status = MessageStatus.THINKING)
+                }
+            }
         }
     }
 
@@ -1061,7 +1048,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun finalizeProcessing(thinkingId: String, clearAgentJob: Boolean = true) {
+    private suspend fun finalizeProcessing(thinkingId: String, clearAgentJob: Boolean = true) {
         // /loop 模式下 clearAgentJob=false：轮间不重置 _isProcessing，防止用户消息插入循环间隙
         if (clearAgentJob) _isProcessing.value = false
         if (clearAgentJob) agentJob = null
@@ -1105,7 +1092,14 @@ class ChatViewModel @Inject constructor(
         val lastUser = lastUserMessage?.content ?: ""
         val lastAi = lastAssistant?.content ?: ""
         if (lastAi.isNotBlank()) {
-            viewModelScope.launch(Dispatchers.IO) {
+            // 用 NonCancellable 直接 await（不再 fire-and-forget launch）：
+            // 1) /loop 模式下 startLoop 逐轮顺序调用 executeTurn，若这里用一个不等待的
+            //    后台协程做缓存失效，下一轮可能在失效完成前就读了 cachedUserProfile/
+            //    cachedMemoryCtx，读到本轮写入前的旧数据。
+            // 2) NonCancellable 保留了原本 viewModelScope.launch 的效果：即使用户此时
+            //    点了"停止"（本轮 turn 已被取消），记忆写入和缓存失效依然会跑完，而不是
+            //    在 finally 块里因协程已取消而被直接跳过。
+            withContext(NonCancellable) {
                 try {
                     val r1 = memoryStore.updateUserProfile("last_project", projectId, "interaction", 0.9f)
                     android.util.Log.e("NuclearBoy", "[ChatVM] memoryWrite last_project=$projectId result=$r1")
@@ -1129,7 +1123,17 @@ class ChatViewModel @Inject constructor(
 
     private fun updateAssistantMessage(id: String, transform: (ChatMessage) -> ChatMessage) {
         _messages.update { messages ->
-            messages.map { msg -> if (msg.id == id) transform(msg) else msg }
+            val lastIndex = messages.lastIndex
+            // Streaming always targets the just-created assistant placeholder, which is
+            // the last message in the list for the whole duration of a turn (no other
+            // message gets added mid-stream) — this fast path is hit on every single SSE
+            // chunk, so skip invoking transform()/comparing ids for every other message
+            // in the conversation and just patch the one slot we know changed.
+            if (lastIndex >= 0 && messages[lastIndex].id == id) {
+                messages.toMutableList().apply { this[lastIndex] = transform(this[lastIndex]) }
+            } else {
+                messages.map { msg -> if (msg.id == id) transform(msg) else msg }
+            }
         }
     }
 

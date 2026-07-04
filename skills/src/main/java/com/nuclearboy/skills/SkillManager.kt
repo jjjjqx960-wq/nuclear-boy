@@ -6,6 +6,7 @@ import com.nuclearboy.common.AppResult
 import com.nuclearboy.common.SkillInfo
 import com.nuclearboy.python.PythonResult
 import com.nuclearboy.python.PythonSandbox
+import com.nuclearboy.python.SandboxPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -353,14 +354,25 @@ class SkillManager(
 
         val (moduleName, functionName) = parseEntryPoint(skill.manifest.entryPoint)
 
+        val paramsJson = Json.encodeToString(
+            kotlinx.serialization.serializer<Map<String, String>>(),
+            params,
+        )
         val pythonScript = buildSkillRunnerScript(
             skillPath = skill.installPath,
             moduleName = moduleName,
             functionName = functionName,
-            params = params,
         )
 
-        val result = pythonSandbox.execute(pythonScript, skill.installPath)
+        // Params are passed via env var (not string-interpolated into the script)
+        // so that untrusted parameter values can't break out of the Python source
+        // and inject arbitrary code — ChaquopyPythonExecutor escapes env values safely.
+        val result = pythonSandbox.execute(
+            pythonScript,
+            skill.installPath,
+            env = mapOf("NB_SKILL_PARAMS_JSON" to paramsJson),
+            policy = buildSkillPolicy(skill),
+        )
 
         if (result.exitCode != 0) {
             android.util.Log.e("NuclearBoy", "[SkillMgr] executeSkill() error: ${skill.manifest.name} exitCode=${result.exitCode} stderr=${result.stderr}")
@@ -505,18 +517,47 @@ sys.exit(result.returncode)
         }
     }
 
+    /**
+     * Derive a [SandboxPolicy] from the skill's declared manifest permissions.
+     * A skill that only requests workspace-relative filesystem access (the
+     * default) is confined strictly to its own install directory; a skill
+     * that explicitly requests paths outside its workspace falls back to
+     * the broader `standard` policy scoped to its install dir, since the
+     * declarative glob permissions aren't translated to absolute paths here.
+     * Either way, network/shell/package permissions are always honored exactly
+     * as declared — never wider than what the skill manifest requests.
+     */
+    private fun buildSkillPolicy(skill: InstalledSkill): SandboxPolicy {
+        val perms = skill.manifest.permissions
+        val networkAllowed = perms.network?.allowed == true
+        val shellAllowed = perms.shell?.allowed == true
+        val allowedPackages = perms.packages?.allowed ?: emptyList()
+        val fsWorkspaceOnly = perms.filesystem == null ||
+            (perms.filesystem.read.all { it.startsWith("workspace") } &&
+                perms.filesystem.write.all { it.startsWith("workspace") })
+
+        return if (fsWorkspaceOnly) {
+            SandboxPolicy(
+                allowedReadPaths = listOf(skill.installPath),
+                allowedWritePaths = listOf(skill.installPath),
+                networkAllowed = networkAllowed,
+                allowedPackages = allowedPackages,
+                shellAllowed = shellAllowed,
+            )
+        } else {
+            SandboxPolicy.standard(skill.installPath).copy(
+                networkAllowed = networkAllowed,
+                allowedPackages = allowedPackages,
+                shellAllowed = shellAllowed,
+            )
+        }
+    }
+
     private fun buildSkillRunnerScript(
         skillPath: String,
         moduleName: String,
         functionName: String,
-        params: Map<String, String>,
     ): String {
-        // Build JSON manually to avoid kotlinx.serialization builtins import issues
-        val paramsJson = Json.encodeToString(
-            kotlinx.serialization.serializer<Map<String, String>>(),
-            params,
-        )
-
         return """
 import sys
 import json
@@ -530,8 +571,9 @@ if skill_dir not in sys.path:
 # Change working directory
 os.chdir(skill_dir)
 
-# Parse parameters
-params = json.loads(r'''$paramsJson''')
+# Parse parameters — passed via env var, not interpolated into source,
+# so untrusted parameter values can't break out and inject Python code
+params = json.loads(os.environ["NB_SKILL_PARAMS_JSON"])
 
 # Import and run the entry point
 import importlib

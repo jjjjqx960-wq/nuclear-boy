@@ -29,13 +29,8 @@ object AppConstants {
     /** Context warning thresholds */
     const val CONTEXT_WARNING_YELLOW = 100_000L  // ~78%
     const val CONTEXT_WARNING_RED = 120_000L     // ~94%
-    const val CONTEXT_FORCE_COMPRESS = 125_000L  // ~98%
 
-    /** Conversation limits before compression */
-    const val CONVERSATION_COMPRESS_THRESHOLD = 50_000L
     const val FILE_CONTENT_TRUNCATE_THRESHOLD = 48_000L
-    const val CRITICAL_REMAINING_TOKENS = 100_000L
-    const val EMERGENCY_REMAINING_TOKENS = 50_000L
 
     /** API retry configuration */
     const val MAX_RETRIES = 3

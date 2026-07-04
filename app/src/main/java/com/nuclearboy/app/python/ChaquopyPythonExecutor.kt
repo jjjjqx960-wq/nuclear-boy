@@ -58,12 +58,14 @@ class ChaquopyPythonExecutor : PythonExecutor {
     ): PythonResult {
         val startTime = System.currentTimeMillis()
         android.util.Log.e("NuclearBoy", "[Chaquopy] run — scriptLen=${script.length}, workingDir=$workingDir, envKeys=${env.keys}")
+        var outFile: java.io.File? = null
+        var errFile: java.io.File? = null
         return try {
             val py = Python.getInstance()
 
             // Write output to known files — most reliable approach for Chaquopy
-            val outFile = java.io.File.createTempFile("nb_out_", ".txt")
-            val errFile = java.io.File.createTempFile("nb_err_", ".txt")
+            outFile = java.io.File.createTempFile("nb_out_", ".txt")
+            errFile = java.io.File.createTempFile("nb_err_", ".txt")
             val outPath = outFile.absolutePath.replace("\\", "/")
             val errPath = errFile.absolutePath.replace("\\", "/")
 
@@ -116,6 +118,13 @@ class ChaquopyPythonExecutor : PythonExecutor {
                 appendLine("    _err_fp.close()")
                 appendLine("    sys.stdout = _old_out")
                 appendLine("    sys.stderr = _old_err")
+                // Undo any SandboxPolicy monkey-patches this run may have installed
+                // (open/subprocess/os.system/socket/requests) — this runs unconditionally
+                // so restrictions from a sandboxed skill/tool call never leak into the
+                // next script executed in this shared, long-lived Chaquopy interpreter.
+                com.nuclearboy.python.PolicyEnforcer.RESTORE_SNIPPET.lineSequence().forEach {
+                    appendLine("    $it")
+                }
             }
 
 
@@ -133,10 +142,6 @@ class ChaquopyPythonExecutor : PythonExecutor {
             val duration = System.currentTimeMillis() - startTime
             android.util.Log.e("NuclearBoy", "[Chaquopy] run — duration=${duration}ms, exitCode=$exitCode, stdoutLen=${stdout.length}, stderrLen=${stderr.length}")
 
-            // Clean up
-            try { outFile.delete() } catch (_: Exception) {}
-            try { errFile.delete() } catch (_: Exception) {}
-
             PythonResult(exitCode, stdout, stderr, duration)
         } catch (e: Exception) {
             val duration = System.currentTimeMillis() - startTime
@@ -145,6 +150,12 @@ class ChaquopyPythonExecutor : PythonExecutor {
                 e.message ?: "Chaquopy 执行错误",
                 duration,
             )
+        } finally {
+            // Always clean up temp files, even if an exception happened before the
+            // success-path cleanup would have run (e.g. Python.getInstance()/exec()
+            // throwing) — otherwise they leak into the temp dir permanently.
+            try { outFile?.delete() } catch (_: Exception) {}
+            try { errFile?.delete() } catch (_: Exception) {}
         }
     }
 

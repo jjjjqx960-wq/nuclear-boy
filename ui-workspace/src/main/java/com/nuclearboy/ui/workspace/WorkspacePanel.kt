@@ -67,9 +67,10 @@ fun WorkspacePanel(
                         Text("暂无文件", style = MaterialTheme.typography.bodyMedium)
                     }
                 } else {
+                    val modifiedSet = remember(modifiedFiles) { modifiedFiles.toSet() }
                     LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        items(files) { file ->
-                            val isModified = modifiedFiles.contains(file.path)
+                        items(files, key = { it.path }) { file ->
+                            val isModified = modifiedSet.contains(file.path)
                             Surface(
                                 onClick = { onFileClick(file) },
                                 modifier = Modifier.fillMaxWidth(),

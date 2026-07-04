@@ -8,7 +8,13 @@ import com.nuclearboy.common.AppResult
 import com.nuclearboy.common.FileChange
 import kotlinx.coroutines.*
 import java.io.File
+import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -70,6 +76,25 @@ interface PythonExecutor {
 class PythonSandbox(private val context: Context) {
 
     private val initialized = AtomicBoolean(false)
+    private val policyEnforcer = PolicyEnforcer()
+
+    // Chaquopy's run() is a plain synchronous, non-suspending call — a `withTimeout {}`
+    // wrapped directly around it can never actually preempt it, because coroutine
+    // cancellation only takes effect at suspension points, and there are none while
+    // blocked inside the native call. So a runaway script (e.g. an infinite loop) used
+    // to hang forever on whatever Dispatchers.IO thread picked it up, slowly starving
+    // that shared pool across repeated timeouts.
+    //
+    // Instead, every script runs on this dedicated single-thread executor and we wait
+    // on the resulting Future with a real, enforced timeout. If it doesn't finish in
+    // time, we abandon that thread (CPython/Chaquopy offers no safe way to force-stop
+    // a running script from another thread) and swap in a fresh executor for the next
+    // call — so a hung script leaks at most one daemon thread, instead of holding a
+    // slot in the shared Dispatchers.IO pool used by every other IO-bound operation.
+    @Volatile private var execThread: ExecutorService = newExecThread()
+
+    private fun newExecThread(): ExecutorService =
+        Executors.newSingleThreadExecutor { r -> Thread(r, "nb-python-exec").apply { isDaemon = true } }
 
     /**
      * Inject the real Python executor. Called by the app module after Hilt init.
@@ -100,31 +125,43 @@ class PythonSandbox(private val context: Context) {
         workingDir: String,
         timeoutSeconds: Long = AppConstants.PYTHON_EXECUTION_TIMEOUT_SECONDS,
         env: Map<String, String> = emptyMap(),
+        policy: SandboxPolicy? = null,
     ): PythonResult = withContext(Dispatchers.IO) {
         ensureInitialized()
         val startTime = System.currentTimeMillis()
+        val effectiveScript = if (policy != null) {
+            policyEnforcer.buildPolicyPreamble(policy) + "\n\n" + script
+        } else {
+            script
+        }
 
-        return@withContext try {
-            withTimeout(timeoutSeconds * 1000) {
-                val exec = executor
-                android.util.Log.e("NuclearBoy", "🐍 PythonSandbox: executor=${exec != null} started=${exec?.isStarted()}")
-                if (exec != null && exec.isStarted()) {
-                    val result = exec.run(script, workingDir, env)
-                    android.util.Log.e(
-                        "NuclearBoy",
-                        "🐍 PythonSandbox result: exit=${result.exitCode} stdoutLen=${result.stdout.length} stderrLen=${result.stderr.length}",
-                    )
-                    result
-                } else {
-                    PythonResult.failure(
-                        "Python 运行时未就绪。请安装 Chaquopy 插件以启用 Python 执行。",
-                        System.currentTimeMillis() - startTime,
-                    )
-                }
-            }
-        } catch (e: TimeoutCancellationException) {
+        val exec = executor
+        android.util.Log.e("NuclearBoy", "🐍 PythonSandbox: executor=${exec != null} started=${exec?.isStarted()}")
+        if (exec == null || !exec.isStarted()) {
+            return@withContext PythonResult.failure(
+                "Python 运行时未就绪。请安装 Chaquopy 插件以启用 Python 执行。",
+                System.currentTimeMillis() - startTime,
+            )
+        }
+
+        val thread = execThread
+        val future = thread.submit(Callable { exec.run(effectiveScript, workingDir, env) })
+        try {
+            val result = future.get(timeoutSeconds, TimeUnit.SECONDS)
+            android.util.Log.e(
+                "NuclearBoy",
+                "🐍 PythonSandbox result: exit=${result.exitCode} stdoutLen=${result.stdout.length} stderrLen=${result.stderr.length}",
+            )
+            result
+        } catch (e: TimeoutException) {
+            execThread = newExecThread() // abandon the stuck thread; don't reuse it
             PythonResult.failure(
                 "Python 执行超时 (${timeoutSeconds}秒)",
+                System.currentTimeMillis() - startTime,
+            )
+        } catch (e: ExecutionException) {
+            PythonResult.failure(
+                e.cause?.message ?: e.message ?: "未知 Python 错误",
                 System.currentTimeMillis() - startTime,
             )
         } catch (e: Exception) {
