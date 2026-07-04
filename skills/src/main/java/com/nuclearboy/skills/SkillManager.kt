@@ -357,7 +357,7 @@ class SkillManager(
             params = params,
         )
 
-        val result = pythonSandbox.execute(pythonScript, "")
+        val result = pythonSandbox.execute(pythonScript, skill.installPath)
 
         if (result.exitCode != 0) {
             android.util.Log.e("NuclearBoy", "[SkillMgr] executeSkill() error: ${skill.manifest.name} exitCode=${result.exitCode} stderr=${result.stderr}")
