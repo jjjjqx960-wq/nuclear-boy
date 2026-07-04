@@ -795,7 +795,7 @@ else:
                     val approved = PermissionPromptBus.requestApproval(
                         taskId = "pc_write_file",
                         toolName = "电脑写文件",
-                        inputSummary = "$action $path（${content.toByteArray().size} 字节）",
+                        inputSummary = "$action $path（${content.length} 字符）",
                     )
                     if (!approved) {
                         ToolResult.failure("用户拒绝了写入电脑文件 $path")
