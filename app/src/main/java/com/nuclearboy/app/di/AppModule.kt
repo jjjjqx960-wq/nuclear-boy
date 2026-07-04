@@ -305,7 +305,6 @@ object AppModule {
                 ),
                 executor = { params ->
                     val path = params["path"] ?: params["filePath"] ?: params["filename"] ?: return@ToolDefinition ToolResult(false, error = "缺少 path 参数。如 path=\"README.md\"")
-                    android.util.Log.e("NuclearBoy", "[DI] read_file — path=$path")
                     when (val result = kotlinx.coroutines.runBlocking { fileOps.readFile(path) }) {
                         is AppResult.Success -> {
                             val outLen = result.data.content?.length ?: 0
@@ -333,7 +332,6 @@ object AppModule {
                 executor = { params ->
                     val path = params["path"] ?: return@ToolDefinition ToolResult(false, error = "缺少 path 参数")
                     val content = params["content"] ?: return@ToolDefinition ToolResult(false, error = "缺少 content 参数")
-                    android.util.Log.e("NuclearBoy", "[DI] write_file — path=$path, contentLen=${content.length}")
                     when (val result = kotlinx.coroutines.runBlocking { fileOps.writeFile(path, content) }) {
                         is AppResult.Success -> {
                             // 检查文件写入前是否已存在，区分 CREATED vs MODIFIED
@@ -360,7 +358,6 @@ object AppModule {
                 ),
                 executor = { params ->
                     val path = params["path"] ?: "."
-                    android.util.Log.e("NuclearBoy", "[DI] list_directory — path=$path")
                     when (val result = kotlinx.coroutines.runBlocking { fileOps.listDirectory(path) }) {
                         is AppResult.Success -> {
                             val listing = result.data.joinToString("\n") { f ->
@@ -385,7 +382,6 @@ object AppModule {
                 ),
                 executor = { params ->
                     val query = params["path"] ?: params["query"] ?: return@ToolDefinition ToolResult(false, error = "缺少 path 参数。示例：path=\"README\"")
-                    android.util.Log.e("NuclearBoy", "[DI] search_files — query=$query")
                     when (val result = kotlinx.coroutines.runBlocking { fileOps.searchFiles(query) }) {
                         is AppResult.Success -> {
                             // 只输出文件名（不含绝对路径），避免设备内部路径暴露给模型造成混淆
@@ -410,7 +406,6 @@ object AppModule {
                 executor = { params ->
                     val name = params["name"] ?: params["path"] ?: params["projectName"] ?: return@ToolDefinition ToolResult(false, error = "缺少 name 参数。请提供项目名称，如 name=\"my-project\"")
                     val techStack = params["tech_stack"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
-                    android.util.Log.e("NuclearBoy", "[DI] create_project — name=$name, techStack=$techStack")
                     when (val result = kotlinx.coroutines.runBlocking { fileOps.createProject(name, techStack) }) {
                         is AppResult.Success -> {
                             android.util.Log.e("NuclearBoy", "[DI] create_project SUCCESS — id=${result.data.id}, name=${result.data.name}")
