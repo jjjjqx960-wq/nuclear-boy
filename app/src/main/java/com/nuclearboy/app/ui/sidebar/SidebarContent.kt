@@ -46,8 +46,6 @@ fun SidebarContent(
     var projectToRename by remember { mutableStateOf<Pair<String, String>?>(null) }
     var renameText by remember { mutableStateOf("") }
 
-    android.util.Log.e("NuclearBoy", "[Sidebar] SidebarContent composed projects=${projects.size} currentId=$currentProjectId activeSkills=${activeSkills.size}")
-
     ModalDrawerSheet(
         modifier = Modifier.width(280.dp),
         drawerContainerColor = Color(0xFF0D0F12),
