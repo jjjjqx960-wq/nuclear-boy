@@ -66,7 +66,6 @@ class ChaquopyPythonExecutor : PythonExecutor {
             val errFile = java.io.File.createTempFile("nb_err_", ".txt")
             val outPath = outFile.absolutePath.replace("\\", "/")
             val errPath = errFile.absolutePath.replace("\\", "/")
-            android.util.Log.e("NuclearBoy", "[Chaquopy] run — temp outFile=$outPath, errFile=$errPath")
 
             val wrappedScript = buildString {
                 appendLine("import sys, os, traceback")
@@ -119,7 +118,6 @@ class ChaquopyPythonExecutor : PythonExecutor {
                 appendLine("    sys.stderr = _old_err")
             }
 
-            android.util.Log.e("NuclearBoy", "[Chaquopy] run — wrappedScript size=${wrappedScript.length} chars")
 
             val locals = builtins().callAttr("dict")
             locals.callAttr("__setitem__", "__name__", "__main__")  // Fix: exec() runs as __main__
@@ -138,7 +136,6 @@ class ChaquopyPythonExecutor : PythonExecutor {
             // Clean up
             try { outFile.delete() } catch (_: Exception) {}
             try { errFile.delete() } catch (_: Exception) {}
-            android.util.Log.e("NuclearBoy", "[Chaquopy] run — cleaned up temp files")
 
             PythonResult(exitCode, stdout, stderr, duration)
         } catch (e: Exception) {
