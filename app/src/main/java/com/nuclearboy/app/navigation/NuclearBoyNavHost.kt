@@ -52,7 +52,6 @@ fun NuclearBoyNavHost(
     ) {
         // ── Splash ────────────────────────────────────────
         composable(NavRoutes.SPLASH) {
-            android.util.Log.e("NuclearBoy", "[NavHost] route=SPLASH")
             SplashScreen(
                 onComplete = {
                     navController.navigate(NavRoutes.chatRoute("__general__")) {
@@ -72,7 +71,6 @@ fun NuclearBoyNavHost(
         ) { backStackEntry ->
             val projectId = backStackEntry.arguments?.getString("projectId") ?: return@composable
             val initialMessage = backStackEntry.arguments?.getString("initialMessage") ?: ""
-            android.util.Log.e("NuclearBoy", "[NavHost] route=CHAT projectId=$projectId")
             val ctx = androidx.compose.ui.platform.LocalContext.current
 
             ChatScreen(
@@ -81,7 +79,6 @@ fun NuclearBoyNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onMenuClick = onMenuClick,
                 onNotification = { msg, project ->
-                    android.util.Log.e("NuclearBoy", "[NavHost] notification msg='$msg' project=$project")
                     when (msg) {
                         "thinking" -> com.nuclearboy.app.service.AgentForegroundService.start(ctx, project)
                         "stop" -> com.nuclearboy.app.service.AgentForegroundService.stop(ctx)
@@ -92,7 +89,6 @@ fun NuclearBoyNavHost(
         }
 
         composable(NavRoutes.SETTINGS) {
-            android.util.Log.e("NuclearBoy", "[NavHost] route=SETTINGS")
             com.nuclearboy.app.ui.settings.SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onMenuClick = onMenuClick,
@@ -103,7 +99,6 @@ fun NuclearBoyNavHost(
 
         // ── 远程终端 ──────────────────────────────────────
         composable(NavRoutes.TERMINAL) {
-            android.util.Log.e("NuclearBoy", "[NavHost] route=TERMINAL")
             com.nuclearboy.app.ui.terminal.TerminalScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
@@ -111,14 +106,12 @@ fun NuclearBoyNavHost(
 
         // ── API Key Tutorial ──────────────────────────────
         composable(NavRoutes.TUTORIAL) {
-            android.util.Log.e("NuclearBoy", "[NavHost] route=TUTORIAL")
             TutorialScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
         composable(NavRoutes.SKILL_MANAGER) {
-            android.util.Log.e("NuclearBoy", "[NavHost] route=SKILL_MANAGER")
             com.nuclearboy.app.ui.skills.SkillManagerPanel(
                 skillManager = projectViewModel.skillManager,
                 onNavigateBack = { navController.popBackStack() },
@@ -126,7 +119,6 @@ fun NuclearBoyNavHost(
         }
 
         composable(NavRoutes.ONBOARDING) {
-            android.util.Log.e("NuclearBoy", "[NavHost] route=ONBOARDING")
             val settingsViewModel: com.nuclearboy.app.ui.settings.SettingsViewModel = hiltViewModel()
             com.nuclearboy.app.ui.onboarding.OnboardingScreen(
                 apiKeyManager = settingsViewModel.apiKeyManager,

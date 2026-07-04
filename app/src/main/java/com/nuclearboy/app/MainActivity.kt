@@ -107,12 +107,10 @@ private fun NuclearBoyMainScreen() {
 
     // Log drawer state changes
     LaunchedEffect(drawerState.isOpen) {
-        android.util.Log.e("NuclearBoy", "[MainActivity] Drawer ${if (drawerState.isOpen) "OPENED" else "CLOSED"}")
     }
 
     // Log navigation events
     LaunchedEffect(currentRoute, currentProjectId) {
-        android.util.Log.e("NuclearBoy", "[MainActivity] Navigation — route=$currentRoute, projectId=$currentProjectId")
     }
 
     // Back handler: close drawer first, then normal back
