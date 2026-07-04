@@ -227,7 +227,15 @@ class ToolRegistry {
      */
     suspend fun execute(name: String, parameters: Map<String, String>): AppResult<ToolResult> {
         val tool = mutex.withLock { tools[name] }
+        return executeResolved(tool, name, parameters)
+    }
 
+    /** Shared by [execute]/[executeSafe] so a resolved [ToolDefinition] is never looked up twice. */
+    private suspend fun executeResolved(
+        tool: ToolDefinition?,
+        name: String,
+        parameters: Map<String, String>,
+    ): AppResult<ToolResult> {
         if (tool == null) {
             // Try external modules
             return executeViaExternalModule(name, parameters)
@@ -246,7 +254,7 @@ class ToolRegistry {
     suspend fun executeSafe(name: String, parameters: Map<String, String>): ToolResult {
         val startTime = System.currentTimeMillis()
         val toolDef = mutex.withLock { tools[name] }
-        val result = when (val execResult = execute(name, parameters)) {
+        val result = when (val execResult = executeResolved(toolDef, name, parameters)) {
             is AppResult.Success -> execResult.data
             is AppResult.Failure -> {
                 val paramHint = toolDef?.parameters?.filter { it.required }

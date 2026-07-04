@@ -306,6 +306,7 @@ class ChatViewModel @Inject constructor(
                 if (toolEvidenceMessage == null) current + userMessage else current + userMessage + toolEvidenceMessage
             }
             addSystemMessage("需要配置 DeepSeek API Key 才能开始\n\n请到右上角「设置」输入你的 Key（sk-v4- 开头），保存后即可使用。\n如果你用的是自建模型服务，也可以在设置里开启「第三方模型」")
+            saveMessages()
             return ""
         }
 
@@ -449,12 +450,14 @@ class ChatViewModel @Inject constructor(
         val lastUser = lastUserMessage ?: return
         // Use update so we never silently drop a streamed chunk that arrived between
         // the snapshot copy and the assignment (finding 2).
+        // sendMessage() below always appends a *fresh* user message, so the old one at
+        // lastUserIndex must be dropped too (not kept) — otherwise retry duplicates the
+        // user bubble. This also fixes the case where the user message is already the
+        // last message (e.g. its assistant reply was deleted): previously that left the
+        // list untouched and retry just appended a second, identical user message.
         _messages.update { currentMessages ->
             val lastUserIndex = currentMessages.indexOfLast { it.id == lastUser.id }
-            if (lastUserIndex >= 0 && lastUserIndex < currentMessages.lastIndex)
-                currentMessages.subList(0, lastUserIndex + 1)
-            else
-                currentMessages
+            if (lastUserIndex >= 0) currentMessages.subList(0, lastUserIndex) else currentMessages
         }
         sendMessage(lastUser.content)
     }
@@ -472,6 +475,11 @@ class ChatViewModel @Inject constructor(
         _streamingState.value = null
         currentThinkingId = null
         currentAssistantMsgId = null
+        if (wasActive) {
+            // 用户主动取消：前台服务此前一直靠 finalizeProcessing() 里的"ready"通知才会被
+            // 更新，取消掉的这一轮永远不会走到那里，服务会以"AI 正在思考…"卡住不停止。
+            notificationCallback?.invoke("stop", currentProjectId)
+        }
     }
 
     fun clearConversation() {
@@ -625,10 +633,12 @@ class ChatViewModel @Inject constructor(
         }
         val tokens = args.split(Regex("\\s+"), limit = 2)
         val explicitCount = tokens[0].toIntOrNull()
-        val (maxIterations, task) = if (explicitCount != null && tokens.size > 1) {
-            explicitCount.coerceIn(1, LOOP_MAX_ITERATIONS) to tokens[1].trim()
-        } else {
-            LOOP_DEFAULT_ITERATIONS to args
+        val (maxIterations, task) = when {
+            explicitCount != null && tokens.size > 1 -> explicitCount.coerceIn(1, LOOP_MAX_ITERATIONS) to tokens[1].trim()
+            // args 整体就是一个裸数字、没有任务描述（例如命令栏模板 "/loop 5 " 被原样发送）——
+            // 不能把这个数字当成任务文本，否则会开始一个以"5"为目标的循环。
+            explicitCount != null -> LOOP_DEFAULT_ITERATIONS to ""
+            else -> LOOP_DEFAULT_ITERATIONS to args
         }
         if (task.isBlank()) {
             addSystemMessage("循环任务描述不能为空。用法：/loop [轮数] <任务描述>")
@@ -654,8 +664,16 @@ class ChatViewModel @Inject constructor(
                             "若目标已完全达成，在回复末尾单独一行输出 $LOOP_DONE_MARKER"
                     }
                     val reply = executeTurn(prompt, clearAgentJobOnFinalize = false)
+                    // executeTurn() 把 lastUserMessage 设成了本轮实际发送的内部续跑 prompt
+                    // （"继续推进目标：...若目标已完全达成..." 这段脚手架文本，不是用户输入）。
+                    // 改回原始 /loop 任务描述——只改内容，id 不变，不影响 retryLastMessage()
+                    // 按 id 定位可视消息的逻辑——这样循环结束后点"重新生成"，重发的是任务本身。
+                    lastUserMessage = lastUserMessage?.copy(content = task)
                     if (reply.contains(LOOP_DONE_MARKER)) {
                         completed = true
+                        // 模型按提示词要求把标记单独输出在最后一行，这只是给循环逻辑看的内部
+                        // 信号，不应该原样出现在用户可见的聊天气泡/persisted历史里。
+                        stripLoopDoneMarkerFromLastAssistantMessage()
                         addSystemMessage("✅ 循环结束：目标已达成（共 $i 轮）")
                         break
                     }
@@ -674,6 +692,22 @@ class ChatViewModel @Inject constructor(
                 _isProcessing.value = false
             }
         }
+    }
+
+    /** 去掉最后一条 assistant 消息里独占一行的 [LOOP_DONE_MARKER]（/loop 内部完成信号），不应展示给用户。 */
+    private fun stripLoopDoneMarkerFromLastAssistantMessage() {
+        _messages.update { messages ->
+            val lastIndex = messages.indexOfLast { it.role == MessageRole.ASSISTANT }
+            if (lastIndex < 0) return@update messages
+            val msg = messages[lastIndex]
+            val cleaned = msg.content.lines()
+                .filterNot { it.trim() == LOOP_DONE_MARKER }
+                .joinToString("\n")
+                .trimEnd()
+            if (cleaned == msg.content) messages
+            else messages.toMutableList().apply { this[lastIndex] = msg.copy(content = cleaned) }
+        }
+        saveMessages()
     }
 
     /** /compact：用 Flash 模型把对话历史压缩成摘要，替换原始消息，释放上下文 */
@@ -1085,6 +1119,10 @@ class ChatViewModel @Inject constructor(
         android.util.Log.e("NuclearBoy", "[ChatVM] finalizeProcessing() notificationSent=$notificationSent lastAssistantRole=${lastAssistant?.role}")
         if (lastAssistant != null && lastAssistant.content.isNotBlank()) {
             notificationCallback?.invoke(lastAssistant.content, currentProjectId)
+        } else {
+            // 回复为空（网络/工具错误等）：没有内容可以展示"已就绪"通知，但前台服务不能就此晾着——
+            // 之前这里什么都不做，"thinking" 状态的常驻通知会一直卡在通知栏，服务也不会停止。
+            notificationCallback?.invoke("stop", currentProjectId)
         }
         saveMessages()
         // 自动提取记忆：从本次对话中学习用户偏好和项目信息

@@ -35,14 +35,23 @@ class AgentForegroundService : Service() {
         createChannel()
         val notification = buildNotification(projectName, action)
         try {
-            ServiceCompat.startForeground(
-                this, NOTIFICATION_ID, notification,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0
-            )
-            android.util.Log.e("NuclearBoy", "[FGService] onStartCommand — foreground started, action=$action")
+            if (action == "ready") {
+                // 回复已就绪：不再需要前台服务身份——把通知留在通知栏（DETACH 让它脱离前台服务
+                // 生命周期继续显示），服务本身随即停止。之前这里也会调用 startForeground()，
+                // 导致每轮对话答完后服务仍以前台服务身份常驻，一直到进程被系统杀掉。
+                stopForeground(STOP_FOREGROUND_DETACH)
+                (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, notification)
+                stopSelf()
+            } else {
+                ServiceCompat.startForeground(
+                    this, NOTIFICATION_ID, notification,
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0
+                )
+            }
+            android.util.Log.e("NuclearBoy", "[FGService] onStartCommand — handled action=$action")
         } catch (e: Exception) {
-            android.util.Log.e("NuclearBoy", "[FGService] onStartCommand — startForeground FAILED: ${e.message}")
+            android.util.Log.e("NuclearBoy", "[FGService] onStartCommand — FAILED: ${e.message}")
             stopSelf()
             return START_NOT_STICKY
         }

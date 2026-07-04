@@ -39,7 +39,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -391,38 +393,37 @@ fun ChatScreen(
                 }
             }
         },
-        bottomBar = {
-            ChatInputBar(
-                text = inputDraft,
-                onTextChange = { inputDraft = it },
-                isProcessing = isProcessing,
-                onSend = { text -> viewModel.sendMessage(text) },
-                onCancel = { viewModel.cancelCurrentOperation() },
-                fileCount = viewModel.projectFiles.collectAsState().value.size,
-                hasMessages = messages.any { it.role != MessageRole.SYSTEM },
-                focusRequest = inputFocusRequest,
-                placeholder = if (projectId == "__general__") "和核弹男孩对话…" else "输入指令…",
-                showToolActionDraftHint = true,
-                onAttachFile = {
-                    android.util.Log.e("NuclearBoy", "[ChatScreen] filePicker launched")
-                    filePickerLauncher.launch(arrayOf("*/*"))
-                },
-            )
-        },
     ) { paddingValues ->
-        if (messages.isEmpty()) {
-            EmptyChatView(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
-                onSuggestionClick = { text -> viewModel.sendMessage(text) },
-            )
-        } else {
-            Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(1.dp),
-                ) {
+        // 输入栏不再放进 Scaffold 的 bottomBar：bottomBar 自带 imePadding()，Scaffold 会把它的
+        // 实时测量高度（键盘动画每一帧都在变）转成 paddingValues 喂给 content，逼着下面的消息
+        // LazyColumn 在键盘弹出的每一帧都重新 measure/relayout —— 这就是键盘"一点点往上挤"而不是
+        // 一次性弹出的卡顿根因。改成把输入栏当成悬浮在消息列表上方的 Box overlay，只有它自己响应
+        // imePadding 动画；列表用输入栏"去掉ime贡献后的静止高度"来留白，这个值只在输入栏自身内容
+        // （命令栏/多行文本/提示条）变化时才更新，不会随键盘动画逐帧刷新。
+        // inputBarRestHeightPx only changes when the input bar's own static content changes
+        // (command bar visibility, text wrapping to more lines, hint bar) — reading it here
+        // does NOT subscribe this whole (expensive) content scope to per-frame ime updates;
+        // that subscription is isolated inside ImeAwareInputBarSlot below.
+        var inputBarRestHeightPx by remember { mutableIntStateOf(0) }
+        val inputBarRestHeight = with(LocalDensity.current) { inputBarRestHeightPx.toDp() }
+
+        // 用完整的 paddingValues（不只是 top）：bottomBar 已经不在 Scaffold 里了，
+        // 这里的 bottom 只是 Scaffold 兜底的静态安全区（导航栏），不会随键盘动画变化，
+        // 但 start/end 仍然需要，横屏下侧边有挖孔/手势区的机型才不会把内容画到下面。
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            if (messages.isEmpty()) {
+                EmptyChatView(
+                    modifier = Modifier.fillMaxSize().padding(bottom = inputBarRestHeight),
+                    onSuggestionClick = { text -> viewModel.sendMessage(text) },
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(top = 8.dp, bottom = inputBarRestHeight + 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(1.dp),
+                    ) {
                     // General Agent 欢迎卡片
                     if (projectId == "__general__" && messages.isEmpty()) {
                         item {
@@ -484,7 +485,30 @@ fun ChatScreen(
                             }
                         }
                     },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = inputBarRestHeight + 12.dp),
+                )
+            }
+            }
+
+            ImeAwareInputBarSlot(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                onRestHeightMeasured = { inputBarRestHeightPx = it },
+            ) {
+                ChatInputBar(
+                    text = inputDraft,
+                    onTextChange = { inputDraft = it },
+                    isProcessing = isProcessing,
+                    onSend = { text -> viewModel.sendMessage(text) },
+                    onCancel = { viewModel.cancelCurrentOperation() },
+                    fileCount = viewModel.projectFiles.collectAsState().value.size,
+                    hasMessages = messages.any { it.role != MessageRole.SYSTEM },
+                    focusRequest = inputFocusRequest,
+                    placeholder = if (projectId == "__general__") "和核弹男孩对话…" else "输入指令…",
+                    showToolActionDraftHint = true,
+                    onAttachFile = {
+                        android.util.Log.e("NuclearBoy", "[ChatScreen] filePicker launched")
+                        filePickerLauncher.launch(arrayOf("*/*"))
+                    },
                 )
             }
         }
@@ -1341,6 +1365,32 @@ private fun TypingPrompt(text: String, color: Color) {
         text = "$display${if (visibleChars > text.length) "_" else ""}",
         fontSize = 13.sp, fontFamily = FontFamily.Monospace, color = color.copy(alpha = 0.8f),
     )
+}
+
+/**
+ * Wraps the input bar and reports its "resting" height (i.e. with the IME's own
+ * contribution subtracted out) via [onRestHeightMeasured].
+ *
+ * Isolated into its own composable so that subscribing to [WindowInsets.ime] (which
+ * changes on every frame of the keyboard show/hide animation) only forces *this small
+ * wrapper* to recompose each frame — not the much larger screen content around it
+ * (message list, etc.), which only needs the rare, settled rest-height value.
+ */
+@Composable
+private fun ImeAwareInputBarSlot(
+    modifier: Modifier = Modifier,
+    onRestHeightMeasured: (Int) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val imeBottomPx = WindowInsets.ime.getBottom(LocalDensity.current)
+    Box(
+        modifier = modifier.onGloballyPositioned { coords ->
+            val restHeight = coords.size.height - imeBottomPx
+            if (restHeight > 0) onRestHeightMeasured(restHeight)
+        },
+    ) {
+        content()
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════

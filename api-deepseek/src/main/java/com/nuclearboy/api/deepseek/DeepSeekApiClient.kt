@@ -150,7 +150,7 @@ class DeepSeekApiClient(
                 android.util.Log.e("NuclearBoy", "[ApiClient] HTTP ${response.code} contentLen=${response.body?.contentLength()}")
                 if (!response.isSuccessful) {
                     val body = response.body?.string() ?: ""
-                    android.util.Log.e("NuclearBoy", "API: ERROR body=$body")
+                    android.util.Log.e("NuclearBoy", "API: ERROR body=${sanitizeProviderBody(body)}")
                     val errorResponse = try {
                         json.decodeFromString<DeepSeekErrorResponse>(body)
                     } catch (_: Exception) { null }
