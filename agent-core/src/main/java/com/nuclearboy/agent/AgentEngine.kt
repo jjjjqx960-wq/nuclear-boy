@@ -114,7 +114,6 @@ private class ToolCallAccumulator {
                     )
                 )
             }
-        android.util.Log.e("NuclearBoy", "[Accumulator] toCompletedCalls() partialCount=${partialCalls.size} completedCount=${completed.size} calls=${completed.map { "${it.function.name}(argsLen=${it.function.arguments.length})" }}")
         return completed
     }
 
