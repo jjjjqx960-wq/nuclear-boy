@@ -221,7 +221,6 @@ object AppModule {
 
         registry.pythonExecutor = { _, params ->
             val scriptCode = params["path"] ?: params["script"]
-            android.util.Log.e("NuclearBoy", "[DI] pythonExecutor called — scriptLen=${scriptCode?.length ?: 0}, workingDir=${params["workingDir"]}, keys=${params.keys}")
             if (scriptCode == null) ToolResult(false, "", error = "缺少 path 参数。示例：path=\"print('hello')\"")
             else {
                 val wd = params["workingDir"]?.takeIf { it != "." } ?: fileOperations.projectRoot().absolutePath
@@ -232,7 +231,6 @@ object AppModule {
         }
 
         registry.skillsExecutor = { name, params ->
-            android.util.Log.e("NuclearBoy", "[DI] skillsExecutor called — skillName=$name, paramKeys=${params.keys}")
             when (val r = skillManager.executeSkill(name, params)) {
                 is AppResult.Success -> {
                     val output = r.data.stdout.ifBlank { "OK" }
@@ -554,7 +552,6 @@ else:
                 val r = runBlocking { sandbox.execute(script, ".") }
                 val out = r.stdout.trim()
                 val resultCount = out.lines().count { it.isNotBlank() }
-                android.util.Log.e("NuclearBoy", "[DI] web_search result — resultCount=$resultCount, stderrLen=${r.stderr.length}")
                 if (out.isNotBlank() && !out.startsWith("#no_results")) ToolResult(true, output = out.take(5000), error = r.stderr.ifBlank { null })
                 else {
                     android.util.Log.e("NuclearBoy", "[DI] web_search NO RESULTS — stderr=${r.stderr.take(200)}")
@@ -568,7 +565,6 @@ else:
                 if (!url.startsWith("http://") && !url.startsWith("https://")) {
                     return@ToolDefinition ToolResult(false, error = "URL 必须以 http:// 或 https:// 开头，收到: ${url.take(80)}")
                 }
-                android.util.Log.e("NuclearBoy", "[DI] web_fetch — url=$url")
                 try {
                     val req = okhttp3.Request.Builder().url(url)
                         .header("User-Agent", "Mozilla/5.0 NUCLEAR-BOY/1.0").build()
