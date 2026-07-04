@@ -182,6 +182,10 @@ class ChatViewModel @Inject constructor(
     override fun onCleared() {
         android.util.Log.e("NuclearBoy", "[ChatVM] onCleared() ViewModel cleanup")
         super.onCleared()
+        // 若销毁时还挂着一个未回答的权限弹窗，必须保守拒绝，否则等待这个 decision 的
+        // 远程电脑任务协程会永久挂起（viewModelScope 里的收集器已随 onCleared 取消）。
+        _permissionPrompt.value?.decision?.complete(false)
+        _permissionPrompt.value = null
         skillManager.unloadProjectSkills()
     }
 
@@ -229,7 +233,15 @@ class ChatViewModel @Inject constructor(
             dir.mkdirs()
             val data = memoryJson.encodeToString(serializer(), _messages.value.takeLast(MAX_PERSISTED_MESSAGES))
             val file = java.io.File(dir, "conversation.json")
-            file.writeText(data)
+            // 原子写：先写临时文件再 rename，避免进程在 writeText 中途被杀导致 conversation.json
+            // 被截断——那样 loadPersistedMessages 解码会抛异常、整段历史被当成空全丢。
+            val tmp = java.io.File(dir, "conversation.json.tmp")
+            tmp.writeText(data)
+            if (!tmp.renameTo(file)) {
+                // 极少数文件系统 rename 覆盖失败：退回直接覆盖，至少不比原来差
+                file.writeText(data)
+                tmp.delete()
+            }
             android.util.Log.e("NuclearBoy", "[ChatVM] saveMessages() saved to ${file.absolutePath}")
         } catch (e: Exception) {
             android.util.Log.e("NuclearBoy", "[ChatVM] saveMessages() error: ${e.message}", e)
@@ -426,6 +438,9 @@ class ChatViewModel @Inject constructor(
         // Use update to avoid dropping a streamed chunk that arrived between prepareEdit
         // and the list assignment (finding 3).
         _messages.update { result.remaining }
+        // The edited message (and everything after it) is gone — recompute lastUserMessage
+        // so a later "重新生成" doesn't resend the now-removed message's content.
+        lastUserMessage = result.remaining.findLast { it.role == MessageRole.USER }
         saveMessages()
         return result.content
     }
@@ -438,6 +453,11 @@ class ChatViewModel @Inject constructor(
             val deleted = messageEditMutex.withLock {
                 if (_isProcessing.value) return@withLock false
                 _messages.update { com.nuclearboy.common.ChatEditing.removeMessage(it, messageId) }
+                // If the deleted message was the tracked lastUserMessage, repoint it at the
+                // new last user message so "重新生成" won't resurrect the deleted content.
+                if (lastUserMessage?.id == messageId) {
+                    lastUserMessage = _messages.value.findLast { it.role == MessageRole.USER }
+                }
                 true
             }
             if (deleted) saveMessages()
