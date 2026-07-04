@@ -99,7 +99,7 @@ private class ToolCallAccumulator {
             delta.function?.name?.let { builder.name = it }
             delta.function?.arguments?.let { builder.arguments.append(it) }
         }
-        android.util.Log.e("NuclearBoy", "[Accumulator] feed() deltas=${deltas?.size ?: 0} partialCalls=${partialCalls.size} keys=[${partialCalls.keys.joinToString()}] ids=[${partialCalls.values.map { it.id }}] names=[${partialCalls.values.map { it.name }}] argsLen=[${partialCalls.values.map { it.arguments.length }}]")
+        // 热路径：每个SSE delta都调用，不打逐次日志，只在 100 次时打里程碑
     }
 
     fun toCompletedCalls(): List<ToolCallDto> {
