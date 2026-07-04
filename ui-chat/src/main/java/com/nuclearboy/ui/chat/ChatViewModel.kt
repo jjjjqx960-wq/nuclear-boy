@@ -175,6 +175,7 @@ class ChatViewModel @Inject constructor(
         sessionGoal = loadSessionGoal(projectId)
         // 每次切换都重新加载消息
         val loaded = try { loadPersistedMessages(projectId) }
+            catch (e: Exception) { android.util.Log.e("NuclearBoy", "[ChatVM] 加载历史失败: ${e.message}"); emptyList() }
         android.util.Log.e("NuclearBoy", "[ChatVM] setProject() messagesLoaded=${loaded.size} root=${root.absolutePath}")
         _messages.value = loaded
         // 恢复最后一条用户消息，否则切换项目后直接点"重新生成"会因 lastUserMessage 为 null 失效
