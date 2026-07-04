@@ -392,7 +392,6 @@ class AgentEngine(
                             )
                             break
                         }
-                        android.util.Log.e("NuclearBoy", "[AgentEngine] run() executing ${toolCalls.size} tool calls: ${toolCalls.map { it.function.name }}")
                         // Add the assistant message with tool calls to history
                         val assistantMsg = MessageDto(
                             role = "assistant",
