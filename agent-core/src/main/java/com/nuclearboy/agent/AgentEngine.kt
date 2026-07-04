@@ -253,16 +253,13 @@ class AgentEngine(
 
         // 4. Attach file contents if present
         val fileContents = buildFileContextStrings(projectContext.currentFiles)
-        android.util.Log.e("NuclearBoy", "[AgentEngine] run() fileContents length=${fileContents.length} chars, empty=${fileContents.isEmpty()}")
         if (fileContents.isNotEmpty()) {
-            // Append file context to the user message
             val lastUserMsg = messages.last()
             messages[messages.lastIndex] = lastUserMsg.copy(
                 content = (lastUserMsg.content ?: "") + "\n\n" + fileContents
             )
         }
 
-        // Update context allocations
         val historyTokens = historyDtos.sumOf {
             ((it.content?.length ?: 0) + (it.reasoningContent?.length ?: 0)) / 3L
         }
@@ -271,12 +268,9 @@ class AgentEngine(
             conversationHistory = historyTokens.coerceAtMost(AppConstants.BUDGET_CONVERSATION_HISTORY),
         )
 
-        android.util.Log.e("NuclearBoy", "[AgentEngine] run() messagesAssembled total=${messages.size} system=1 history=${historyDtos.size} user=1 historyTokens=$historyTokens userTokens=$userTokens contextUsed=${contextManager.budget.value.totalUsed}")
-
         // ── Main Tool-Use Loop ───────────────────────────
-        // 工具定义在单次 run 内不变，循环外取一次即可（原先每轮都持锁重建 JSON schema，浪费）
         val toolDefs = toolRegistry.toDeepSeekToolDefinitions()
-        android.util.Log.e("NuclearBoy", "[AgentEngine] run() toolDefs count=${toolDefs.size} names=${toolDefs.map { it.function.name }}")
+        android.util.Log.e("NuclearBoy", "[AgentEngine] run() assembled msgs=${messages.size}(hist=${historyDtos.size}) fileBytes=${fileContents.length} histTok=$historyTokens tools=${toolDefs.size}")
 
         var iteration = 0
         var finalResponse: ChatMessage? = null
