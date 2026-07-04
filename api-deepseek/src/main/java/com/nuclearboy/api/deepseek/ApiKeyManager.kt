@@ -239,8 +239,9 @@ class ApiKeyManager(context: Context) {
 
     fun deleteCustomModel(modelId: String) {
         val models = loadCustomModels().filterNot { it.id == modelId }
-        val wasActive = getActiveModelId() == modelId
-        val nextActive = if (wasActive) OFFICIAL_MODEL_ID else getActiveModelId()
+        val currentActiveId = prefs.getString(KEY_ACTIVE_MODEL_ID, null)
+        val wasActive = currentActiveId == modelId
+        val nextActive = if (wasActive) OFFICIAL_MODEL_ID else currentActiveId ?: OFFICIAL_MODEL_ID
         prefs.edit()
             .putString(KEY_CUSTOM_MODELS_JSON, json.encodeToString(models))
             .putString(KEY_ACTIVE_MODEL_ID, nextActive)
