@@ -152,7 +152,6 @@ class ToolRegistry {
     suspend fun getTool(name: String): ToolDefinition? {
         mutex.withLock {
             val tool = tools[name]
-            android.util.Log.e("NuclearBoy", "[ToolReg] getTool() toolName=$name found=${tool != null}")
             return tool
         }
     }
