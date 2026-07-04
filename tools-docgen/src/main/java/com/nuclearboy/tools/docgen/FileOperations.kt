@@ -30,6 +30,10 @@ class FileOperations(
     /** Current project subdirectory, set when a project is opened. */
     @Volatile var currentProjectDir: String = ""
 
+    // 项目名清理：只编译一次，sanitizeProjectName 每次创建/重命名项目都会调用
+    private val invalidProjectNameCharsRegex = Regex("""[<>:"/\\|?*\x00-\x1f]""")
+    private val projectNameWhitespaceRegex   = Regex("""\s+""")
+
     init {
         android.util.Log.e("NuclearBoy", "[FileOps] init() workspaceRoot=${workspaceRoot.absolutePath}")
         workspaceRoot.mkdirs()
@@ -445,8 +449,8 @@ class FileOperations(
 
     private fun sanitizeProjectName(name: String): String {
         val result = name.trim()
-            .replace(Regex("""[<>:"/\\|?*\x00-\x1f]"""), "")
-            .replace(Regex("""\s+"""), "-")
+            .replace(invalidProjectNameCharsRegex, "")
+            .replace(projectNameWhitespaceRegex, "-")
             .take(100)
             .ifEmpty { "untitled-project" }
         android.util.Log.e("NuclearBoy", "[FileOps] sanitizeProjectName() input='$name' output='$result'")
