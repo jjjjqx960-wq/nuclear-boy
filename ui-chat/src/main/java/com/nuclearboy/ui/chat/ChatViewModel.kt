@@ -224,7 +224,7 @@ class ChatViewModel @Inject constructor(
             // 直接用 workspaceRoot + projectId 构建路径，不依赖 currentProjectDir
             val dir = java.io.File(fileOperations.getWorkspaceRoot(), "$pid/.agent")
             dir.mkdirs()
-            val data = Json.encodeToString(serializer(), _messages.value.takeLast(MAX_PERSISTED_MESSAGES))
+            val data = memoryJson.encodeToString(serializer(), _messages.value.takeLast(MAX_PERSISTED_MESSAGES))
             val file = java.io.File(dir, "conversation.json")
             file.writeText(data)
             android.util.Log.e("NuclearBoy", "[ChatVM] saveMessages() saved to ${file.absolutePath}")
