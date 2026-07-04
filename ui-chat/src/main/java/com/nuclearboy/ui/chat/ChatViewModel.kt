@@ -64,14 +64,24 @@ class ChatViewModel @Inject constructor(
     private val appSettings: com.nuclearboy.common.AppSettingsStore,
 ) : ViewModel() {
 
-    // 从记忆加载用户画像
-    private suspend fun loadUserProfile(): UserProfile {
+    // 用户画像内存缓存：exportUserProfile 每次都查Room DB，每轮对话缓存一次
+    // remember 工具写入新记忆后 autoExtractMemories 会更新 DB，下轮会重新加载
+    @Volatile private var cachedUserProfile: com.nuclearboy.common.UserProfile? = null
+
+    // 从记忆加载用户画像（优先内存缓存）
+    private suspend fun loadUserProfile(): com.nuclearboy.common.UserProfile {
+        cachedUserProfile?.let { return it }
         val result = memoryStore.exportUserProfile()
-        return when (result) {
+        val profile = when (result) {
             is AppResult.Success -> result.data
-            is AppResult.Failure -> UserProfile()
+            is AppResult.Failure -> com.nuclearboy.common.UserProfile()
         }
+        cachedUserProfile = profile
+        return profile
     }
+
+    /** 让缓存失效，使下次 loadUserProfile 重新从 DB 读取（记忆更新后调用）。 */
+    private fun invalidateUserProfileCache() { cachedUserProfile = null }
 
     /** Set by NavHost to enable background notifications */
     var notificationCallback: ((String, String?) -> Unit)? = null
@@ -1098,6 +1108,8 @@ class ChatViewModel @Inject constructor(
                     android.util.Log.e("NuclearBoy", "[ChatVM] memoryWrite total_conversations=$convCount result=$r2")
                     val r3 = memoryStore.autoExtractMemories(projectId, lastUser, lastAi)
                     android.util.Log.e("NuclearBoy", "[ChatVM] memoryWrite autoExtractMemories result=$r3")
+                    // 记忆已更新，使用户画像缓存失效，下次对话重新从 DB 加载
+                    invalidateUserProfileCache()
                 } catch (e: Exception) {
                     android.util.Log.e("NuclearBoy", "[ChatVM] memoryWrite FAILED: ${e.message}", e)
                 }
