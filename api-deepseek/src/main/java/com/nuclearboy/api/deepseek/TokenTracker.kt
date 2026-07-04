@@ -63,7 +63,6 @@ class TokenTracker {
         startTimeMs = System.currentTimeMillis()
         lastUpdateTimeMs = startTimeMs
         tokensInCurrentStream = 0
-        android.util.Log.e("NuclearBoy", "[TokenTracker] startRequest() modelTier=$modelTier thinkingMode=$thinkingMode promptTokens=$promptTokens")
 
         _snapshot.update { current ->
             current.copy(
@@ -84,7 +83,6 @@ class TokenTracker {
         tokensInCurrentStream++
         if (tokensInCurrentStream % 100 == 0L) {
             val tps = (1000.0 * tokensInCurrentStream / (now - startTimeMs + 1))
-            android.util.Log.e("NuclearBoy", "[TokenTracker] onStreamToken() milestone token=$tokensInCurrentStream isReasoning=$isReasoning tps=${"%.1f".format(tps)}")
         }
 
         // 每 10 个 token 才触发一次 StateFlow 更新，避免流式阶段全量重组（~20-60次/秒 → ~3-6次/秒）
@@ -113,7 +111,6 @@ class TokenTracker {
         val speed = if (latencyMs > 0) (totalTokens * 1000.0 / latencyMs) else 0.0
         val cachedTokens = usage.promptTokensDetails?.cachedTokens ?: 0
         val hitRate = if (usage.promptTokens > 0) cachedTokens * 100.0 / usage.promptTokens else 0.0
-        android.util.Log.e("NuclearBoy", "缓存: ${cachedTokens}/${usage.promptTokens} = ${hitRate.toInt()}%")
         val reasoningTokens = usage.completionTokensDetails?.reasoningTokens ?: 0
         val cost = calculateCost(
             modelTier = _snapshot.value.modelTier,
