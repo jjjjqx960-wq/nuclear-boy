@@ -325,7 +325,6 @@ fun SidebarContent(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = {
                         if (newProjectName.isNotBlank()) {
-                            android.util.Log.e("NuclearBoy", "[Sidebar] createProject name='${newProjectName.trim()}' (keyboard done)")
                             onCreateProject(newProjectName.trim())
                             newProjectName = ""
                             showCreateDialog = false
@@ -337,7 +336,6 @@ fun SidebarContent(
                 TextButton(
                     onClick = {
                         if (newProjectName.isNotBlank()) {
-                            android.util.Log.e("NuclearBoy", "[Sidebar] createProject name='${newProjectName.trim()}' (button click)")
                             onCreateProject(newProjectName.trim())
                             newProjectName = ""
                             showCreateDialog = false
