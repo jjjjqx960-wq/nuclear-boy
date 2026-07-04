@@ -57,6 +57,9 @@ class SkillManager(
         encodeDefaults = true
     }
 
+    // YAML 解析：折叠块内容的空白合并只编译一次
+    private val yamlFoldedWhitespaceRegex = Regex("\\s+")
+
     init {
         android.util.Log.e("NuclearBoy", "[SkillMgr] init() skillsDir=${skillsDir.absolutePath}")
         scope.launch {
@@ -650,7 +653,7 @@ if result is not None:
                     }
                     val content = if (isFolded) {
                         // Folded: join with spaces, collapse whitespace
-                        blockLines.joinToString(" ").replace(Regex("\\s+"), " ").trim()
+                        blockLines.joinToString(" ").replace(yamlFoldedWhitespaceRegex, " ").trim()
                     } else {
                         // Literal: join with newlines preserving line breaks
                         blockLines.joinToString("\n")
