@@ -418,10 +418,12 @@ class ApiKeyManager(context: Context) {
 
     fun getActiveModelId(): String =
         prefs.getString(KEY_ACTIVE_MODEL_ID, null)
-            ?: if (prefs.getBoolean(KEY_CUSTOM_ENABLED, false) && loadCustomModels().isNotEmpty()) {
-                loadCustomModels().first().id
-            } else {
-                OFFICIAL_MODEL_ID
+            ?: run {
+                val customs = loadCustomModels()
+                if (prefs.getBoolean(KEY_CUSTOM_ENABLED, false) && customs.isNotEmpty())
+                    customs.first().id
+                else
+                    OFFICIAL_MODEL_ID
             }
 
     private fun getActiveCustomModel(): CustomModelRecord? {
