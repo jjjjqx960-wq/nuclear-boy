@@ -51,7 +51,10 @@ class DiagnosticsReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_RUN_DIAGNOSTICS = "com.nuclearboy.app.RUN_DIAGNOSTICS"
 
+        // 只编译一次，避免每次诊断都重建 Regex 实例
+        private val skKeyRedactRegex = Regex("sk-[A-Za-z0-9_-]{6,}")
+
         private fun redactSecretDetail(detail: String): String =
-            detail.replace(Regex("sk-[A-Za-z0-9_-]{6,}"), "sk-<REDACTED>")
+            skKeyRedactRegex.replace(detail, "sk-<REDACTED>")
     }
 }

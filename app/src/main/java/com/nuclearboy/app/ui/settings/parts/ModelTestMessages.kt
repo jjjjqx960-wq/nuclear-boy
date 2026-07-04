@@ -518,9 +518,13 @@ private fun DiagnosticsCopyItem.statusLabel(): String =
 
 private fun redactModelTestSecrets(raw: String): String = redactSettingsCopySecrets(raw)
 
+// 只编译一次，避免每次拷贝设置信息都重建 Regex
+private val bearerTokenRedactRegex = Regex("Bearer\\s+[A-Za-z0-9._~+/=-]+", RegexOption.IGNORE_CASE)
+private val skKeyRedactRegex2 = Regex("sk-[A-Za-z0-9_-]{6,}")
+
 private fun redactSettingsCopySecrets(raw: String): String =
-    raw.replace(Regex("Bearer\\s+[A-Za-z0-9._~+/=-]+", RegexOption.IGNORE_CASE), "Bearer <REDACTED_TOKEN>")
-        .replace(Regex("sk-[A-Za-z0-9_-]{6,}"), "sk-<REDACTED_TOKEN>")
+    bearerTokenRedactRegex.replace(raw, "Bearer <REDACTED_TOKEN>")
+        .let { skKeyRedactRegex2.replace(it, "sk-<REDACTED_TOKEN>") }
 
 private fun String.shellSingleQuoted(): String = "'${replace("'", "'\\''")}'"
 
