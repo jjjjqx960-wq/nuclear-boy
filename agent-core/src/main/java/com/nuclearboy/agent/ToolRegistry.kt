@@ -245,14 +245,11 @@ class ToolRegistry {
      * tool execution — failures are encoded as ToolResult(success=false).
      */
     suspend fun executeSafe(name: String, parameters: Map<String, String>): ToolResult {
-        android.util.Log.e("NuclearBoy", "[ToolReg] executeSafe() toolName=$name paramsKeys=${parameters.keys}")
         val startTime = System.currentTimeMillis()
         val toolDef = mutex.withLock { tools[name] }
-        android.util.Log.e("NuclearBoy", "[ToolReg] executeSafe() toolFound=${toolDef != null}")
         val result = when (val execResult = execute(name, parameters)) {
             is AppResult.Success -> execResult.data
             is AppResult.Failure -> {
-                // Append parameter hints so the model can correct itself
                 val paramHint = toolDef?.parameters?.filter { it.required }
                     ?.joinToString(", ") { "${it.name} (${it.type})" }
                 val errorMsg = if (paramHint != null) {
@@ -264,7 +261,7 @@ class ToolRegistry {
             }
         }
         val duration = System.currentTimeMillis() - startTime
-        android.util.Log.e("NuclearBoy", "[ToolReg] executeSafe() result: success=${result.success} outputLen=${result.output.length} duration=${duration}ms errorLen=${result.error?.length ?: 0}")
+        android.util.Log.e("NuclearBoy", "[ToolReg] executeSafe() $name: success=${result.success} dur=${duration}ms")
         return result
     }
 
